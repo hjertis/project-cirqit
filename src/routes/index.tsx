@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import Dashboard from '../pages/Dashboard';
 import OrdersPage from '../pages/Orders';
+import ImportOrdersPage from '../pages/ImportOrdersPage';
 import Login from '../pages/auth/Login';
 import Signup from '../pages/auth/SignUp';
 import ProtectedRoute from './ProtectedRoute';
@@ -26,6 +27,7 @@ const AppRoutes = () => {
         {/* Orders module */}
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/create" element={<div>Create Order Page</div>} />
+        <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/:id" element={<div>Order Details Page</div>} />
         
         {/* Products module */}

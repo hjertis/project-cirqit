@@ -10,15 +10,16 @@ import {
   InputAdornment,
   Button,
   Chip,
-  Divider,
   LinearProgress
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Add as AddIcon,
   FilterList as FilterListIcon,
-  GetApp as GetAppIcon
+  GetApp as GetAppIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import RecentOrdersTable from '../components/dashboard/RecentOrdersTable';
 
 interface TabPanelProps {
@@ -75,32 +76,41 @@ const OrdersPage = () => {
     }, 2000);
   };
 
+  const navigate = useNavigate();
+
+const handleImportClick = () => {
+  navigate('/orders/import');
+};
+
   return (
     <Box>
       {/* Page Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Orders
-        </Typography>
-        <Box>
-          <Button
-            variant="outlined"
-            startIcon={<GetAppIcon />}
-            onClick={handleExport}
-            disabled={isLoading}
-            sx={{ mr: 2 }}
-          >
-            Export
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleNewOrder}
-          >
-            New Order
-          </Button>
-        </Box>
-      </Box>
+      <Box>
+  <Button
+    variant="outlined"
+    startIcon={<GetAppIcon />}
+    onClick={handleExport}
+    disabled={isLoading}
+    sx={{ mr: 2 }}
+  >
+    Export
+  </Button>
+  <Button
+    variant="outlined"
+    startIcon={<CloudUploadIcon />}
+    onClick={handleImportClick}
+    sx={{ mr: 2 }}
+  >
+    Import
+  </Button>
+  <Button
+    variant="contained"
+    startIcon={<AddIcon />}
+    onClick={handleNewOrder}
+  >
+    New Order
+  </Button>
+</Box>
       
       {isLoading && <LinearProgress sx={{ mb: 2 }} />}
       
