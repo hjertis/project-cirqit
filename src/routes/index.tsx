@@ -4,8 +4,10 @@ import Layout from "../components/layout/Layout";
 import Dashboard from "../pages/Dashboard";
 import OrdersPage from "../pages/Orders";
 import ImportOrdersPage from "../pages/ImportOrdersPage";
+import CreateOrderPage from "../pages/CreateOrderPage";
+import EditOrderPage from "../pages/EditOrderPage";
 import Login from "../pages/auth/Login";
-import Signup from "../pages/auth/SignUp";
+import Signup from "../pages/auth/Signup";
 import OrderDetails from "../components/orders/OrderDetails";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -27,10 +29,10 @@ const AppRoutes = () => {
 
         {/* Orders module */}
         <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/orders/create" element={<div>Create Order Page</div>} />
+        <Route path="/orders/create" element={<CreateOrderPage />} />
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
-        <Route path="/orders/:id/edit" element={<div>Edit Order Page</div>} />
+        <Route path="/orders/:id/edit" element={<EditOrderPage />} />
 
         {/* Products module */}
         <Route path="/products" element={<div>Products Page</div>} />
