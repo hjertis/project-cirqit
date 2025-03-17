@@ -4,6 +4,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { NavigateNext as NavigateNextIcon } from '@mui/icons-material';
 import { useState } from 'react';
 import OrderPlanningGantt from '../components/orders/OrderPlanningGantt';
+import OrderWorkflowTimeline from '../components/orders/OrderWorkflowTimeline';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -55,21 +56,17 @@ const OrderPlanningPage = () => {
       {/* Planning Tabs */}
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="planning tabs">
+          <Tab label="Workflow Timeline" />
           <Tab label="Gantt Chart" />
-          <Tab label="Calendar View" />
           <Tab label="Resource Allocation" />
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
-          <OrderPlanningGantt />
+          <OrderWorkflowTimeline />
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ p: 2 }}>
-            <Typography variant="h6" color="text.secondary" align="center">
-              Calendar View Coming Soon
-            </Typography>
-          </Box>
+          <OrderPlanningGantt />
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
