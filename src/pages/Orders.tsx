@@ -29,6 +29,7 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
+  Snackbar,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -45,6 +46,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
+import { doc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { db } from "../config/firebase";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -96,6 +99,10 @@ const OrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
   // Get the initial filter based on the tab
   const getFilterForTab = (tabIndex: number): OrderFilter => {
@@ -212,29 +219,82 @@ const OrdersPage = () => {
 
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
-    setSelectedOrder(null);
+    // Don't reset selectedOrder here
   };
-
   const handleDeleteClick = () => {
+    // Store the selected order before closing the menu
+    setOrderToDelete(selectedOrder);
     handleMenuClose();
     setConfirmDeleteOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    // In a real app, you would call a delete API here
-    console.log(`Deleting order ${selectedOrder}`);
-    setConfirmDeleteOpen(false);
-    setSelectedOrder(null);
+  const handleConfirmDelete = async () => {
+    console.log("Starting delete process for order:", orderToDelete);
 
-    // For demo purposes, let's just show an alert
-    setTimeout(() => {
-      alert(`Order ${selectedOrder} has been deleted`);
-    }, 500);
+    if (!orderToDelete) {
+      console.log("No order selected, cancelling delete");
+      setConfirmDeleteOpen(false);
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+
+      // 1. Delete all processes associated with this order
+      console.log("Finding processes for order:", orderToDelete);
+      const processesQuery = query(
+        collection(db, "processes"),
+        where("workOrderId", "==", orderToDelete)
+      );
+
+      const processesSnapshot = await getDocs(processesQuery);
+      console.log(`Found ${processesSnapshot.size} processes to delete`);
+
+      // Use a batch for efficient deletion of multiple documents
+      const batch = writeBatch(db);
+
+      processesSnapshot.forEach(doc => {
+        console.log("Adding process to delete batch:", doc.id);
+        batch.delete(doc.ref);
+      });
+
+      // 2. Delete the order document itself
+      console.log("Adding order to delete batch:", orderToDelete);
+      const orderRef = doc(db, "orders", orderToDelete);
+      batch.delete(orderRef);
+
+      // Commit all the delete operations
+      console.log("Committing batch delete");
+      await batch.commit();
+      console.log("Batch delete committed successfully");
+
+      // Show success message
+      setSuccessMessage(`Order ${orderToDelete} has been deleted successfully`);
+      setSnackbarOpen(true);
+
+      // Close the dialog
+      setConfirmDeleteOpen(false);
+      setOrderToDelete(null); // Clear the order to delete
+      setSelectedOrder(null); // Also clear the selectedOrder
+
+      // Refresh the orders list
+      console.log("Refreshing orders list");
+      await refreshOrders();
+      console.log("Orders list refreshed");
+    } catch (err) {
+      console.error("Error in delete process:", err);
+      setSuccessMessage(
+        `Failed to delete order: ${err instanceof Error ? err.message : String(err)}`
+      );
+      setSnackbarOpen(true);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleCancelDelete = () => {
     setConfirmDeleteOpen(false);
-    setSelectedOrder(null);
+    setOrderToDelete(null); // Clear the order to delete
   };
 
   const handleRemoveFilter = (filterToRemove: string) => {
@@ -400,15 +460,20 @@ const OrdersPage = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete order {selectedOrder}? This action cannot be undone.
+            Are you sure you want to delete order {orderToDelete}? This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelDelete} variant="outlined">
             Cancel
           </Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error">
-            Delete
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -528,6 +593,17 @@ const OrdersPage = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={() => setSnackbarOpen(false)}
+          message={successMessage || error}
+          ContentProps={{
+            sx: {
+              backgroundColor: error ? "error.main" : "success.main",
+            },
+          }}
+        />
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
