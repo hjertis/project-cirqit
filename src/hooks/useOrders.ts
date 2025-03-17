@@ -50,7 +50,7 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
     setError(null);
 
     try {
-      console.log("Fetching orders with filter:", filter);
+      /* console.log("Fetching orders with filter:", filter); */
       let ordersQuery;
 
       // For debugging - fetch all orders without filtering first
@@ -71,14 +71,14 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
         );
       }
 
-      console.log("Executing Firestore query");
+      /* console.log("Executing Firestore query"); */
       const querySnapshot = await getDocs(ordersQuery);
-      console.log(`Query returned ${querySnapshot.docs.length} results`);
+      /* console.log(`Query returned ${querySnapshot.docs.length} results`); */
 
       const fetchedOrders: FirebaseOrder[] = [];
       querySnapshot.forEach(doc => {
         const data = doc.data();
-        console.log(`Order ${doc.id} status: ${data.status}`);
+        /* console.log(`Order ${doc.id} status: ${data.status}`); */
         fetchedOrders.push({
           id: doc.id,
           ...data,
@@ -89,9 +89,9 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
 
       // Client-side filtering if needed for complex cases
       if (filter && filter.status && filter.status.length > 0) {
-        console.log(`Filtering client-side for status: ${filter.status.join(", ")}`);
+        /* console.log(`Filtering client-side for status: ${filter.status.join(", ")}`); */
         const filteredOrders = fetchedOrders.filter(order => filter.status!.includes(order.status));
-        console.log(`Client-side filtering returned ${filteredOrders.length} results`);
+        /* console.log(`Client-side filtering returned ${filteredOrders.length} results`); */
         setOrders(filteredOrders);
       }
     } catch (err) {
@@ -110,7 +110,7 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
 
   // Function to update filters
   const updateFilter = useCallback((newFilter: OrderFilter) => {
-    console.log("Updating filter to:", newFilter);
+    /* console.log("Updating filter to:", newFilter); */
     setFilter(newFilter);
   }, []);
 

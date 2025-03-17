@@ -20,6 +20,7 @@ import NotificationsPanel from "../components/dashboard/NotificationsPanel";
 import UpcomingTasks from "../components/dashboard/UpcomingTasks";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { Link as RouterLink } from "react-router-dom";
+import OrderDetailsDialog from "../components/orders/OrderDetailsDialog";
 import {
   Inventory as InventoryIcon,
   Timeline as TimelineIcon,
@@ -54,6 +55,8 @@ function TabPanel(props: TabPanelProps) {
 const Dashboard = () => {
   const [tabValue, setTabValue] = useState(0);
   const { stats, refreshStats, lastUpdatedString, isLoading } = useDashboardData();
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   const handleTabChange = (event: SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -158,7 +161,18 @@ const Dashboard = () => {
           </Button>
         </Box>
         <Divider sx={{ mb: 2 }} />
-        <RecentOrdersTable maxItems={5} />
+        <RecentOrdersTable
+          maxItems={5}
+          onViewOrder={orderId => {
+            setSelectedOrderId(orderId);
+            setDetailsDialogOpen(true);
+          }}
+        />
+        <OrderDetailsDialog
+          open={detailsDialogOpen}
+          onClose={() => setDetailsDialogOpen(false)}
+          orderId={selectedOrderId}
+        />
       </Paper>
 
       {/* Additional Dashboard Components */}

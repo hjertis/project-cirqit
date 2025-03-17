@@ -39,9 +39,10 @@ const getStatusColor = (status: string) => {
 
 interface RecentOrdersTableProps {
   maxItems?: number;
+  onViewOrder?: (orderId: string) => void;
 }
 
-export default function RecentOrdersTable({ maxItems = 5 }: RecentOrdersTableProps) {
+export default function RecentOrdersTable({ maxItems = 5, onViewOrder }: RecentOrdersTableProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(maxItems);
   const { orders, loading, error, formatDate } = useOrders();
@@ -57,7 +58,13 @@ export default function RecentOrdersTable({ maxItems = 5 }: RecentOrdersTablePro
   };
 
   const handleViewOrder = (orderId: string) => {
-    navigate(`/orders/${orderId}`);
+    if (onViewOrder) {
+      // Use callback if provided
+      onViewOrder(orderId);
+    } else {
+      // Fall back to navigation if no callback
+      navigate(`/orders/${orderId}`);
+    }
   };
 
   const handleEditOrder = (orderId: string) => {

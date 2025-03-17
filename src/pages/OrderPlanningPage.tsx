@@ -5,6 +5,7 @@ import { NavigateNext as NavigateNextIcon } from '@mui/icons-material';
 import { useState } from 'react';
 import OrderPlanningGantt from '../components/orders/OrderPlanningGantt';
 import OrderWorkflowTimeline from '../components/orders/OrderWorkflowTimeline';
+import SimplifiedGanttChart from '../components/orders/SimplifiedGanttChart';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -57,8 +58,8 @@ const OrderPlanningPage = () => {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="planning tabs">
           <Tab label="Workflow Timeline" />
-          <Tab label="Gantt Chart" />
-          <Tab label="Resource Allocation" />
+          <Tab label="Timeline View" />
+          <Tab label="Detailed Gantt" />
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
@@ -66,15 +67,11 @@ const OrderPlanningPage = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <OrderPlanningGantt />
+          <SimplifiedGanttChart />
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
-          <Box sx={{ p: 2 }}>
-            <Typography variant="h6" color="text.secondary" align="center">
-              Resource Allocation View Coming Soon
-            </Typography>
-          </Box>
+          <OrderPlanningGantt />
         </TabPanel>
       </Paper>
     </Box>

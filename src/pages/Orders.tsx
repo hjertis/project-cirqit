@@ -43,11 +43,12 @@ import {
   MoreVert as MoreVertIcon,
   Refresh as RefreshIcon,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
 import { doc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../config/firebase";
+import OrderDetailsDialog from "../components/orders/OrderDetailsDialog";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -103,6 +104,8 @@ const OrdersPage = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   // Get the initial filter based on the tab
   const getFilterForTab = (tabIndex: number): OrderFilter => {
@@ -121,6 +124,7 @@ const OrdersPage = () => {
   // Use our orders hook with the initial filter
   const { orders, loading, error, updateFilter, formatDate, refreshOrders } = useOrders();
 
+  const location = useLocation();
   const navigate = useNavigate();
 
   // Update filter when tab changes
@@ -205,9 +209,9 @@ const OrdersPage = () => {
   };
 
   const handleViewOrder = (orderId: string) => {
-    navigate(`/orders/${orderId}`);
+    setSelectedOrderId(orderId);
+    setDetailsDialogOpen(true);
   };
-
   const handleEditOrder = (orderId: string) => {
     navigate(`/orders/${orderId}/edit`);
   };
@@ -305,6 +309,18 @@ const OrdersPage = () => {
       setActiveFilters(activeFilters.filter(f => f !== filterToRemove));
     }
   };
+
+  useEffect(() => {
+
+    // Check if we navigated here from a redirect with state
+    if (location.state && location.state.openOrderDetails) {
+      setSelectedOrderId(location.state.orderId);
+      setDetailsDialogOpen(true);
+      
+      // Clear the state to prevent dialog reopening on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   return (
     <Box>
@@ -603,6 +619,11 @@ const OrdersPage = () => {
               backgroundColor: error ? "error.main" : "success.main",
             },
           }}
+        />
+        <OrderDetailsDialog
+          open={detailsDialogOpen}
+          onClose={() => setDetailsDialogOpen(false)}
+          orderId={selectedOrderId}
         />
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
