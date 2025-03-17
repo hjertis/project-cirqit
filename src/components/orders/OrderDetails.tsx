@@ -22,6 +22,16 @@ import {
   IconButton,
   Tabs,
   Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Snackbar,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -31,8 +41,9 @@ import {
   Assignment as AssignmentIcon,
   AccessTime as AccessTimeIcon,
   LocalShipping as LocalShippingIcon,
+  Person as PersonIcon,
 } from "@mui/icons-material";
-import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 
 interface TabPanelProps {
@@ -86,6 +97,19 @@ interface Process {
   progress: number;
 }
 
+// Available resources for assignment
+const availableResources = [
+  "John Doe",
+  "Jane Smith",
+  "Mike Johnson",
+  "Sarah Williams",
+  "Robert Brown",
+  "Emma Davis",
+];
+
+// Status options for processes
+const processStatusOptions = ["Not Started", "Pending", "In Progress", "Completed", "Delayed"];
+
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Open":
@@ -114,6 +138,22 @@ const OrderDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  
+  // State for resource assignment modal
+  const [assignResourceOpen, setAssignResourceOpen] = useState(false);
+  const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
+  const [selectedResource, setSelectedResource] = useState<string>("");
+  const [assignLoading, setAssignLoading] = useState(false);
+  
+  // State for status update modal
+  const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [statusNotes, setStatusNotes] = useState<string>("");
+  const [updateLoading, setUpdateLoading] = useState(false);
+  
+  // State for success message
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -197,6 +237,121 @@ const OrderDetails = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+  
+  // Handle opening the resource assignment modal
+  const handleAssignResourceClick = () => {
+    setAssignResourceOpen(true);
+  };
+  
+  // Handle resource selection in the modal
+  const handleResourceSelect = (processId: string, resource: string) => {
+    setSelectedProcess(processes.find(p => p.id === processId) || null);
+    setSelectedResource(resource);
+  };
+  
+  // Handle saving the resource assignment
+  const handleSaveAssignment = async () => {
+    if (!selectedProcess || !selectedResource) return;
+    
+    setAssignLoading(true);
+    
+    try {
+      // Update the process document in Firestore
+      const processRef = doc(db, "processes", selectedProcess.id);
+      await updateDoc(processRef, {
+        assignedResource: selectedResource,
+        updated: Timestamp.fromDate(new Date())
+      });
+      
+      // Update the local state
+      setProcesses(processes.map(process => 
+        process.id === selectedProcess.id 
+          ? { ...process, assignedResource: selectedResource } 
+          : process
+      ));
+      
+      // Show success message
+      setSuccessMessage(`Resource ${selectedResource} assigned to process ${selectedProcess.name}`);
+      setSnackbarOpen(true);
+      
+      // Close the modal
+      setAssignResourceOpen(false);
+      setSelectedProcess(null);
+      setSelectedResource("");
+    } catch (err) {
+      console.error("Error assigning resource:", err);
+      setError(`Failed to assign resource: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+  
+  // Handle opening the status update modal
+  const handleUpdateStatusClick = () => {
+    setUpdateStatusOpen(true);
+  };
+  
+  // Handle status selection in the modal
+  const handleStatusSelect = (processId: string, status: string) => {
+    setSelectedProcess(processes.find(p => p.id === processId) || null);
+    setSelectedStatus(status);
+  };
+  
+  // Handle saving the status update
+  const handleSaveStatus = async () => {
+    if (!selectedProcess || !selectedStatus) return;
+    
+    setUpdateLoading(true);
+    
+    try {
+      // Update the process document in Firestore
+      const processRef = doc(db, "processes", selectedProcess.id);
+      
+      const updates: Record<string, any> = {
+        status: selectedStatus,
+        updated: Timestamp.fromDate(new Date())
+      };
+      
+      // If moving to completed, set progress to 100%
+      if (selectedStatus === 'Completed') {
+        updates.progress = 100;
+      } 
+      // If moving to In Progress from an earlier state, set progress to a default value
+      else if (selectedStatus === 'In Progress' && 
+               (selectedProcess.status === 'Not Started' || selectedProcess.status === 'Pending')) {
+        updates.progress = 25;
+      }
+      
+      await updateDoc(processRef, updates);
+      
+      // Update the local state
+      setProcesses(processes.map(process => 
+        process.id === selectedProcess.id 
+          ? { ...process, status: selectedStatus, ...(updates.progress ? { progress: updates.progress } : {}) } 
+          : process
+      ));
+      
+      // Show success message
+      setSuccessMessage(`Status updated to ${selectedStatus} for process ${selectedProcess.name}`);
+      setSnackbarOpen(true);
+      
+      // Close the modal
+      setUpdateStatusOpen(false);
+      setSelectedProcess(null);
+      setSelectedStatus("");
+      setStatusNotes("");
+    } catch (err) {
+      console.error("Error updating status:", err);
+      setError(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+  
+  // Handle closing the snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   if (loading) {
@@ -428,10 +583,20 @@ const OrderDetails = () => {
           </TableContainer>
           {processes.length > 0 && (
             <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
-              <Button variant="outlined" startIcon={<AssignmentIcon />} sx={{ mr: 1 }}>
+              <Button 
+                variant="outlined" 
+                startIcon={<AssignmentIcon />} 
+                sx={{ mr: 1 }}
+                onClick={handleAssignResourceClick}
+              >
                 Assign Resources
               </Button>
-              <Button variant="outlined" color="success" startIcon={<LocalShippingIcon />}>
+              <Button 
+                variant="outlined" 
+                color="success" 
+                startIcon={<LocalShippingIcon />}
+                onClick={handleUpdateStatusClick}
+              >
                 Update Status
               </Button>
             </Box>
@@ -499,6 +664,160 @@ const OrderDetails = () => {
           </Box>
         </TabPanel>
       </Paper>
+      
+      {/* Resource Assignment Dialog */}
+      <Dialog open={assignResourceOpen} onClose={() => setAssignResourceOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Assign Resources</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 3 }}>
+            Select a process and assign a resource to it
+          </Typography>
+          
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel id="process-select-label">Process</InputLabel>
+            <Select
+              labelId="process-select-label"
+              id="process-select"
+              value={selectedProcess?.id || ""}
+              label="Process"
+              onChange={(e) => {
+                const processId = e.target.value as string;
+                const process = processes.find(p => p.id === processId);
+                setSelectedProcess(process || null);
+                // Pre-select current resource if any
+                if (process && process.assignedResource) {
+                  setSelectedResource(process.assignedResource);
+                } else {
+                  setSelectedResource("");
+                }
+              }}
+            >
+              {processes.map((process) => (
+                <MenuItem key={process.id} value={process.id}>
+                  {process.sequence}. {process.name} ({process.type})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          {selectedProcess && (
+            <FormControl fullWidth>
+              <InputLabel id="resource-select-label">Resource</InputLabel>
+              <Select
+                labelId="resource-select-label"
+                id="resource-select"
+                value={selectedResource}
+                label="Resource"
+                onChange={(e) => setSelectedResource(e.target.value)}
+                startAdornment={selectedResource ? <PersonIcon sx={{ ml: 1, mr: 0.5 }} /> : null}
+              >
+                {availableResources.map((resource) => (
+                  <MenuItem key={resource} value={resource}>
+                    {resource}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignResourceOpen(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSaveAssignment}
+            disabled={!selectedProcess || !selectedResource || assignLoading}
+          >
+            {assignLoading ? "Saving..." : "Assign"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Status Update Dialog */}
+      <Dialog open={updateStatusOpen} onClose={() => setUpdateStatusOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Update Process Status</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 3 }}>
+            Select a process and update its status
+          </Typography>
+          
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel id="process-status-select-label">Process</InputLabel>
+            <Select
+              labelId="process-status-select-label"
+              id="process-status-select"
+              value={selectedProcess?.id || ""}
+              label="Process"
+              onChange={(e) => {
+                const processId = e.target.value as string;
+                const process = processes.find(p => p.id === processId);
+                setSelectedProcess(process || null);
+                // Pre-select current status
+                if (process) {
+                  setSelectedStatus(process.status);
+                } else {
+                  setSelectedStatus("");
+                }
+              }}
+            >
+              {processes.map((process) => (
+                <MenuItem key={process.id} value={process.id}>
+                  {process.sequence}. {process.name} ({process.type})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          {selectedProcess && (
+            <>
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel id="status-select-label">Status</InputLabel>
+                <Select
+                  labelId="status-select-label"
+                  id="status-select"
+                  value={selectedStatus}
+                  label="Status"
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                >
+                  {processStatusOptions.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      {status}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <TextField
+                fullWidth
+                label="Notes (Optional)"
+                multiline
+                rows={3}
+                value={statusNotes}
+                onChange={(e) => setStatusNotes(e.target.value)}
+                placeholder="Add any notes about this status change"
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUpdateStatusOpen(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSaveStatus}
+            disabled={!selectedProcess || !selectedStatus || updateLoading}
+            color="primary"
+          >
+            {updateLoading ? "Updating..." : "Update Status"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Success Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={successMessage}
+      />
     </Box>
   );
 };

@@ -6,6 +6,7 @@ import OrdersPage from "../pages/Orders";
 import ImportOrdersPage from "../pages/ImportOrdersPage";
 import CreateOrderPage from "../pages/CreateOrderPage";
 import EditOrderPage from "../pages/EditOrderPage";
+import OrderPlanningPage from "../pages/OrderPlanningPage";
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
 import OrderDetails from "../components/orders/OrderDetails";
@@ -31,6 +32,7 @@ const AppRoutes = () => {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/create" element={<CreateOrderPage />} />
         <Route path="/orders/import" element={<ImportOrdersPage />} />
+        <Route path="/orders/planning" element={<OrderPlanningPage />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/orders/:id/edit" element={<EditOrderPage />} />
 
