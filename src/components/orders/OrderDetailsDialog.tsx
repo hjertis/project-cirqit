@@ -26,15 +26,19 @@ import {
   Tab,
   useTheme,
   useMediaQuery,
+  Snackbar,
 } from "@mui/material";
 import {
   Close as CloseIcon,
   Edit as EditIcon,
   AccessTime as AccessTimeIcon,
+  Archive as ArchiveIcon,
+  Unarchive as UnarchiveIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
+import { archiveOrder, restoreOrder } from "../../services/orderService";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -129,6 +133,8 @@ const OrderDetailsDialog = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveResult, setArchiveResult] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -239,6 +245,74 @@ const OrderDetailsDialog = ({
         </Box>
       );
     }
+
+    const handleArchiveOrder = async () => {
+      if (!order) return;
+
+      // Show a confirmation dialog
+      const confirm = window.confirm(
+        `Are you sure you want to archive order ${order.orderNumber}? This will move it to the archive collection.`
+      );
+
+      if (!confirm) return;
+
+      setIsArchiving(true);
+      setArchiveResult(null);
+
+      try {
+        const result = await archiveOrder(order.id);
+
+        if (result.success) {
+          setArchiveResult(`Successfully archived: ${result.message}`);
+          // Redirect to the orders list after a short delay
+          setTimeout(() => {
+            navigate("/orders");
+          }, 2000);
+        } else {
+          setArchiveResult(`Failed to archive: ${result.message}`);
+        }
+      } catch (error) {
+        setArchiveResult(
+          `Error archiving order: ${error instanceof Error ? error.message : String(error)}`
+        );
+      } finally {
+        setIsArchiving(false);
+      }
+    };
+
+    const handleRestoreOrder = async () => {
+      if (!order) return;
+
+      // Show a confirmation dialog
+      const confirm = window.confirm(
+        `Are you sure you want to restore order ${order.orderNumber} from the archive? This will move it back to active orders.`
+      );
+
+      if (!confirm) return;
+
+      setIsArchiving(true);
+      setArchiveResult(null);
+
+      try {
+        const result = await restoreOrder(order.id);
+
+        if (result.success) {
+          setArchiveResult(`Successfully restored: ${result.message}`);
+          // Redirect to the orders list after a short delay
+          setTimeout(() => {
+            navigate("/orders");
+          }, 2000);
+        } else {
+          setArchiveResult(`Failed to restore: ${result.message}`);
+        }
+      } catch (error) {
+        setArchiveResult(
+          `Error restoring order: ${error instanceof Error ? error.message : String(error)}`
+        );
+      } finally {
+        setIsArchiving(false);
+      }
+    };
 
     return (
       <>
@@ -454,12 +528,35 @@ const OrderDetailsDialog = ({
         <DialogActions>
           <Button onClick={onClose}>Close</Button>
           <Button onClick={handleViewFull} startIcon={<EditIcon />}>
-            View Full Details
-          </Button>
-          <Button onClick={handleViewFull} startIcon={<EditIcon />}>
             {fullPage ? "Edit Order" : "View Full Details"}
           </Button>
+          <Button
+            color="secondary"
+            variant="outlined"
+            onClick={handleArchiveOrder}
+            disabled={isArchiving || order.status !== "Finished"}
+            startIcon={isArchiving ? <CircularProgress size={20} /> : <ArchiveIcon />}
+            sx={{ ml: 1 }}
+          >
+            {isArchiving ? "Archiving..." : "Archive Order"}
+          </Button>
+          <Button
+            color="secondary"
+            variant="outlined"
+            onClick={handleRestoreOrder}
+            disabled={isArchiving}
+            startIcon={isArchiving ? <CircularProgress size={20} /> : <UnarchiveIcon />}
+            sx={{ ml: 1 }}
+          >
+            {isArchiving ? "Restoring..." : "Restore Order"}
+          </Button>
         </DialogActions>
+        <Snackbar
+          open={!!archiveResult}
+          autoHideDuration={6000}
+          onClose={() => setArchiveResult(null)}
+          message={archiveResult || ""}
+        />
       </>
     );
   };

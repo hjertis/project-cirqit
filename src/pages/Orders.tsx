@@ -42,7 +42,9 @@ import {
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
   Refresh as RefreshIcon,
+  Archive as ArchiveIcon,
 } from "@mui/icons-material";
+import { Link as RouterLink } from "react-router-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
@@ -107,34 +109,95 @@ const OrdersPage = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  // Get the initial filter based on the tab
-  const getFilterForTab = (tabIndex: number): OrderFilter => {
-    switch (tabIndex) {
-      case 1: // In Progress tab
-        return { status: ["In Progress"] };
-      case 2: // Completed tab
-        return { status: ["Done", "Finished"] };
-      case 3: // Delayed tab
-        return { status: ["Delayed"] };
-      default: // All Orders tab
-        return {};
+  const testDirectFirestoreQuery = async () => {
+    console.log("[TEST] Running direct Firestore query test");
+
+    try {
+      // First, get all orders without filters
+      const allOrdersQuery = query(collection(db, "orders"), orderBy("updated", "desc"), limit(50));
+
+      console.log("[TEST] Executing all orders query");
+      const allOrdersSnapshot = await getDocs(allOrdersQuery);
+
+      console.log(`[TEST] All orders query returned ${allOrdersSnapshot.size} documents`);
+
+      // Count status values in results
+      const statusCounts: Record<string, number> = {};
+      allOrdersSnapshot.forEach(doc => {
+        const status = doc.data().status || "unknown";
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+
+      console.log("[TEST] Status counts in all orders:", statusCounts);
+
+      // Now query just for "Firm Planned" status
+      const firmPlannedQuery = query(
+        collection(db, "orders"),
+        where("status", "==", "Firm Planned"),
+        limit(50)
+      );
+
+      console.log("[TEST] Executing Firm Planned query");
+      const firmPlannedSnapshot = await getDocs(firmPlannedQuery);
+
+      console.log(`[TEST] Firm Planned query returned ${firmPlannedSnapshot.size} documents`);
+    } catch (error) {
+      console.error("[TEST] Error in direct query test:", error);
     }
   };
 
+  // Get the initial filter based on the tab
+  const getFilterForTab = (tabIndex: number): OrderFilter => {
+    console.log("[Orders DEBUG] Creating filter for tab index:", tabIndex);
+
+    let filter: OrderFilter;
+
+    switch (tabIndex) {
+      case 1: // In Progress tab
+        filter = { status: ["In Progress"] };
+        console.log("[Orders DEBUG] Tab 1 (In Progress) filter:", filter);
+        break;
+      case 2: // Completed tab
+        filter = { status: ["Done", "Finished"] };
+        console.log("[Orders DEBUG] Tab 2 (Completed) filter:", filter);
+        break;
+      case 3: // Delayed tab
+        filter = { status: ["Delayed"] };
+        console.log("[Orders DEBUG] Tab 3 (Delayed) filter:", filter);
+        break;
+      default: // All Orders tab (index 0) - filter out Finished/Done orders
+        // For All Orders, we only want active orders (not Finished/Done)
+        filter = {
+          status: ["Open", "Released", "In Progress", "Delayed", "Firm Planned"],
+        };
+        console.log("[Orders DEBUG] Tab 0 (All Orders) filter - active orders only:", filter);
+    }
+
+    return filter;
+  };
+
   // Use our orders hook with the initial filter
-  const { orders, loading, error, updateFilter, formatDate, refreshOrders } = useOrders();
+  const { orders, loading, error, updateFilter, formatDate, refreshOrders } = useOrders({}, 1000);
 
   const location = useLocation();
   const navigate = useNavigate();
 
   // Update filter when tab changes
   useEffect(() => {
+    console.log("[Orders DEBUG] Tab changed to:", tabValue);
+
+    // Get the filter for this tab
     const newFilter = getFilterForTab(tabValue);
+    console.log("[Orders DEBUG] Created filter object:", newFilter);
+
+    // Apply the filter
+    console.log("[Orders DEBUG] Calling updateFilter with:", newFilter);
     updateFilter(newFilter);
 
     // Update active filters UI
     if (tabValue === 0) {
       setActiveFilters([]);
+      console.log("[Orders DEBUG] Cleared active filters for All Orders tab");
     } else {
       const filterLabel =
         tabValue === 1
@@ -143,6 +206,7 @@ const OrdersPage = () => {
             ? "Status: Completed"
             : "Status: Delayed";
       setActiveFilters([filterLabel]);
+      console.log("[Orders DEBUG] Set active filter label to:", filterLabel);
     }
   }, [tabValue, updateFilter]);
 
@@ -311,12 +375,11 @@ const OrdersPage = () => {
   };
 
   useEffect(() => {
-
     // Check if we navigated here from a redirect with state
     if (location.state && location.state.openOrderDetails) {
       setSelectedOrderId(location.state.orderId);
       setDetailsDialogOpen(true);
-      
+
       // Clear the state to prevent dialog reopening on refresh
       window.history.replaceState({}, document.title);
     }
@@ -348,6 +411,15 @@ const OrdersPage = () => {
             {isExporting ? "Exporting..." : "Export"}
           </Button>
           <Button
+            component={RouterLink}
+            to="/orders/archived"
+            variant="outlined"
+            startIcon={<ArchiveIcon />}
+            sx={{ mr: 2 }}
+          >
+            Archived Orders
+          </Button>
+          <Button
             variant="outlined"
             startIcon={<CloudUploadIcon />}
             onClick={handleImportClick}
@@ -366,6 +438,7 @@ const OrdersPage = () => {
           <Button variant="contained" startIcon={<AddIcon />} onClick={handleNewOrder}>
             New Order
           </Button>
+          <Button onClick={testDirectFirestoreQuery}>Run Query Test</Button>
         </Box>
       </Box>
 

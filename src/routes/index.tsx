@@ -1,4 +1,4 @@
-// src/routes/index.tsx - Complete update
+// src/routes/index.tsx 
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import Dashboard from "../pages/Dashboard";
@@ -8,6 +8,8 @@ import CreateOrderPage from "../pages/CreateOrderPage";
 import EditOrderPage from "../pages/EditOrderPage";
 import OrderDetailsPage from "../pages/OrderDetailsPage";
 import OrderPlanningPage from "../pages/OrderPlanningPage";
+import ArchivedOrdersPage from "../pages/ArchivedOrdersPage";
+import MigrateOrdersPage from "../pages/admin/MigrateOrdersPage";
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
 import ProtectedRoute from "./ProtectedRoute";
@@ -33,6 +35,7 @@ const AppRoutes = () => {
         <Route path="/orders/create" element={<CreateOrderPage />} />
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
+        <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} /> 
         <Route path="/orders/:id/edit" element={<EditOrderPage />} />
 
@@ -46,6 +49,9 @@ const AppRoutes = () => {
 
         {/* Reports module */}
         <Route path="/reports" element={<div>Reports Page</div>} />
+
+        {/* Admin section */}
+        <Route path="/admin/migrate-orders" element={<MigrateOrdersPage />} />
 
         {/* Settings */}
         <Route path="/settings" element={<div>Settings Page</div>} />

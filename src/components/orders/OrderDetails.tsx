@@ -42,9 +42,21 @@ import {
   AccessTime as AccessTimeIcon,
   LocalShipping as LocalShippingIcon,
   Person as PersonIcon,
+  Archive as ArchiveIcon,
+  Unarchive as UnarchiveIcon,
 } from "@mui/icons-material";
-import { doc, getDoc, collection, query, where, getDocs, Timestamp, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../../config/firebase";
+import { archiveOrder, restoreOrder } from "../../services/orderService";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -138,22 +150,26 @@ const OrderDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
-  
+
   // State for resource assignment modal
   const [assignResourceOpen, setAssignResourceOpen] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
   const [selectedResource, setSelectedResource] = useState<string>("");
   const [assignLoading, setAssignLoading] = useState(false);
-  
+
   // State for status update modal
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [statusNotes, setStatusNotes] = useState<string>("");
   const [updateLoading, setUpdateLoading] = useState(false);
-  
+
   // State for success message
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  // State for archiving
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveResult, setArchiveResult] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -238,43 +254,45 @@ const OrderDetails = () => {
   const handlePrint = () => {
     window.print();
   };
-  
+
   // Handle opening the resource assignment modal
   const handleAssignResourceClick = () => {
     setAssignResourceOpen(true);
   };
-  
+
   // Handle resource selection in the modal
   const handleResourceSelect = (processId: string, resource: string) => {
     setSelectedProcess(processes.find(p => p.id === processId) || null);
     setSelectedResource(resource);
   };
-  
+
   // Handle saving the resource assignment
   const handleSaveAssignment = async () => {
     if (!selectedProcess || !selectedResource) return;
-    
+
     setAssignLoading(true);
-    
+
     try {
       // Update the process document in Firestore
       const processRef = doc(db, "processes", selectedProcess.id);
       await updateDoc(processRef, {
         assignedResource: selectedResource,
-        updated: Timestamp.fromDate(new Date())
+        updated: Timestamp.fromDate(new Date()),
       });
-      
+
       // Update the local state
-      setProcesses(processes.map(process => 
-        process.id === selectedProcess.id 
-          ? { ...process, assignedResource: selectedResource } 
-          : process
-      ));
-      
+      setProcesses(
+        processes.map(process =>
+          process.id === selectedProcess.id
+            ? { ...process, assignedResource: selectedResource }
+            : process
+        )
+      );
+
       // Show success message
       setSuccessMessage(`Resource ${selectedResource} assigned to process ${selectedProcess.name}`);
       setSnackbarOpen(true);
-      
+
       // Close the modal
       setAssignResourceOpen(false);
       setSelectedProcess(null);
@@ -286,56 +304,64 @@ const OrderDetails = () => {
       setAssignLoading(false);
     }
   };
-  
+
   // Handle opening the status update modal
   const handleUpdateStatusClick = () => {
     setUpdateStatusOpen(true);
   };
-  
+
   // Handle status selection in the modal
   const handleStatusSelect = (processId: string, status: string) => {
     setSelectedProcess(processes.find(p => p.id === processId) || null);
     setSelectedStatus(status);
   };
-  
+
   // Handle saving the status update
   const handleSaveStatus = async () => {
     if (!selectedProcess || !selectedStatus) return;
-    
+
     setUpdateLoading(true);
-    
+
     try {
       // Update the process document in Firestore
       const processRef = doc(db, "processes", selectedProcess.id);
-      
+
       const updates: Record<string, any> = {
         status: selectedStatus,
-        updated: Timestamp.fromDate(new Date())
+        updated: Timestamp.fromDate(new Date()),
       };
-      
+
       // If moving to completed, set progress to 100%
-      if (selectedStatus === 'Completed') {
+      if (selectedStatus === "Completed") {
         updates.progress = 100;
-      } 
+      }
       // If moving to In Progress from an earlier state, set progress to a default value
-      else if (selectedStatus === 'In Progress' && 
-               (selectedProcess.status === 'Not Started' || selectedProcess.status === 'Pending')) {
+      else if (
+        selectedStatus === "In Progress" &&
+        (selectedProcess.status === "Not Started" || selectedProcess.status === "Pending")
+      ) {
         updates.progress = 25;
       }
-      
+
       await updateDoc(processRef, updates);
-      
+
       // Update the local state
-      setProcesses(processes.map(process => 
-        process.id === selectedProcess.id 
-          ? { ...process, status: selectedStatus, ...(updates.progress ? { progress: updates.progress } : {}) } 
-          : process
-      ));
-      
+      setProcesses(
+        processes.map(process =>
+          process.id === selectedProcess.id
+            ? {
+                ...process,
+                status: selectedStatus,
+                ...(updates.progress ? { progress: updates.progress } : {}),
+              }
+            : process
+        )
+      );
+
       // Show success message
       setSuccessMessage(`Status updated to ${selectedStatus} for process ${selectedProcess.name}`);
       setSnackbarOpen(true);
-      
+
       // Close the modal
       setUpdateStatusOpen(false);
       setSelectedProcess(null);
@@ -348,7 +374,7 @@ const OrderDetails = () => {
       setUpdateLoading(false);
     }
   };
-  
+
   // Handle closing the snackbar
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
@@ -372,6 +398,74 @@ const OrderDetails = () => {
       </Box>
     );
   }
+
+  const handleArchiveOrder = async () => {
+    if (!order) return;
+
+    // Show a confirmation dialog
+    const confirm = window.confirm(
+      `Are you sure you want to archive order ${order.orderNumber}? This will move it to the archive collection.`
+    );
+
+    if (!confirm) return;
+
+    setIsArchiving(true);
+    setArchiveResult(null);
+
+    try {
+      const result = await archiveOrder(order.id);
+
+      if (result.success) {
+        setArchiveResult(`Successfully archived: ${result.message}`);
+        // Redirect to the orders list after a short delay
+        setTimeout(() => {
+          navigate("/orders");
+        }, 2000);
+      } else {
+        setArchiveResult(`Failed to archive: ${result.message}`);
+      }
+    } catch (error) {
+      setArchiveResult(
+        `Error archiving order: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleRestoreOrder = async () => {
+    if (!order) return;
+
+    // Show a confirmation dialog
+    const confirm = window.confirm(
+      `Are you sure you want to restore order ${order.orderNumber} from the archive? This will move it back to active orders.`
+    );
+
+    if (!confirm) return;
+
+    setIsArchiving(true);
+    setArchiveResult(null);
+
+    try {
+      const result = await restoreOrder(order.id);
+
+      if (result.success) {
+        setArchiveResult(`Successfully restored: ${result.message}`);
+        // Redirect to the orders list after a short delay
+        setTimeout(() => {
+          navigate("/orders");
+        }, 2000);
+      } else {
+        setArchiveResult(`Failed to restore: ${result.message}`);
+      }
+    } catch (error) {
+      setArchiveResult(
+        `Error restoring order: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      setIsArchiving(false);
+    }
+  };
 
   return (
     <Box>
@@ -409,6 +503,26 @@ const OrderDetails = () => {
               <Typography variant="h6" gutterBottom>
                 Order Details
               </Typography>
+              <Button
+                color="secondary"
+                variant="outlined"
+                onClick={handleArchiveOrder}
+                disabled={isArchiving || order.status !== "Finished"}
+                startIcon={isArchiving ? <CircularProgress size={20} /> : <ArchiveIcon />}
+                sx={{ ml: 1 }}
+              >
+                {isArchiving ? "Archiving..." : "Archive Order"}
+              </Button>
+              <Button
+                color="secondary"
+                variant="outlined"
+                onClick={handleRestoreOrder}
+                disabled={isArchiving}
+                startIcon={isArchiving ? <CircularProgress size={20} /> : <UnarchiveIcon />}
+                sx={{ ml: 1 }}
+              >
+                {isArchiving ? "Restoring..." : "Restore Order"}
+              </Button>
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
                 <Grid item xs={4}>
@@ -583,17 +697,17 @@ const OrderDetails = () => {
           </TableContainer>
           {processes.length > 0 && (
             <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
-              <Button 
-                variant="outlined" 
-                startIcon={<AssignmentIcon />} 
+              <Button
+                variant="outlined"
+                startIcon={<AssignmentIcon />}
                 sx={{ mr: 1 }}
                 onClick={handleAssignResourceClick}
               >
                 Assign Resources
               </Button>
-              <Button 
-                variant="outlined" 
-                color="success" 
+              <Button
+                variant="outlined"
+                color="success"
                 startIcon={<LocalShippingIcon />}
                 onClick={handleUpdateStatusClick}
               >
@@ -664,15 +778,20 @@ const OrderDetails = () => {
           </Box>
         </TabPanel>
       </Paper>
-      
+
       {/* Resource Assignment Dialog */}
-      <Dialog open={assignResourceOpen} onClose={() => setAssignResourceOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={assignResourceOpen}
+        onClose={() => setAssignResourceOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Assign Resources</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 3 }}>
             Select a process and assign a resource to it
           </Typography>
-          
+
           <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel id="process-select-label">Process</InputLabel>
             <Select
@@ -680,7 +799,7 @@ const OrderDetails = () => {
               id="process-select"
               value={selectedProcess?.id || ""}
               label="Process"
-              onChange={(e) => {
+              onChange={e => {
                 const processId = e.target.value as string;
                 const process = processes.find(p => p.id === processId);
                 setSelectedProcess(process || null);
@@ -692,14 +811,14 @@ const OrderDetails = () => {
                 }
               }}
             >
-              {processes.map((process) => (
+              {processes.map(process => (
                 <MenuItem key={process.id} value={process.id}>
                   {process.sequence}. {process.name} ({process.type})
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          
+
           {selectedProcess && (
             <FormControl fullWidth>
               <InputLabel id="resource-select-label">Resource</InputLabel>
@@ -708,10 +827,10 @@ const OrderDetails = () => {
                 id="resource-select"
                 value={selectedResource}
                 label="Resource"
-                onChange={(e) => setSelectedResource(e.target.value)}
+                onChange={e => setSelectedResource(e.target.value)}
                 startAdornment={selectedResource ? <PersonIcon sx={{ ml: 1, mr: 0.5 }} /> : null}
               >
-                {availableResources.map((resource) => (
+                {availableResources.map(resource => (
                   <MenuItem key={resource} value={resource}>
                     {resource}
                   </MenuItem>
@@ -722,8 +841,8 @@ const OrderDetails = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAssignResourceOpen(false)}>Cancel</Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={handleSaveAssignment}
             disabled={!selectedProcess || !selectedResource || assignLoading}
           >
@@ -731,15 +850,20 @@ const OrderDetails = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Status Update Dialog */}
-      <Dialog open={updateStatusOpen} onClose={() => setUpdateStatusOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={updateStatusOpen}
+        onClose={() => setUpdateStatusOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Update Process Status</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 3 }}>
             Select a process and update its status
           </Typography>
-          
+
           <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel id="process-status-select-label">Process</InputLabel>
             <Select
@@ -747,7 +871,7 @@ const OrderDetails = () => {
               id="process-status-select"
               value={selectedProcess?.id || ""}
               label="Process"
-              onChange={(e) => {
+              onChange={e => {
                 const processId = e.target.value as string;
                 const process = processes.find(p => p.id === processId);
                 setSelectedProcess(process || null);
@@ -759,14 +883,14 @@ const OrderDetails = () => {
                 }
               }}
             >
-              {processes.map((process) => (
+              {processes.map(process => (
                 <MenuItem key={process.id} value={process.id}>
                   {process.sequence}. {process.name} ({process.type})
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          
+
           {selectedProcess && (
             <>
               <FormControl fullWidth sx={{ mb: 3 }}>
@@ -776,23 +900,23 @@ const OrderDetails = () => {
                   id="status-select"
                   value={selectedStatus}
                   label="Status"
-                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  onChange={e => setSelectedStatus(e.target.value)}
                 >
-                  {processStatusOptions.map((status) => (
+                  {processStatusOptions.map(status => (
                     <MenuItem key={status} value={status}>
                       {status}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
-              
+
               <TextField
                 fullWidth
                 label="Notes (Optional)"
                 multiline
                 rows={3}
                 value={statusNotes}
-                onChange={(e) => setStatusNotes(e.target.value)}
+                onChange={e => setStatusNotes(e.target.value)}
                 placeholder="Add any notes about this status change"
               />
             </>
@@ -800,8 +924,8 @@ const OrderDetails = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUpdateStatusOpen(false)}>Cancel</Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={handleSaveStatus}
             disabled={!selectedProcess || !selectedStatus || updateLoading}
             color="primary"
@@ -810,7 +934,7 @@ const OrderDetails = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Success Snackbar */}
       <Snackbar
         open={snackbarOpen}
