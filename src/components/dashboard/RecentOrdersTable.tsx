@@ -50,7 +50,7 @@ export default function RecentOrdersTable({
   maxItems = 5,
   onViewOrder,
   defaultSortField = "start",
-  defaultSortDirection = "desc",
+  defaultSortDirection = "asc",
 }: RecentOrdersTableProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(maxItems);
