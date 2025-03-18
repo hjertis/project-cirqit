@@ -30,6 +30,7 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  TableSortLabel,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -48,7 +49,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
-import { doc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { doc, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 import OrderDetailsDialog from "../components/orders/OrderDetailsDialog";
 
@@ -108,11 +109,13 @@ const OrdersPage = () => {
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [order, setOrder] = useState<"asc" | "asc">("asc");
+  const [orderBy, setOrderBy] = useState<string>("start");
 
   const testDirectFirestoreQuery = async () => {
     try {
       // First, get all orders without filters
-      const allOrdersQuery = query(collection(db, "orders"), orderBy("updated", "desc"), limit(50));
+      const allOrdersQuery = query(collection(db, "orders"), orderBy("updated", "asc"), limit(50));
 
       const allOrdersSnapshot = await getDocs(allOrdersQuery);
 
@@ -349,6 +352,45 @@ const OrdersPage = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location]);
+
+  const sortByTimestamp = (a: any, b: any, orderBy: string) => {
+    // Handle case where timestamp might be undefined
+    if (!a[orderBy] || !b[orderBy]) {
+      if (!a[orderBy]) return 1;
+      if (!b[orderBy]) return -1;
+      return 0;
+    }
+
+    // Handle Firestore Timestamp objects
+    if (a[orderBy] instanceof Timestamp && b[orderBy] instanceof Timestamp) {
+      const aDate = a[orderBy].toDate().getTime();
+      const bDate = b[orderBy].toDate().getTime();
+      return aDate - bDate;
+    }
+
+    // Default fallback for non-timestamp fields
+    if (a[orderBy] < b[orderBy]) return -1;
+    if (a[orderBy] > b[orderBy]) return 1;
+    return 0;
+  };
+
+  // Add this function to handle sorting requests
+  const handleRequestSort = (property: string) => {
+    const isAsc = orderBy === property && order === "asc";
+    setOrder(isAsc ? "desc" : "asc");
+    setOrderBy(property);
+  };
+
+  // Modify your orders array with sorting before slicing for pagination
+  const sortedOrders = React.useMemo(() => {
+    if (!filteredOrders.length) return [];
+
+    // Create a copy to avoid mutating the original array
+    return [...filteredOrders].sort((a, b) => {
+      const sortResult = sortByTimestamp(a, b, orderBy);
+      return order === "asc" ? sortResult : -sortResult;
+    });
+  }, [filteredOrders, order, orderBy]);
 
   return (
     <Box>
@@ -592,13 +634,29 @@ const OrdersPage = () => {
                 <TableCell>Description</TableCell>
                 <TableCell>Customer/Part</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Start Date</TableCell>
-                <TableCell>End Date</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === "start"}
+                    direction={orderBy === "start" ? order : "asc"}
+                    onClick={() => handleRequestSort("start")}
+                  >
+                    Start Date
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={orderBy === "end"}
+                    direction={orderBy === "end" ? order : "asc"}
+                    onClick={() => handleRequestSort("end")}
+                  >
+                    End Date
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredOrders
+              {sortedOrders
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map(order => (
                   <TableRow key={order.id} hover>
@@ -666,7 +724,7 @@ const OrdersPage = () => {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
-          count={filteredOrders.length}
+          count={sortedOrders.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
