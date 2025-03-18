@@ -72,6 +72,7 @@ const OrdersImporter = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importResults, setImportResults] = useState<any>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -245,28 +246,34 @@ const OrdersImporter = () => {
 
   // Handle import of validated data
   const handleImport = async () => {
+    if (validationResult.data.length === 0) {
+      console.log('No data to import');
+      return;
+    }
+  
     setIsLoading(true);
     setImportError(null);
-
+  
     try {
       // Import the order import service
       const orderImportService = await import("../../services/orderImportService");
-
+  
       // Use the import service to process all orders
-      const results = await orderImportService.importOrdersBatch(validationResult.data);
-
+      const importResults = await orderImportService.importOrdersBatch(validationResult.data);
+  
       // Log results
-      console.log("Import results:", results);
-
-      if (results.errors > 0) {
+      console.log("Import results:", importResults);
+  
+      if (importResults.errors > 0) {
         // If there are errors, show first error but continue
-        const errorMessage = results.errorMessages[0];
+        const errorMessage = importResults.errorMessages[0];
         setImportError(`Some orders could not be imported. ${errorMessage}`);
       }
-
+  
       // Even with some errors, continue to completion if some were successful
-      if (results.created > 0 || results.updated > 0) {
+      if (importResults.created > 0 || importResults.updated > 0) {
         setImportSuccess(true);
+        setImportResults(importResults); // Store the results for the completion step
         setActiveStep(3); // Move to completion step
       }
     } catch (error) {
@@ -278,7 +285,7 @@ const OrdersImporter = () => {
       setIsLoading(false);
     }
   };
-
+  
   // Reset the import process
   const handleReset = () => {
     setCsvFile(null);
@@ -485,12 +492,12 @@ const OrdersImporter = () => {
       <Typography variant="h6" gutterBottom>
         Import Orders
       </Typography>
-
+  
       <Alert severity="info" sx={{ mb: 3 }}>
         <AlertTitle>Ready to Import</AlertTitle>
         You are about to import {parsedData.length} orders into the system
       </Alert>
-
+  
       <Box sx={{ mb: 3 }}>
         <Typography variant="body2" gutterBottom>
           <strong>Summary:</strong>
@@ -507,21 +514,27 @@ const OrdersImporter = () => {
             • Finished: {parsedData.filter(row => row.Status === "Finished").length}
           </Typography>
           <Typography variant="body2">
-            • Planned: {parsedData.filter(row => row.Status === "Planned").length}
+            • Done: {parsedData.filter(row => row.Status === "Done").length}
           </Typography>
           <Typography variant="body2">
-            • Urgent: {parsedData.filter(row => row.State === "URGENT").length}
+            • Planned: {parsedData.filter(row => row.Status === "Planned").length}
           </Typography>
+          
+          {parsedData.filter(row => row.Status === "Finished" || row.Status === "Done").length > 0 && (
+            <Typography variant="body2" sx={{ mt: 1, color: 'primary.main', fontWeight: 'medium' }}>
+              Note: {parsedData.filter(row => row.Status === "Finished" || row.Status === "Done").length} finished orders will be automatically archived
+            </Typography>
+          )}
         </Box>
       </Box>
-
+  
       {importError && (
         <Alert severity="error" sx={{ mb: 3 }}>
           <AlertTitle>Import Failed</AlertTitle>
           {importError}
         </Alert>
       )}
-
+  
       <Box sx={{ display: "flex", justifyContent: "space-between" }}>
         <Button onClick={() => setActiveStep(1)} disabled={isLoading}>
           Back
@@ -547,6 +560,9 @@ const OrdersImporter = () => {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Orders have been imported into the system. Any duplicate order numbers were updated with the
         new information.
+        {importResults && importResults.archived > 0 && 
+          ` ${importResults.archived} orders with "Finished" or "Done" status were automatically archived.`
+        }
       </Typography>
       <Box sx={{ display: "flex", justifyContent: "center", gap: 2 }}>
         <Button variant="outlined" onClick={handleReset} startIcon={<RestartIcon />}>
@@ -555,6 +571,15 @@ const OrdersImporter = () => {
         <Button variant="contained" onClick={() => (window.location.href = "/orders")}>
           Go to Orders
         </Button>
+        {importResults && importResults.archived > 0 && (
+          <Button 
+            variant="outlined" 
+            color="secondary"
+            onClick={() => (window.location.href = "/orders/archived")}
+          >
+            View Archived Orders
+          </Button>
+        )}
       </Box>
     </Box>
   );

@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import { archiveOrder } from "./orderService";
 
 // Initialize dayjs with custom parse format plugin
 dayjs.extend(customParseFormat);
@@ -46,6 +47,9 @@ export const importOrder = async (order: OrderImportData) => {
     return "Medium";
   };
   
+  // Check if we need to archive this order
+  const isFinishedOrder = order.Status === "Finished" || order.Status === "Done";
+  
   if (!docSnap.exists()) {
     // Create new order
     const workOrder = {
@@ -70,31 +74,40 @@ export const importOrder = async (order: OrderImportData) => {
     // Generate processes for this work order
     await generateProcesses(workOrderId, order.State || "REGULAR", startDate);
     
-    return { created: true, updated: false };
+    // If the order is finished, archive it immediately
+    if (isFinishedOrder) {
+      await archiveOrder(workOrderId);
+      return { created: true, updated: false, archived: true };
+    }
+    
+    return { created: true, updated: false, archived: false };
   } else {
     // Update existing order
     const updates: Record<string, any> = {};
+    const currentData = docSnap.data();
+    let statusChanged = false;
     
-    if (docSnap.data()?.status !== order.Status) {
+    if (currentData?.status !== order.Status) {
       updates.status = order.Status;
+      statusChanged = true;
     }
     
     if (
-      !docSnap.data()?.start?.toDate || 
-      docSnap.data().start.toDate().getTime() !== startDate.getTime()
+      !currentData?.start?.toDate || 
+      currentData.start.toDate().getTime() !== startDate.getTime()
     ) {
       updates.start = Timestamp.fromDate(startDate);
     }
     
     if (
-      !docSnap.data()?.end?.toDate ||
-      docSnap.data().end.toDate().getTime() !== endDate.getTime()
+      !currentData?.end?.toDate ||
+      currentData.end.toDate().getTime() !== endDate.getTime()
     ) {
       updates.end = Timestamp.fromDate(endDate);
     }
     
     if (
-      docSnap.data()?.quantity !== Number(order.Quantity) &&
+      currentData?.quantity !== Number(order.Quantity) &&
       !isNaN(Number(order.Quantity))
     ) {
       updates.quantity = Number(order.Quantity);
@@ -103,10 +116,17 @@ export const importOrder = async (order: OrderImportData) => {
     if (Object.keys(updates).length > 0) {
       updates.updated = Timestamp.fromDate(new Date());
       await updateDoc(docRef, updates);
-      return { created: false, updated: true };
+      
+      // If the status was changed to "Finished" or "Done", archive the order
+      if (statusChanged && isFinishedOrder) {
+        await archiveOrder(workOrderId);
+        return { created: false, updated: true, archived: true };
+      }
+      
+      return { created: false, updated: true, archived: false };
     }
     
-    return { created: false, updated: false };
+    return { created: false, updated: false, archived: false };
   }
 };
 
@@ -118,6 +138,7 @@ export const importOrdersBatch = async (orders: OrderImportData[]) => {
     total: orders.length,
     created: 0,
     updated: 0,
+    archived: 0,
     skipped: 0,
     errors: 0,
     errorMessages: [] as string[]
@@ -127,8 +148,9 @@ export const importOrdersBatch = async (orders: OrderImportData[]) => {
     try {
       const result = await importOrder(order);
       if (result.created) results.created++;
-      else if (result.updated) results.updated++;
-      else results.skipped++;
+      if (result.updated) results.updated++;
+      if (result.archived) results.archived++;
+      if (!result.created && !result.updated) results.skipped++;
     } catch (error) {
       results.errors++;
       results.errorMessages.push(

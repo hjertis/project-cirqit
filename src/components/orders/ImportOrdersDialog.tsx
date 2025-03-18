@@ -12,7 +12,8 @@ import {
   Alert,
   AlertTitle,
   Box,
-  Typography
+  Typography,
+  Chip
 } from '@mui/material';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -87,10 +88,16 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
     try {
       const importResults = await importOrdersBatch(results);
       
+      const finishedOrdersCount = importResults.archived || 0;
+      
       if (importResults.errors > 0) {
-        toast.warning(`Imported with some errors: ${importResults.created} created, ${importResults.updated} updated, ${importResults.errors} failed`);
+        toast.warning(
+          `Imported with some errors: ${importResults.created} created, ${importResults.updated} updated, ${finishedOrdersCount} archived, ${importResults.errors} failed`
+        );
       } else {
-        toast.success(`Successfully imported: ${importResults.created} created, ${importResults.updated} updated`);
+        toast.success(
+          `Successfully imported: ${importResults.created} created, ${importResults.updated} updated, ${finishedOrdersCount} archived`
+        );
       }
       
       // Close dialog after successful import
@@ -114,6 +121,13 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+
+  // Count finished orders in the CSV
+  const getFinishedOrdersCount = () => {
+    return results.filter(row => 
+      row.Status === "Finished" || row.Status === "Done"
+    ).length;
   };
 
   return (
@@ -166,9 +180,24 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
           />
           
           {results.length > 0 && (
-            <Typography variant="body2" sx={{ mt: 2 }}>
-              {results.length} records ready to import
-            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                {results.length} records ready to import
+              </Typography>
+              
+              {getFinishedOrdersCount() > 0 && (
+                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Chip 
+                    label={`${getFinishedOrdersCount()} finished orders`} 
+                    color="primary" 
+                    size="small" 
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    These will be automatically archived after import
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           )}
         </Box>
         
