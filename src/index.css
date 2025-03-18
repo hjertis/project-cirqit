@@ -24,11 +24,12 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
+
+/* Remove vertical centering that was causing layout issues */
+/* The display: flex and place-items: center were causing the centering problem */
 
 h1 {
   font-size: 3.2em;
@@ -65,4 +66,11 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Add this to ensure app takes full height */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }

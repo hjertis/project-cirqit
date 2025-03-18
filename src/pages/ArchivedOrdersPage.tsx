@@ -25,7 +25,7 @@ import {
   Alert,
   Snackbar,
   Breadcrumbs,
-  Link
+  Link,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -33,12 +33,13 @@ import {
   Visibility as VisibilityIcon,
   Refresh as RefreshIcon,
   RestoreFromTrash as RestoreIcon,
-  NavigateNext as NavigateNextIcon
+  NavigateNext as NavigateNextIcon,
 } from "@mui/icons-material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import useArchivedOrders from "../hooks/useArchivedOrders";
 import { restoreOrder } from "../services/orderService";
 import OrderDetailsDialog from "../components/orders/OrderDetailsDialog";
+import ContentWrapper from "../components/layout/ContentWrapper";
 
 const ArchivedOrdersPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,13 +54,10 @@ const ArchivedOrdersPage = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   // Use our custom hook for archived orders
-  const {
-    archivedOrders,
-    loading,
-    error,
-    formatDate,
-    refreshArchivedOrders
-  } = useArchivedOrders({}, 200); // Display up to 200 archived orders
+  const { archivedOrders, loading, error, formatDate, refreshArchivedOrders } = useArchivedOrders(
+    {},
+    200
+  ); // Display up to 200 archived orders
 
   const navigate = useNavigate();
 
@@ -113,7 +111,7 @@ const ArchivedOrdersPage = () => {
     try {
       setIsRestoring(true);
       const result = await restoreOrder(orderToRestore);
-      
+
       if (result.success) {
         setSuccessMessage(`Order ${orderToRestore} has been restored successfully`);
         setSnackbarOpen(true);
@@ -141,199 +139,199 @@ const ArchivedOrdersPage = () => {
   };
 
   return (
-    <Box>
-      {/* Page Header */}
-      <Box sx={{ mb: 3 }}>
-        <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
-          <Link component={RouterLink} to="/" color="inherit">
-            Dashboard
-          </Link>
-          <Link component={RouterLink} to="/orders" color="inherit">
-            Orders
-          </Link>
-          <Typography color="text.primary">Archived Orders</Typography>
-        </Breadcrumbs>
-        
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}>
-          <Typography variant="h4" component="h1">
-            Archived Orders
-          </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
+    <ContentWrapper>
+      <Box>
+        {/* Page Header */}
+        <Box sx={{ mb: 3 }}>
+          <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
+            <Link component={RouterLink} to="/" color="inherit">
+              Dashboard
+            </Link>
+            <Link component={RouterLink} to="/orders" color="inherit">
+              Orders
+            </Link>
+            <Typography color="text.primary">Archived Orders</Typography>
+          </Breadcrumbs>
+
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}
           >
-            Refresh
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Search and Filters */}
-      <Paper sx={{ mb: 3, p: 2 }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 2,
-          }}
-        >
-          <TextField
-            placeholder="Search archived orders..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            size="small"
-            sx={{ width: { xs: "100%", sm: "300px" } }}
-          />
-        </Box>
-      </Paper>
-
-      {/* Orders Table */}
-      <Paper>
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Box sx={{ p: 3 }}>
-            <Alert
-              severity="error"
-              action={
-                <Button color="inherit" size="small" onClick={refreshArchivedOrders}>
-                  Retry
-                </Button>
-              }
-            >
-              {error}
-            </Alert>
-          </Box>
-        ) : filteredOrders.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: "center" }}>
-            <Typography color="text.secondary">
-              No archived orders found. {searchTerm ? "Try a different search term." : ""}
+            <Typography variant="h4" component="h1">
+              Archived Orders
             </Typography>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={handleRefresh}>
+              Refresh
+            </Button>
           </Box>
-        ) : (
-          <>
-            <TableContainer>
-              <Table sx={{ minWidth: 650 }}>
-                <TableHead>
-                  <TableRow sx={{ backgroundColor: "background.default" }}>
-                    <TableCell>Order #</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell>Customer/Part</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Archived</TableCell>
-                    <TableCell>End Date</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredOrders
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map(order => (
-                      <TableRow key={order.id} hover>
-                        <TableCell component="th" scope="row">
-                          {order.orderNumber}
-                        </TableCell>
-                        <TableCell>{order.description}</TableCell>
-                        <TableCell>{order.customer || `Part: ${order.partNo}`}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={order.status}
-                            color="default"
-                            size="small"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>{formatDate(order.archivedAt)}</TableCell>
-                        <TableCell>{formatDate(order.end)}</TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="View">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleViewOrder(order.id)}
-                            >
-                              <VisibilityIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Restore">
-                            <IconButton
-                              size="small"
-                              color="secondary"
-                              onClick={() => handleRestoreClick(order.id)}
-                            >
-                              <RestoreIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              component="div"
-              count={filteredOrders.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </>
-        )}
-      </Paper>
+        </Box>
 
-      {/* Order Details Dialog */}
-      <OrderDetailsDialog
-        open={detailsDialogOpen}
-        onClose={() => setDetailsDialogOpen(false)}
-        orderId={selectedOrderId}
-        isArchived={true} // Add this prop to OrderDetailsDialog component
-      />
-
-      {/* Restore Confirmation Dialog */}
-      <Dialog open={confirmRestoreOpen} onClose={handleCancelRestore}>
-        <DialogTitle>Confirm Restore</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to restore order {orderToRestore} from the archive?
-            This will move it back to active orders.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelRestore} variant="outlined">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmRestore}
-            variant="contained"
-            color="primary"
-            disabled={isRestoring}
+        {/* Search and Filters */}
+        <Paper sx={{ mb: 3, p: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
           >
-            {isRestoring ? "Restoring..." : "Restore"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <TextField
+              placeholder="Search archived orders..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              size="small"
+              sx={{ width: { xs: "100%", sm: "300px" } }}
+            />
+          </Box>
+        </Paper>
 
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
-        message={successMessage}
-      />
-    </Box>
+        {/* Orders Table */}
+        <Paper>
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Box sx={{ p: 3 }}>
+              <Alert
+                severity="error"
+                action={
+                  <Button color="inherit" size="small" onClick={refreshArchivedOrders}>
+                    Retry
+                  </Button>
+                }
+              >
+                {error}
+              </Alert>
+            </Box>
+          ) : filteredOrders.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography color="text.secondary">
+                No archived orders found. {searchTerm ? "Try a different search term." : ""}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <TableContainer>
+                <Table sx={{ minWidth: 650 }}>
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "background.default" }}>
+                      <TableCell>Order #</TableCell>
+                      <TableCell>Description</TableCell>
+                      <TableCell>Customer/Part</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Archived</TableCell>
+                      <TableCell>End Date</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredOrders
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map(order => (
+                        <TableRow key={order.id} hover>
+                          <TableCell component="th" scope="row">
+                            {order.orderNumber}
+                          </TableCell>
+                          <TableCell>{order.description}</TableCell>
+                          <TableCell>{order.customer || `Part: ${order.partNo}`}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={order.status}
+                              color="default"
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{formatDate(order.archivedAt)}</TableCell>
+                          <TableCell>{formatDate(order.end)}</TableCell>
+                          <TableCell align="right">
+                            <Tooltip title="View">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleViewOrder(order.id)}
+                              >
+                                <VisibilityIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Restore">
+                              <IconButton
+                                size="small"
+                                color="secondary"
+                                onClick={() => handleRestoreClick(order.id)}
+                              >
+                                <RestoreIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                rowsPerPageOptions={[5, 10, 25, 50]}
+                component="div"
+                count={filteredOrders.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+              />
+            </>
+          )}
+        </Paper>
+
+        {/* Order Details Dialog */}
+        <OrderDetailsDialog
+          open={detailsDialogOpen}
+          onClose={() => setDetailsDialogOpen(false)}
+          orderId={selectedOrderId}
+          isArchived={true} // Add this prop to OrderDetailsDialog component
+        />
+
+        {/* Restore Confirmation Dialog */}
+        <Dialog open={confirmRestoreOpen} onClose={handleCancelRestore}>
+          <DialogTitle>Confirm Restore</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to restore order {orderToRestore} from the archive? This will
+              move it back to active orders.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancelRestore} variant="outlined">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmRestore}
+              variant="contained"
+              color="primary"
+              disabled={isRestoring}
+            >
+              {isRestoring ? "Restoring..." : "Restore"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={() => setSnackbarOpen(false)}
+          message={successMessage}
+        />
+      </Box>
+    </ContentWrapper>
   );
 };
 

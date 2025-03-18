@@ -1,11 +1,12 @@
 // src/pages/OrderPlanningPage.tsx
-import { Box, Breadcrumbs, Typography, Link, Paper, Tabs, Tab } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
-import { NavigateNext as NavigateNextIcon } from '@mui/icons-material';
-import { useState } from 'react';
-import OrderPlanningGantt from '../components/orders/OrderPlanningGantt';
-import OrderWorkflowTimeline from '../components/orders/OrderWorkflowTimeline';
-import SimplifiedGanttChart from '../components/orders/SimplifiedGanttChart';
+import { Box, Breadcrumbs, Typography, Link, Paper, Tabs, Tab } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
+import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
+import { useState } from "react";
+import OrderPlanningGantt from "../components/orders/OrderPlanningGantt";
+import OrderWorkflowTimeline from "../components/orders/OrderWorkflowTimeline";
+import SimplifiedGanttChart from "../components/orders/SimplifiedGanttChart";
+import ContentWrapper from "../components/layout/ContentWrapper";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -37,44 +38,46 @@ const OrderPlanningPage = () => {
   };
 
   return (
-    <Box>
-      {/* Page Header with Breadcrumbs */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Order Planning
-        </Typography>
-        <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
-          <Link component={RouterLink} to="/" color="inherit">
-            Dashboard
-          </Link>
-          <Link component={RouterLink} to="/orders" color="inherit">
-            Orders
-          </Link>
-          <Typography color="text.primary">Planning</Typography>
-        </Breadcrumbs>
+    <ContentWrapper>
+      <Box>
+        {/* Page Header with Breadcrumbs */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h4" gutterBottom>
+            Order Planning
+          </Typography>
+          <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
+            <Link component={RouterLink} to="/" color="inherit">
+              Dashboard
+            </Link>
+            <Link component={RouterLink} to="/orders" color="inherit">
+              Orders
+            </Link>
+            <Typography color="text.primary">Planning</Typography>
+          </Breadcrumbs>
+        </Box>
+
+        {/* Planning Tabs */}
+        <Paper sx={{ mb: 3 }}>
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="planning tabs">
+            <Tab label="Workflow Timeline" />
+            <Tab label="Timeline View" />
+            <Tab label="Detailed Gantt" />
+          </Tabs>
+
+          <TabPanel value={tabValue} index={0}>
+            <OrderWorkflowTimeline />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <SimplifiedGanttChart />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
+            <OrderPlanningGantt />
+          </TabPanel>
+        </Paper>
       </Box>
-
-      {/* Planning Tabs */}
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={handleTabChange} aria-label="planning tabs">
-          <Tab label="Workflow Timeline" />
-          <Tab label="Timeline View" />
-          <Tab label="Detailed Gantt" />
-        </Tabs>
-
-        <TabPanel value={tabValue} index={0}>
-          <OrderWorkflowTimeline />
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={1}>
-          <SimplifiedGanttChart />
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={2}>
-          <OrderPlanningGantt />
-        </TabPanel>
-      </Paper>
-    </Box>
+    </ContentWrapper>
   );
 };
 

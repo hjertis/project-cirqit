@@ -52,6 +52,7 @@ import useOrders, { OrderFilter } from "../hooks/useOrders";
 import { doc, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 import OrderDetailsDialog from "../components/orders/OrderDetailsDialog";
+import ContentWrapper from "../components/layout/ContentWrapper";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -111,31 +112,6 @@ const OrdersPage = () => {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [order, setOrder] = useState<"asc" | "asc">("asc");
   const [orderBy, setOrderBy] = useState<string>("start");
-
-  const testDirectFirestoreQuery = async () => {
-    try {
-      // First, get all orders without filters
-      const allOrdersQuery = query(collection(db, "orders"), orderBy("updated", "asc"), limit(50));
-
-      const allOrdersSnapshot = await getDocs(allOrdersQuery);
-
-      // Count status values in results
-      const statusCounts: Record<string, number> = {};
-      allOrdersSnapshot.forEach(doc => {
-        const status = doc.data().status || "unknown";
-        statusCounts[status] = (statusCounts[status] || 0) + 1;
-      });
-
-      // Now query just for "Firm Planned" status
-      const firmPlannedQuery = query(
-        collection(db, "orders"),
-        where("status", "==", "Firm Planned"),
-        limit(50)
-      );
-    } catch (error) {
-      console.error("[TEST] Error in direct query test:", error);
-    }
-  };
 
   // Get the initial filter based on the tab
   const getFilterForTab = (tabIndex: number): OrderFilter => {
@@ -393,187 +369,188 @@ const OrdersPage = () => {
   }, [filteredOrders, order, orderBy]);
 
   return (
-    <Box>
-      {/* Page Header */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Orders
-        </Typography>
-        <Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-            sx={{ mr: 2 }}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<GetAppIcon />}
-            onClick={handleExport}
-            disabled={isExporting}
-            sx={{ mr: 2 }}
-          >
-            {isExporting ? "Exporting..." : "Export"}
-          </Button>
-          <Button
-            component={RouterLink}
-            to="/orders/archived"
-            variant="outlined"
-            startIcon={<ArchiveIcon />}
-            sx={{ mr: 2 }}
-          >
-            Archived Orders
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<CloudUploadIcon />}
-            onClick={handleImportClick}
-            sx={{ mr: 2 }}
-          >
-            Import
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<CloudUploadIcon />}
-            onClick={openImportDialog}
-            sx={{ mr: 2 }}
-          >
-            Quick Import
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleNewOrder}>
-            New Order
-          </Button>
-          <Button onClick={testDirectFirestoreQuery}>Run Query Test</Button>
-        </Box>
-      </Box>
-
-      {isExporting && <LinearProgress sx={{ mb: 2 }} />}
-
-      {/* Filters and Search */}
-      <Paper sx={{ mb: 3, p: 2 }}>
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 2,
-          }}
-        >
-          <TextField
-            placeholder="Search orders..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            size="small"
-            sx={{ width: { xs: "100%", sm: "300px" } }}
-          />
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-            <Button size="small" startIcon={<FilterListIcon />} sx={{ mr: 1 }}>
-              Filters
+    <ContentWrapper>
+      <Box>
+        {/* Page Header */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+          <Typography variant="h4" component="h1">
+            Orders
+          </Typography>
+          <Box>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              sx={{ mr: 2 }}
+            >
+              Refresh
             </Button>
-            {activeFilters.map(filter => (
-              <Chip
-                key={filter}
-                label={filter}
-                onDelete={() => handleRemoveFilter(filter)}
-                size="small"
-              />
-            ))}
+            <Button
+              variant="outlined"
+              startIcon={<GetAppIcon />}
+              onClick={handleExport}
+              disabled={isExporting}
+              sx={{ mr: 2 }}
+            >
+              {isExporting ? "Exporting..." : "Export"}
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/orders/archived"
+              variant="outlined"
+              startIcon={<ArchiveIcon />}
+              sx={{ mr: 2 }}
+            >
+              Archived Orders
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<CloudUploadIcon />}
+              onClick={handleImportClick}
+              sx={{ mr: 2 }}
+            >
+              Import
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<CloudUploadIcon />}
+              onClick={openImportDialog}
+              sx={{ mr: 2 }}
+            >
+              Quick Import
+            </Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleNewOrder}>
+              New Order
+            </Button>
           </Box>
         </Box>
-      </Paper>
 
-      {/* Orders Tabs and Table */}
-      <Paper>
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="orders tabs">
-            <Tab label="All Orders" />
-            <Tab label="In Progress" />
-            <Tab label="Completed" />
-            <Tab label="Delayed" />
-          </Tabs>
-        </Box>
+        {isExporting && <LinearProgress sx={{ mb: 2 }} />}
 
-        <TabPanel value={tabValue} index={0}>
-          {renderOrdersTable()}
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={1}>
-          {renderOrdersTable()}
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={2}>
-          {renderOrdersTable()}
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={3}>
-          {renderOrdersTable()}
-        </TabPanel>
-      </Paper>
-
-      {/* Import Dialog */}
-      <ImportOrdersDialog open={importDialogOpen} onClose={closeImportDialog} />
-
-      {/* Context Menu */}
-      <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
-        <MenuItem
-          onClick={() => {
-            handleMenuClose();
-            if (selectedOrder) handleViewOrder(selectedOrder);
-          }}
-        >
-          <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
-          View Details
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleMenuClose();
-            if (selectedOrder) handleEditOrder(selectedOrder);
-          }}
-        >
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Edit
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleDeleteClick} sx={{ color: "error.main" }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Delete
-        </MenuItem>
-      </Menu>
-
-      {/* Confirm Delete Dialog */}
-      <Dialog open={confirmDeleteOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete order {orderToDelete}? This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete} variant="outlined">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            variant="contained"
-            color="error"
-            disabled={isDeleting}
+        {/* Filters and Search */}
+        <Paper sx={{ mb: 3, p: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
           >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+            <TextField
+              placeholder="Search orders..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              size="small"
+              sx={{ width: { xs: "100%", sm: "300px" } }}
+            />
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Button size="small" startIcon={<FilterListIcon />} sx={{ mr: 1 }}>
+                Filters
+              </Button>
+              {activeFilters.map(filter => (
+                <Chip
+                  key={filter}
+                  label={filter}
+                  onDelete={() => handleRemoveFilter(filter)}
+                  size="small"
+                />
+              ))}
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Orders Tabs and Table */}
+        <Paper>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="orders tabs">
+              <Tab label="All Orders" />
+              <Tab label="In Progress" />
+              <Tab label="Completed" />
+              <Tab label="Delayed" />
+            </Tabs>
+          </Box>
+
+          <TabPanel value={tabValue} index={0}>
+            {renderOrdersTable()}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            {renderOrdersTable()}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
+            {renderOrdersTable()}
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            {renderOrdersTable()}
+          </TabPanel>
+        </Paper>
+
+        {/* Import Dialog */}
+        <ImportOrdersDialog open={importDialogOpen} onClose={closeImportDialog} />
+
+        {/* Context Menu */}
+        <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              if (selectedOrder) handleViewOrder(selectedOrder);
+            }}
+          >
+            <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
+            View Details
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              if (selectedOrder) handleEditOrder(selectedOrder);
+            }}
+          >
+            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+            Edit
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={handleDeleteClick} sx={{ color: "error.main" }}>
+            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+            Delete
+          </MenuItem>
+        </Menu>
+
+        {/* Confirm Delete Dialog */}
+        <Dialog open={confirmDeleteOpen} onClose={handleCancelDelete}>
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete order {orderToDelete}? This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancelDelete} variant="outlined">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              variant="contained"
+              color="error"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </ContentWrapper>
   );
 
   // Function to render the orders table
