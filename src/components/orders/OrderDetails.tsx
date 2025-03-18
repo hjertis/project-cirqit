@@ -36,7 +36,6 @@ import {
 import {
   ArrowBack as ArrowBackIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
   Print as PrintIcon,
   Assignment as AssignmentIcon,
   AccessTime as AccessTimeIcon,

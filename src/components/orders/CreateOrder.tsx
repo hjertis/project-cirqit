@@ -27,7 +27,7 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
-import { collection, addDoc, Timestamp, doc, setDoc } from "firebase/firestore";
+import { collection, Timestamp, doc, setDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 
 // Define the form data interface

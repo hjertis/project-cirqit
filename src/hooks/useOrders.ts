@@ -44,28 +44,10 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
   const [filter, setFilter] = useState<OrderFilter | undefined>(initialFilter);
   const [itemLimit, setItemLimit] = useState(initialLimit);
 
-  // DEBUG: Add this function to log filter and query details
-  const logDebugInfo = (message: string, data: any) => {
-    console.log(`[useOrders DEBUG] ${message}:`, data);
-  };
-
   // Fetch orders function
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    logDebugInfo("Current filter object", filter);
-    logDebugInfo("Filter type", typeof filter);
-    if (filter) {
-      logDebugInfo("Filter has keys", Object.keys(filter));
-      if (filter.status) {
-        logDebugInfo("Status filter", filter.status);
-        logDebugInfo("Status filter type", typeof filter.status);
-        logDebugInfo("Status filter length", filter.status.length);
-      } else {
-        logDebugInfo("No status property in filter", null);
-      }
-    }
 
     try {
       let ordersQuery;
@@ -75,28 +57,17 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
       if (filter && filter.status && Array.isArray(filter.status) && filter.status.length > 0) {
         // Has status filter with values
         queryDescription = `Filtering by status: ${filter.status.join(", ")}`;
-        logDebugInfo(queryDescription, null);
-        
+
         ordersQuery = query(
           collection(db, "orders"),
           where("status", "in", filter.status),
           limit(itemLimit)
         );
       } else {
-        // No filter or empty filter - get all orders
-        queryDescription = "No filter - getting all orders";
-        logDebugInfo(queryDescription, null);
-        
-        ordersQuery = query(
-          collection(db, "orders"), 
-          orderBy("updated", "desc"), 
-          limit(itemLimit)
-        );
+        ordersQuery = query(collection(db, "orders"), orderBy("updated", "desc"), limit(itemLimit));
       }
 
-      logDebugInfo("Executing query", queryDescription);
       const querySnapshot = await getDocs(ordersQuery);
-      logDebugInfo(`Query returned ${querySnapshot.docs.length} results`, null);
 
       const fetchedOrders: FirebaseOrder[] = [];
       const statusCounts: Record<string, number> = {};
@@ -104,19 +75,16 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
       querySnapshot.forEach(doc => {
         const data = doc.data();
         const status = data.status || "unknown";
-        
+
         // Count each status type for debugging
         statusCounts[status] = (statusCounts[status] || 0) + 1;
-        
+
         fetchedOrders.push({
           id: doc.id,
           ...data,
         } as FirebaseOrder);
       });
 
-      logDebugInfo("Status counts in results", statusCounts);
-      logDebugInfo("Setting orders state with count", fetchedOrders.length);
-      
       setOrders(fetchedOrders);
     } catch (err) {
       console.error("Error fetching orders:", err);
@@ -129,19 +97,16 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
 
   // Fetch orders when filter or limit changes
   useEffect(() => {
-    logDebugInfo("Effect triggered - fetching orders", { filter, itemLimit });
     fetchOrders();
   }, [fetchOrders]);
 
   // Function to update filters
   const updateFilter = useCallback((newFilter: OrderFilter) => {
-    logDebugInfo("Updating filter to", newFilter);
     setFilter(newFilter);
   }, []);
 
   // Function to update limit
   const updateLimit = useCallback((newLimit: number) => {
-    logDebugInfo("Updating item limit to", newLimit);
     setItemLimit(newLimit);
   }, []);
 

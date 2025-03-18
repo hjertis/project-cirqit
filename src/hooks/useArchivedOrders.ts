@@ -50,18 +50,14 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
     setError(null);
 
     try {
-      console.log("Fetching archived orders with filter:", filter);
       let ordersQuery;
 
       // Create a base query
       const baseQuery = collection(db, "archivedOrders");
-      
+
       // Add query constraints
-      const queryConstraints: QueryConstraint[] = [
-        orderBy("archivedAt", "desc"),
-        limit(itemLimit)
-      ];
-      
+      const queryConstraints: QueryConstraint[] = [orderBy("archivedAt", "desc"), limit(itemLimit)];
+
       // Apply date range filter if present
       if (filter?.dateRange) {
         const { start, end } = filter.dateRange;
@@ -70,28 +66,27 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
           where("archivedAt", "<=", Timestamp.fromDate(end))
         );
       }
-      
+
       // Build and execute the query
       ordersQuery = query(baseQuery, ...queryConstraints);
-      
-      console.log("Executing Firestore query for archived orders");
+
       const querySnapshot = await getDocs(ordersQuery);
-      console.log(`Query returned ${querySnapshot.docs.length} results`);
 
       const fetchedOrders: ArchivedOrder[] = [];
-      
+
       querySnapshot.forEach(doc => {
         fetchedOrders.push({
           id: doc.id,
           ...doc.data(),
         } as ArchivedOrder);
       });
-      
-      setArchivedOrders(fetchedOrders);
 
+      setArchivedOrders(fetchedOrders);
     } catch (err) {
       console.error("Error fetching archived orders:", err);
-      setError(`Failed to load archived orders: ${err instanceof Error ? err.message : String(err)}`);
+      setError(
+        `Failed to load archived orders: ${err instanceof Error ? err.message : String(err)}`
+      );
       setArchivedOrders([]); // Clear orders on error
     } finally {
       setLoading(false);
@@ -105,7 +100,6 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
 
   // Function to update filters
   const updateFilter = useCallback((newFilter: ArchiveFilter) => {
-    console.log("Updating archive filter to:", newFilter);
     setFilter(newFilter);
   }, []);
 

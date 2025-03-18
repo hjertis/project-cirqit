@@ -110,16 +110,11 @@ const OrdersPage = () => {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   const testDirectFirestoreQuery = async () => {
-    console.log("[TEST] Running direct Firestore query test");
-
     try {
       // First, get all orders without filters
       const allOrdersQuery = query(collection(db, "orders"), orderBy("updated", "desc"), limit(50));
 
-      console.log("[TEST] Executing all orders query");
       const allOrdersSnapshot = await getDocs(allOrdersQuery);
-
-      console.log(`[TEST] All orders query returned ${allOrdersSnapshot.size} documents`);
 
       // Count status values in results
       const statusCounts: Record<string, number> = {};
@@ -128,19 +123,12 @@ const OrdersPage = () => {
         statusCounts[status] = (statusCounts[status] || 0) + 1;
       });
 
-      console.log("[TEST] Status counts in all orders:", statusCounts);
-
       // Now query just for "Firm Planned" status
       const firmPlannedQuery = query(
         collection(db, "orders"),
         where("status", "==", "Firm Planned"),
         limit(50)
       );
-
-      console.log("[TEST] Executing Firm Planned query");
-      const firmPlannedSnapshot = await getDocs(firmPlannedQuery);
-
-      console.log(`[TEST] Firm Planned query returned ${firmPlannedSnapshot.size} documents`);
     } catch (error) {
       console.error("[TEST] Error in direct query test:", error);
     }
@@ -148,29 +136,23 @@ const OrdersPage = () => {
 
   // Get the initial filter based on the tab
   const getFilterForTab = (tabIndex: number): OrderFilter => {
-    console.log("[Orders DEBUG] Creating filter for tab index:", tabIndex);
-
     let filter: OrderFilter;
 
     switch (tabIndex) {
       case 1: // In Progress tab
         filter = { status: ["In Progress"] };
-        console.log("[Orders DEBUG] Tab 1 (In Progress) filter:", filter);
         break;
       case 2: // Completed tab
         filter = { status: ["Done", "Finished"] };
-        console.log("[Orders DEBUG] Tab 2 (Completed) filter:", filter);
         break;
       case 3: // Delayed tab
         filter = { status: ["Delayed"] };
-        console.log("[Orders DEBUG] Tab 3 (Delayed) filter:", filter);
         break;
       default: // All Orders tab (index 0) - filter out Finished/Done orders
         // For All Orders, we only want active orders (not Finished/Done)
         filter = {
           status: ["Open", "Released", "In Progress", "Delayed", "Firm Planned"],
         };
-        console.log("[Orders DEBUG] Tab 0 (All Orders) filter - active orders only:", filter);
     }
 
     return filter;
@@ -184,20 +166,15 @@ const OrdersPage = () => {
 
   // Update filter when tab changes
   useEffect(() => {
-    console.log("[Orders DEBUG] Tab changed to:", tabValue);
-
     // Get the filter for this tab
     const newFilter = getFilterForTab(tabValue);
-    console.log("[Orders DEBUG] Created filter object:", newFilter);
 
     // Apply the filter
-    console.log("[Orders DEBUG] Calling updateFilter with:", newFilter);
     updateFilter(newFilter);
 
     // Update active filters UI
     if (tabValue === 0) {
       setActiveFilters([]);
-      console.log("[Orders DEBUG] Cleared active filters for All Orders tab");
     } else {
       const filterLabel =
         tabValue === 1
@@ -206,7 +183,6 @@ const OrdersPage = () => {
             ? "Status: Completed"
             : "Status: Delayed";
       setActiveFilters([filterLabel]);
-      console.log("[Orders DEBUG] Set active filter label to:", filterLabel);
     }
   }, [tabValue, updateFilter]);
 
@@ -297,10 +273,7 @@ const OrdersPage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    console.log("Starting delete process for order:", orderToDelete);
-
     if (!orderToDelete) {
-      console.log("No order selected, cancelling delete");
       setConfirmDeleteOpen(false);
       return;
     }
@@ -309,32 +282,26 @@ const OrdersPage = () => {
       setIsDeleting(true);
 
       // 1. Delete all processes associated with this order
-      console.log("Finding processes for order:", orderToDelete);
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderToDelete)
       );
 
       const processesSnapshot = await getDocs(processesQuery);
-      console.log(`Found ${processesSnapshot.size} processes to delete`);
 
       // Use a batch for efficient deletion of multiple documents
       const batch = writeBatch(db);
 
       processesSnapshot.forEach(doc => {
-        console.log("Adding process to delete batch:", doc.id);
         batch.delete(doc.ref);
       });
 
       // 2. Delete the order document itself
-      console.log("Adding order to delete batch:", orderToDelete);
       const orderRef = doc(db, "orders", orderToDelete);
       batch.delete(orderRef);
 
       // Commit all the delete operations
-      console.log("Committing batch delete");
       await batch.commit();
-      console.log("Batch delete committed successfully");
 
       // Show success message
       setSuccessMessage(`Order ${orderToDelete} has been deleted successfully`);
@@ -346,9 +313,7 @@ const OrdersPage = () => {
       setSelectedOrder(null); // Also clear the selectedOrder
 
       // Refresh the orders list
-      console.log("Refreshing orders list");
       await refreshOrders();
-      console.log("Orders list refreshed");
     } catch (err) {
       console.error("Error in delete process:", err);
       setSuccessMessage(

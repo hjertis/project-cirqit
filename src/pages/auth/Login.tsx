@@ -1,5 +1,5 @@
 // src/pages/auth/Login.tsx
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Box,
   Button,
@@ -11,78 +11,77 @@ import {
   Link,
   Grid,
   Container,
-  Avatar
-} from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
+  Avatar,
+} from "@mui/material";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState("");
+
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Get the redirect path from location state
-  const from = (location.state as any)?.from?.pathname || '/';
-  
+  const from = (location.state as any)?.from?.pathname || "/";
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    
+
     if (!email || !password) {
-      setError('Please enter both email and password');
+      setError("Please enter both email and password");
       return;
     }
-    
-    setError('');
+
+    setError("");
     setIsLoading(true);
-    
+
     try {
       // Here you would typically call your authentication service
       // await authService.login(email, password);
-      
+
       // For now, just simulate login
       setTimeout(() => {
-        console.log('Logged in with:', email, password);
         // Redirect to the previous page or dashboard
         navigate(from, { replace: true });
       }, 1500);
     } catch (err) {
-      setError('Invalid email or password');
-      console.error('Login error:', err);
+      setError("Invalid email or password");
+      console.error("Login error:", err);
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   return (
     <Container component="main" maxWidth="xs">
       <Paper
         elevation={3}
         sx={{
           marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
           p: 4,
         }}
       >
-        <Avatar sx={{ m: 1, bgcolor: 'primary.main' }}>
+        <Avatar sx={{ m: 1, bgcolor: "primary.main" }}>
           <LockOutlinedIcon />
         </Avatar>
         <Typography component="h1" variant="h5">
           Sign in
         </Typography>
-        
+
         {error && (
           <Typography color="error" sx={{ mt: 2 }}>
             {error}
           </Typography>
         )}
-        
-        <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1, width: '100%' }}>
+
+        <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1, width: "100%" }}>
           <TextField
             margin="normal"
             required
@@ -93,7 +92,7 @@ const Login = () => {
             autoComplete="email"
             autoFocus
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={e => setEmail(e.target.value)}
             disabled={isLoading}
           />
           <TextField
@@ -106,7 +105,7 @@ const Login = () => {
             id="password"
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={e => setPassword(e.target.value)}
             disabled={isLoading}
           />
           <FormControlLabel
@@ -121,7 +120,7 @@ const Login = () => {
             sx={{ mt: 3, mb: 2 }}
             disabled={isLoading}
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {isLoading ? "Signing in..." : "Sign In"}
           </Button>
           <Grid container>
             <Grid item xs>
