@@ -12,20 +12,25 @@ import {
   Grid,
   Container,
   Avatar,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get the redirect path from location state
+  // Get the redirect path from location state or default to homepage
   const from = (location.state as any)?.from?.pathname || "/";
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -40,16 +45,28 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Here you would typically call your authentication service
-      // await authService.login(email, password);
+      await login(email, password);
 
-      // For now, just simulate login
-      setTimeout(() => {
-        // Redirect to the previous page or dashboard
-        navigate(from, { replace: true });
-      }, 1500);
-    } catch (err) {
-      setError("Invalid email or password");
+      // If rememberMe is checked, persist auth state (this is optional)
+      if (rememberMe) {
+        localStorage.setItem("rememberMe", "true");
+      } else {
+        localStorage.removeItem("rememberMe");
+      }
+
+      // Navigate to the page user tried to access or home page
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      // Handle specific Firebase Auth errors
+      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+        setError("Invalid email or password");
+      } else if (err.code === "auth/too-many-requests") {
+        setError("Too many failed login attempts. Please try again later.");
+      } else if (err.code === "auth/user-disabled") {
+        setError("This account has been disabled. Please contact support.");
+      } else {
+        setError(`Login failed: ${err.message}`);
+      }
       console.error("Login error:", err);
     } finally {
       setIsLoading(false);
@@ -76,9 +93,9 @@ const Login = () => {
         </Typography>
 
         {error && (
-          <Typography color="error" sx={{ mt: 2 }}>
+          <Alert severity="error" sx={{ mt: 2, width: "100%" }}>
             {error}
-          </Typography>
+          </Alert>
         )}
 
         <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1, width: "100%" }}>
@@ -109,7 +126,14 @@ const Login = () => {
             disabled={isLoading}
           />
           <FormControlLabel
-            control={<Checkbox value="remember" color="primary" />}
+            control={
+              <Checkbox
+                value="remember"
+                color="primary"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+              />
+            }
             label="Remember me"
             disabled={isLoading}
           />
@@ -120,7 +144,7 @@ const Login = () => {
             sx={{ mt: 3, mb: 2 }}
             disabled={isLoading}
           >
-            {isLoading ? "Signing in..." : "Sign In"}
+            {isLoading ? <CircularProgress size={24} /> : "Sign In"}
           </Button>
           <Grid container>
             <Grid item xs>

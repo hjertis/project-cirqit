@@ -1,4 +1,4 @@
-// src/components/layout/TopBar.tsx
+// src/components/layout/Topbar.tsx
 import { useState } from "react";
 import {
   AppBar,
@@ -14,15 +14,20 @@ import {
   Tooltip,
   styled,
   alpha,
+  Divider,
+  ListItemIcon,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
   Search as SearchIcon,
   Notifications as NotificationsIcon,
-  AccountCircle,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
+  AccountCircle as AccountCircleIcon,
+  Person as PersonIcon,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
@@ -72,6 +77,8 @@ interface TopBarProps {
 const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const isMenuOpen = Boolean(anchorEl);
+  const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -81,17 +88,92 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
     setAnchorEl(null);
   };
 
+  const handleProfile = () => {
+    navigate("/profile");
+    handleMenuClose();
+  };
+
+  const handleSettings = () => {
+    navigate("/settings");
+    handleMenuClose();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // No need to navigate - protected route will redirect to login
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+    handleMenuClose();
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = (): string => {
+    if (!currentUser?.displayName) {
+      return currentUser?.email?.charAt(0).toUpperCase() || "U";
+    }
+
+    return currentUser.displayName
+      .split(" ")
+      .map(name => name.charAt(0))
+      .join("")
+      .toUpperCase();
+  };
+
   const menuId = "primary-search-account-menu";
   const renderMenu = (
-    <Menu anchorEl={anchorEl} id={menuId} keepMounted open={isMenuOpen} onClose={handleMenuClose}>
-      <MenuItem onClick={handleMenuClose}>
-        <AccountCircle sx={{ mr: 2 }} /> Profile
+    <Menu
+      anchorEl={anchorEl}
+      id={menuId}
+      keepMounted
+      open={isMenuOpen}
+      onClose={handleMenuClose}
+      PaperProps={{
+        elevation: 0,
+        sx: {
+          overflow: "visible",
+          filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.1))",
+          mt: 1.5,
+          width: 200,
+          "& .MuiAvatar-root": {
+            width: 32,
+            height: 32,
+            ml: -0.5,
+            mr: 1,
+          },
+        },
+      }}
+      transformOrigin={{ horizontal: "right", vertical: "top" }}
+      anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+    >
+      <Box sx={{ px: 2, py: 1 }}>
+        <Typography variant="subtitle1" noWrap>
+          {currentUser?.displayName || "User"}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {currentUser?.email}
+        </Typography>
+      </Box>
+      <Divider />
+      <MenuItem onClick={handleProfile}>
+        <ListItemIcon>
+          <PersonIcon fontSize="small" />
+        </ListItemIcon>
+        Profile
       </MenuItem>
-      <MenuItem onClick={handleMenuClose}>
-        <SettingsIcon sx={{ mr: 2 }} /> Settings
+      <MenuItem onClick={handleSettings}>
+        <ListItemIcon>
+          <SettingsIcon fontSize="small" />
+        </ListItemIcon>
+        Settings
       </MenuItem>
-      <MenuItem onClick={handleMenuClose}>
-        <LogoutIcon sx={{ mr: 2 }} /> Logout
+      <Divider />
+      <MenuItem onClick={handleLogout}>
+        <ListItemIcon>
+          <LogoutIcon fontSize="small" />
+        </ListItemIcon>
+        Logout
       </MenuItem>
     </Menu>
   );
@@ -140,7 +222,7 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
               </IconButton>
             </Tooltip>
             <Tooltip title="Settings">
-              <IconButton size="large" color="inherit">
+              <IconButton size="large" color="inherit" onClick={handleSettings}>
                 <SettingsIcon />
               </IconButton>
             </Tooltip>
@@ -154,7 +236,9 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
                 onClick={handleProfileMenuOpen}
                 color="inherit"
               >
-                <Avatar sx={{ width: 32, height: 32 }}>JD</Avatar>
+                <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.dark" }}>
+                  {getUserInitials()}
+                </Avatar>
               </IconButton>
             </Tooltip>
           </Box>

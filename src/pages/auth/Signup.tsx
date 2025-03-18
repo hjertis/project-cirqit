@@ -13,9 +13,12 @@ import {
   Stepper,
   Step,
   StepLabel,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const steps = ["Account Details", "Personal Information", "Review"];
 
@@ -32,8 +35,10 @@ const Signup = () => {
   });
   const [errors, setErrors] = useState({} as Record<string, string>);
   const [isLoading, setIsLoading] = useState(false);
+  const [signupError, setSignupError] = useState("");
 
   const navigate = useNavigate();
+  const { signup } = useAuth();
 
   const handleChange =
     (field: keyof typeof formData) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,6 +53,11 @@ const Signup = () => {
           ...errors,
           [field]: "",
         });
+      }
+
+      // Clear general signup error
+      if (signupError) {
+        setSignupError("");
       }
     };
 
@@ -100,17 +110,33 @@ const Signup = () => {
 
   const handleSubmit = async () => {
     setIsLoading(true);
+    setSignupError("");
 
     try {
-      // Here you would typically call your authentication service
-      // await authService.register(formData);
+      // Create user with Firebase Auth
+      await signup(formData.email, formData.password, `${formData.firstName} ${formData.lastName}`);
 
-      // For now, just simulate registration
-      setTimeout(() => {
-        // Redirect to login
-        navigate("/login", { replace: true });
-      }, 1500);
-    } catch (err) {
+      // You could also store additional user data in Firestore here
+      // For example, company and phone data that isn't stored in the Firebase Auth user object
+
+      // Navigate to login page or dashboard
+      navigate("/login", {
+        replace: true,
+        state: { message: "Account created successfully! Please sign in." },
+      });
+    } catch (err: any) {
+      // Handle specific Firebase Auth errors
+      if (err.code === "auth/email-already-in-use") {
+        setSignupError(
+          "This email is already in use. Please use a different email or try logging in."
+        );
+      } else if (err.code === "auth/invalid-email") {
+        setSignupError("Invalid email address format.");
+      } else if (err.code === "auth/weak-password") {
+        setSignupError("Password is too weak. It should be at least 6 characters.");
+      } else {
+        setSignupError(`Failed to create account: ${err.message}`);
+      }
       console.error("Registration error:", err);
     } finally {
       setIsLoading(false);
@@ -310,6 +336,12 @@ const Signup = () => {
           ))}
         </Stepper>
 
+        {signupError && (
+          <Alert severity="error" sx={{ mt: 2, width: "100%" }}>
+            {signupError}
+          </Alert>
+        )}
+
         <Box component="form" noValidate sx={{ mt: 3, width: "100%" }}>
           {getStepContent(activeStep)}
 
@@ -317,7 +349,14 @@ const Signup = () => {
             <Button disabled={activeStep === 0 || isLoading} onClick={handleBack}>
               Back
             </Button>
-            <Button variant="contained" onClick={handleNext} disabled={isLoading}>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={isLoading}
+              endIcon={
+                isLoading && activeStep === steps.length - 1 ? <CircularProgress size={20} /> : null
+              }
+            >
               {activeStep === steps.length - 1
                 ? isLoading
                   ? "Creating Account..."
