@@ -1,20 +1,20 @@
 // src/components/layout/TopBar.tsx
-import { useState } from 'react';
-import { 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  IconButton, 
-  InputBase, 
-  Badge, 
-  Avatar, 
-  Menu, 
+import { useState } from "react";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  IconButton,
+  InputBase,
+  Badge,
+  Avatar,
+  Menu,
   MenuItem,
   Box,
   Tooltip,
   styled,
-  alpha
-} from '@mui/material';
+  alpha,
+} from "@mui/material";
 import {
   Menu as MenuIcon,
   Search as SearchIcon,
@@ -22,44 +22,44 @@ import {
   AccountCircle,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
-const Search = styled('div')(({ theme }) => ({
-  position: 'relative',
+const Search = styled("div")(({ theme }) => ({
+  position: "relative",
   borderRadius: theme.shape.borderRadius,
   backgroundColor: alpha(theme.palette.common.white, 0.15),
-  '&:hover': {
+  "&:hover": {
     backgroundColor: alpha(theme.palette.common.white, 0.25),
   },
   marginRight: theme.spacing(2),
   marginLeft: 0,
-  width: '100%',
-  [theme.breakpoints.up('sm')]: {
+  width: "100%",
+  [theme.breakpoints.up("sm")]: {
     marginLeft: theme.spacing(3),
-    width: 'auto',
+    width: "auto",
   },
 }));
 
-const SearchIconWrapper = styled('div')(({ theme }) => ({
+const SearchIconWrapper = styled("div")(({ theme }) => ({
   padding: theme.spacing(0, 2),
-  height: '100%',
-  position: 'absolute',
-  pointerEvents: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  height: "100%",
+  position: "absolute",
+  pointerEvents: "none",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 }));
 
 const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
-  '& .MuiInputBase-input': {
+  color: "inherit",
+  "& .MuiInputBase-input": {
     padding: theme.spacing(1, 1, 1, 0),
     // vertical padding + font size from searchIcon
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-    transition: theme.transitions.create('width'),
-    width: '100%',
-    [theme.breakpoints.up('md')]: {
-      width: '20ch',
+    transition: theme.transitions.create("width"),
+    width: "100%",
+    [theme.breakpoints.up("md")]: {
+      width: "20ch",
     },
   },
 }));
@@ -81,15 +81,9 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
     setAnchorEl(null);
   };
 
-  const menuId = 'primary-search-account-menu';
+  const menuId = "primary-search-account-menu";
   const renderMenu = (
-    <Menu
-      anchorEl={anchorEl}
-      id={menuId}
-      keepMounted
-      open={isMenuOpen}
-      onClose={handleMenuClose}
-    >
+    <Menu anchorEl={anchorEl} id={menuId} keepMounted open={isMenuOpen} onClose={handleMenuClose}>
       <MenuItem onClick={handleMenuClose}>
         <AccountCircle sx={{ mr: 2 }} /> Profile
       </MenuItem>
@@ -104,11 +98,11 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
 
   return (
     <>
-      <AppBar 
-        position="fixed" 
-        sx={{ 
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          boxShadow: 'rgb(58 53 65 / 42%) 0px 4px 8px -4px'
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: theme => theme.zIndex.drawer + 1,
+          boxShadow: "rgb(58 53 65 / 42%) 0px 4px 8px -4px",
         }}
       >
         <Toolbar>
@@ -126,7 +120,7 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
             variant="h6"
             noWrap
             component="div"
-            sx={{ display: { xs: 'none', sm: 'block' } }}
+            sx={{ display: { xs: "none", sm: "block" } }}
           >
             SMT Admin
           </Typography>
@@ -134,13 +128,10 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
             <SearchIconWrapper>
               <SearchIcon />
             </SearchIconWrapper>
-            <StyledInputBase
-              placeholder="Search…"
-              inputProps={{ 'aria-label': 'search' }}
-            />
+            <StyledInputBase placeholder="Search…" inputProps={{ "aria-label": "search" }} />
           </Search>
           <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
+          <Box sx={{ display: { xs: "none", md: "flex" } }}>
             <Tooltip title="Notifications">
               <IconButton size="large" color="inherit">
                 <Badge badgeContent={4} color="error">
