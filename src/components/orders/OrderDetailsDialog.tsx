@@ -38,6 +38,7 @@ import { useNavigate } from "react-router-dom";
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
+import OrderTimeTracking from "./OrderTimeTracking";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -462,6 +463,7 @@ const OrderDetailsDialog = ({
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="order details tabs">
               <Tab label="Processes" />
               <Tab label="Notes" />
+              <Tab label="Time Tracking" />
             </Tabs>
           </Box>
 
@@ -521,6 +523,18 @@ const OrderDetailsDialog = ({
                 )}
               </CardContent>
             </Card>
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
+            <OrderTimeTracking
+              orderId={order?.id || ""}
+              orderNumber={order?.orderNumber || ""}
+              processes={processes.map(p => ({
+                id: p.id,
+                name: p.name,
+                type: p.type,
+              }))}
+            />
           </TabPanel>
         </DialogContent>
 

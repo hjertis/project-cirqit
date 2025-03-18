@@ -114,7 +114,7 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
   const formatDate = useCallback((timestamp: Timestamp | undefined) => {
     if (!timestamp || !timestamp.toDate) return "N/A";
     const date = timestamp.toDate();
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString("da-DK", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

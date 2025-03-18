@@ -28,6 +28,7 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import QuickTimeClockWidget from "../time/QuickTimeClockWidget";
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
@@ -221,6 +222,9 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
                 </Badge>
               </IconButton>
             </Tooltip>
+
+            <QuickTimeClockWidget />
+
             <Tooltip title="Settings">
               <IconButton size="large" color="inherit" onClick={handleSettings}>
                 <SettingsIcon />

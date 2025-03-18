@@ -56,6 +56,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
+import OrderTimeTracking from "./OrderTimeTracking";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -645,6 +646,7 @@ const OrderDetails = () => {
             <Tab label="Processes" />
             <Tab label="Notes" />
             <Tab label="History" />
+            <Tab label="Time Tracking" />
           </Tabs>
         </Box>
 
@@ -774,6 +776,19 @@ const OrderDetails = () => {
                 </TableContainer>
               </CardContent>
             </Card>
+          </Box>
+        </TabPanel>
+        <TabPanel value={tabValue} index={3}>
+          <Box sx={{ p: 2 }}>
+            <OrderTimeTracking
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+              processes={processes.map(p => ({
+                id: p.id,
+                name: p.name,
+                type: p.type,
+              }))}
+            />
           </Box>
         </TabPanel>
       </Paper>

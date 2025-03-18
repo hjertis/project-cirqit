@@ -15,6 +15,7 @@ import Signup from "../pages/auth/Signup";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 import ProfilePage from "../pages/ProfilePage";
 import ProtectedRoute from "./ProtectedRoute";
+import TimeDashboardPage from "../pages/TimeDashboardPage";
 
 /**
  * Main application routes configuration
@@ -59,6 +60,7 @@ const AppRoutes = () => {
 
         {/* Reports module */}
         <Route path="/reports" element={<div>Reports Page</div>} />
+        <Route path="/time" element={<TimeDashboardPage />} />
 
         {/* Admin section */}
         <Route

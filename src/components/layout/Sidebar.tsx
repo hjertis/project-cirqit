@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.tsx
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   Drawer,
@@ -12,8 +12,8 @@ import {
   Toolbar,
   useTheme,
   useMediaQuery,
-  Collapse
-} from '@mui/material';
+  Collapse,
+} from "@mui/material";
 import {
   Dashboard as DashboardIcon,
   Assignment as OrdersIcon,
@@ -21,10 +21,11 @@ import {
   People as EmployeesIcon,
   BarChart as ReportsIcon,
   Settings as SettingsIcon,
+  AccessTime as AccessTimeIcon,
   ExpandLess,
-  ExpandMore
-} from '@mui/icons-material';
-import { useState } from 'react';
+  ExpandMore,
+} from "@mui/icons-material";
+import { useState } from "react";
 
 // Drawer width
 const drawerWidth = 240;
@@ -43,7 +44,7 @@ interface NavItem {
 
 const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
@@ -54,35 +55,40 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
 
   const navItems: NavItem[] = [
     {
-      text: 'Dashboard',
+      text: "Dashboard",
       icon: <DashboardIcon />,
-      path: '/'
+      path: "/",
     },
     {
-      text: 'Orders',
+      text: "Orders",
       icon: <OrdersIcon />,
-      path: '/orders',
+      path: "/orders",
       children: [
-        { text: 'All Orders', icon: <OrdersIcon />, path: '/orders' },
-        { text: 'Create Order', icon: <OrdersIcon />, path: '/orders/create' },
-        { text: 'Planning', icon: <OrdersIcon />, path: '/orders/planning' }
-      ]
+        { text: "All Orders", icon: <OrdersIcon />, path: "/orders" },
+        { text: "Create Order", icon: <OrdersIcon />, path: "/orders/create" },
+        { text: "Planning", icon: <OrdersIcon />, path: "/orders/planning" },
+      ],
     },
     {
-      text: 'Products',
+      text: "Products",
       icon: <ProductsIcon />,
-      path: '/products'
+      path: "/products",
     },
     {
-      text: 'Employees',
+      text: "Employees",
       icon: <EmployeesIcon />,
-      path: '/employees'
+      path: "/employees",
     },
     {
-      text: 'Reports',
+      text: "Reports",
       icon: <ReportsIcon />,
-      path: '/reports'
-    }
+      path: "/reports",
+    },
+    {
+      text: "Time Tracking",
+      icon: <AccessTimeIcon />,
+      path: "/time",
+    },
   ];
 
   const handleNavClick = (path: string) => {
@@ -97,58 +103,54 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       <Toolbar />
       <Divider />
       <List>
-        {navItems.map((item) => (
+        {navItems.map(item => (
           <Box key={item.text}>
             {item.children ? (
               <>
                 <ListItem disablePadding>
-                  <ListItemButton 
+                  <ListItemButton
                     onClick={() => handleSubmenuToggle(item.text)}
                     selected={location.pathname.startsWith(item.path)}
                     sx={{
-                      '&.Mui-selected': {
-                        backgroundColor: 'primary.light',
-                        color: 'primary.contrastText',
-                        '&:hover': {
-                          backgroundColor: 'primary.main',
+                      "&.Mui-selected": {
+                        backgroundColor: "primary.light",
+                        color: "primary.contrastText",
+                        "&:hover": {
+                          backgroundColor: "primary.main",
                         },
-                        '& .MuiListItemIcon-root': {
-                          color: 'primary.contrastText',
-                        }
-                      }
+                        "& .MuiListItemIcon-root": {
+                          color: "primary.contrastText",
+                        },
+                      },
                     }}
                   >
-                    <ListItemIcon>
-                      {item.icon}
-                    </ListItemIcon>
+                    <ListItemIcon>{item.icon}</ListItemIcon>
                     <ListItemText primary={item.text} />
                     {openSubmenu === item.text ? <ExpandLess /> : <ExpandMore />}
                   </ListItemButton>
                 </ListItem>
                 <Collapse in={openSubmenu === item.text} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
-                    {item.children.map((child) => (
-                      <ListItemButton 
+                    {item.children.map(child => (
+                      <ListItemButton
                         key={child.text}
                         onClick={() => handleNavClick(child.path)}
                         selected={location.pathname === child.path}
-                        sx={{ 
+                        sx={{
                           pl: 4,
-                          '&.Mui-selected': {
-                            backgroundColor: 'primary.light',
-                            color: 'primary.contrastText',
-                            '&:hover': {
-                              backgroundColor: 'primary.main',
+                          "&.Mui-selected": {
+                            backgroundColor: "primary.light",
+                            color: "primary.contrastText",
+                            "&:hover": {
+                              backgroundColor: "primary.main",
                             },
-                            '& .MuiListItemIcon-root': {
-                              color: 'primary.contrastText',
-                            }
-                          }
+                            "& .MuiListItemIcon-root": {
+                              color: "primary.contrastText",
+                            },
+                          },
                         }}
                       >
-                        <ListItemIcon>
-                          {child.icon}
-                        </ListItemIcon>
+                        <ListItemIcon>{child.icon}</ListItemIcon>
                         <ListItemText primary={child.text} />
                       </ListItemButton>
                     ))}
@@ -157,25 +159,23 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
               </>
             ) : (
               <ListItem disablePadding>
-                <ListItemButton 
+                <ListItemButton
                   onClick={() => handleNavClick(item.path)}
                   selected={location.pathname === item.path}
                   sx={{
-                    '&.Mui-selected': {
-                      backgroundColor: 'primary.light',
-                      color: 'primary.contrastText',
-                      '&:hover': {
-                        backgroundColor: 'primary.main',
+                    "&.Mui-selected": {
+                      backgroundColor: "primary.light",
+                      color: "primary.contrastText",
+                      "&:hover": {
+                        backgroundColor: "primary.main",
                       },
-                      '& .MuiListItemIcon-root': {
-                        color: 'primary.contrastText',
-                      }
-                    }
+                      "& .MuiListItemIcon-root": {
+                        color: "primary.contrastText",
+                      },
+                    },
                   }}
                 >
-                  <ListItemIcon>
-                    {item.icon}
-                  </ListItemIcon>
+                  <ListItemIcon>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
                 </ListItemButton>
               </ListItem>
@@ -186,7 +186,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       <Divider />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick('/settings')}>
+          <ListItemButton onClick={() => handleNavClick("/settings")}>
             <ListItemIcon>
               <SettingsIcon />
             </ListItemIcon>
@@ -198,10 +198,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
   );
 
   return (
-    <Box
-      component="nav"
-      sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
-    >
+    <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
       {/* The implementation can be swapped with js to avoid SEO duplication of links. */}
       {isMobile ? (
         <Drawer
@@ -212,8 +209,8 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
             keepMounted: true, // Better open performance on mobile.
           }}
           sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            display: { xs: "block", md: "none" },
+            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
           }}
         >
           {drawer}
@@ -222,8 +219,8 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            display: { xs: "none", md: "block" },
+            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
           }}
           open
         >
