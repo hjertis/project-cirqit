@@ -44,6 +44,7 @@ import {
   MoreVert as MoreVertIcon,
   Refresh as RefreshIcon,
   Archive as ArchiveIcon,
+  CalendarToday as CalendarTodayIcon,
 } from "@mui/icons-material";
 import { Link as RouterLink } from "react-router-dom";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -402,6 +403,15 @@ const OrdersPage = () => {
               sx={{ mr: 2 }}
             >
               Archived Orders
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/orders/calendar"
+              variant="outlined"
+              startIcon={<CalendarTodayIcon />}
+              sx={{ mr: 2 }}
+            >
+              Resource Calendar
             </Button>
             <Button
               variant="outlined"

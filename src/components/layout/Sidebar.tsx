@@ -24,6 +24,7 @@ import {
   AccessTime as AccessTimeIcon,
   ExpandLess,
   ExpandMore,
+  PeopleAlt as PeopleAltIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 
@@ -88,6 +89,11 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       text: "Time Tracking",
       icon: <AccessTimeIcon />,
       path: "/time",
+    },
+    {
+      text: "Resources",
+      icon: <PeopleAltIcon />, // or another appropriate icon
+      path: "/resources",
     },
   ];
 

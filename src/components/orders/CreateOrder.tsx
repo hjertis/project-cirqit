@@ -1,5 +1,5 @@
 // src/components/orders/CreateOrder.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -29,6 +29,7 @@ import {
 } from "@mui/icons-material";
 import { collection, Timestamp, doc, setDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
+import { getResources, Resource } from "../../services/resourceService";
 
 // Define the form data interface
 interface OrderFormData {
@@ -43,6 +44,7 @@ interface OrderFormData {
   priority: string;
   notes: string;
   processes: ProcessTemplate[];
+  assignedResourceId?: string;
 }
 
 // Define process template interface
@@ -113,7 +115,28 @@ const CreateOrder = () => {
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loadingResources, setLoadingResources] = useState<boolean>(false);
+
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchResources = async () => {
+      setLoadingResources(true);
+      try {
+        // Only fetch active resources
+        const activeResources = await getResources(true);
+        setResources(activeResources);
+      } catch (err) {
+        console.error("Error fetching resources:", err);
+        // Optionally show an error message
+      } finally {
+        setLoadingResources(false);
+      }
+    };
+
+    fetchResources();
+  }, []);
 
   // Handle form field changes
   const handleChange =
@@ -277,6 +300,7 @@ const CreateOrder = () => {
         priority: formData.priority,
         notes: formData.notes,
         updated: Timestamp.fromDate(new Date()),
+        assignedResourceId: formData.assignedResourceId || null,
       };
 
       // Add the order to Firestore
@@ -468,6 +492,27 @@ const CreateOrder = () => {
                 onChange={handleChange("customer")}
                 helperText="Optional"
               />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel id="resource-select-label">Assigned Resource (Optional)</InputLabel>
+                <Select
+                  labelId="resource-select-label"
+                  value={formData.assignedResourceId || ""}
+                  onChange={handleChange("assignedResourceId") as any}
+                  label="Assigned Resource (Optional)"
+                  disabled={loadingResources}
+                >
+                  <MenuItem value="">
+                    <em>{loadingResources ? "Loading resources..." : "None"}</em>
+                  </MenuItem>
+                  {resources.map(resource => (
+                    <MenuItem key={resource.id} value={resource.id}>
+                      {resource.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
 
             {/* Schedule */}
