@@ -125,7 +125,15 @@ const initialFormData: OrderFormData = {
 };
 
 // Predefined process templates
-const processTypes = ["Setup", "Assembly", "Testing", "Quality Check", "Packaging", "Shipping"];
+const processTypes = [
+  "Setup",
+  "Assembly",
+  "Testing",
+  "Quality Check",
+  "Packaging",
+  "Shipping",
+  "Production",
+];
 
 // Available statuses
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
