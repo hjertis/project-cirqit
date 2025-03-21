@@ -410,8 +410,72 @@ const EditOrder = () => {
       // Update order in Firestore
       await updateDoc(doc(db, "orders", id!), orderData);
 
-      // The rest of the function remains the same
-      // ...
+      // Handle process updates - first identify existing, updated, and new processes
+      const existingProcessIds = originalProcesses.map(p => p.id);
+      const currentProcessIds = formData.processes.filter(p => p.id).map(p => p.id) as string[];
+
+      // Find processes to delete (in original but not in current)
+      const processesToDelete = existingProcessIds.filter(id => !currentProcessIds.includes(id));
+
+      // Delete processes that were removed
+      for (const processId of processesToDelete) {
+        await deleteDoc(doc(db, "processes", processId));
+      }
+
+      // Update or create processes
+      for (const process of formData.processes) {
+        // Calculate process dates based on parent order dates and sequence
+        const processStartDate = new Date(startDate);
+        const processEndDate = new Date(processStartDate);
+
+        // Find previous processes to determine start date
+        const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
+        if (previousProcesses.length > 0) {
+          const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
+          processStartDate.setDate(startDate.getDate() + totalPreviousDuration);
+        }
+
+        // Calculate end date based on process duration
+        processEndDate.setDate(processStartDate.getDate() + process.duration);
+
+        if (process.id) {
+          // Update existing process
+          const processRef = doc(db, "processes", process.id);
+          await updateDoc(processRef, {
+            workOrderId: formData.orderNumber,
+            type: process.type,
+            name: process.name,
+            sequence: process.sequence,
+            status: process.status || "Not Started",
+            startDate: Timestamp.fromDate(processStartDate),
+            endDate: Timestamp.fromDate(processEndDate),
+            updated: Timestamp.fromDate(new Date()),
+          });
+        } else {
+          // Create new process
+          const processRef = doc(collection(db, "processes"));
+          await setDoc(processRef, {
+            workOrderId: formData.orderNumber,
+            processId: processRef.id,
+            type: process.type,
+            name: process.name,
+            sequence: process.sequence,
+            status: process.status || "Not Started",
+            startDate: Timestamp.fromDate(processStartDate),
+            endDate: Timestamp.fromDate(processEndDate),
+            assignedResource: null,
+            progress: 0,
+            createdAt: Timestamp.fromDate(new Date()),
+          });
+        }
+      }
+
+      setSuccess(true);
+
+      // Navigate back to order details after a short delay
+      setTimeout(() => {
+        navigate(`/orders/${id}`);
+      }, 1500);
     } catch (err) {
       console.error("Error updating order:", err);
       setError(`Failed to update order: ${err instanceof Error ? err.message : String(err)}`);
@@ -462,7 +526,7 @@ const EditOrder = () => {
             variant="contained"
             onClick={handleSubmit}
             startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-            disabled={saving}
+            loading={saving}
           >
             {saving ? "Saving..." : "Save Changes"}
           </Button>
