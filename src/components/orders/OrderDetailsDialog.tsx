@@ -33,12 +33,14 @@ import {
   AccessTime as AccessTimeIcon,
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon,
+  Print as PrintIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
 import OrderTimeTracking from "./OrderTimeTracking";
+import PrintableWorkOrder from "./PrintableWorkOrder";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -135,6 +137,11 @@ const OrderDetailsDialog = ({
   const [tabValue, setTabValue] = useState(0);
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveResult, setArchiveResult] = useState<string | null>(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+
+  const handlePrintOrder = () => {
+    setPrintDialogOpen(true);
+  };
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -543,6 +550,9 @@ const OrderDetailsDialog = ({
           <Button onClick={handleViewFull} startIcon={<EditIcon />}>
             {fullPage ? "Edit Order" : "View Full Details"}
           </Button>
+          <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrintOrder}>
+            Print Work Order
+          </Button>
           <Button
             color="secondary"
             variant="outlined"
@@ -570,6 +580,15 @@ const OrderDetailsDialog = ({
           onClose={() => setArchiveResult(null)}
           message={archiveResult || ""}
         />
+        {/* Printable Work Order Dialog */}
+        {order && (
+          <PrintableWorkOrder
+            open={printDialogOpen}
+            onClose={() => setPrintDialogOpen(false)}
+            order={order}
+            processes={processes}
+          />
+        )}
       </>
     );
   };

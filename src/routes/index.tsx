@@ -18,6 +18,8 @@ import ProtectedRoute from "./ProtectedRoute";
 import TimeDashboardPage from "../pages/TimeDashboardPage";
 import ResourceCalendarPage from "../pages/ResourceCalendarPage";
 import ResourceManagementPage from "../pages/ResourceManagementPage";
+import PrintOrderPage from "../pages/PrintOrderPage";
+import StandaloneWorkOrderPrintPage from "../pages/StandaloneWorkOrderPrintPage";
 
 /**
  * Main application routes configuration
@@ -47,7 +49,9 @@ const AppRoutes = () => {
         <Route path="/orders/create" element={<CreateOrderPage />} />
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
-        <Route path="/orders/calendar" element={<ResourceCalendarPage />} />{" "}
+        <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
+        {/* <Route path="/orders/:id/print" element={<PrintOrderPage />} /> */}
+        <Route path="/orders/:id/print" element={<StandaloneWorkOrderPrintPage />} />
         {/* New calendar route */}
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
