@@ -5,15 +5,6 @@ import {
   Box,
   Typography,
   Paper,
-  Grid,
-  Divider,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Checkbox,
   Button,
   CircularProgress,
   Alert,
@@ -29,9 +20,10 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
-import { formatDate } from "../utils/helpers";
 import ContentWrapper from "../components/layout/ContentWrapper";
-
+import CompactProcessesTable from "../components/orders/CompactProcessesTable";
+import CompactSignatureSection from "../components/orders/CompactSignatureSection";
+import "../styles/CompactPrintStyles.css";
 interface Process {
   id: string;
   name: string;
@@ -64,6 +56,15 @@ const getStatusColor = (status: string): string => {
   }
 };
 
+// Format date function
+const formatDate = (date: Date): string => {
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+};
+
 const StandaloneWorkOrderPrintPage = () => {
   const theme = useTheme();
   const { id } = useParams<{ id: string }>();
@@ -76,7 +77,6 @@ const StandaloneWorkOrderPrintPage = () => {
 
   // State for managing manual progress checkboxes
   const [processProgress, setProcessProgress] = useState<Record<string, number>>({});
-  const [processNotes, setProcessNotes] = useState<Record<string, string>>({});
 
   // Fetch order and processes
   useEffect(() => {
@@ -118,15 +118,10 @@ const StandaloneWorkOrderPrintPage = () => {
 
         // Initialize progress state
         const initialProgress: Record<string, number> = {};
-        const initialNotes: Record<string, string> = {};
-
         processesData.forEach(process => {
           initialProgress[process.id] = process.progress || 0;
-          initialNotes[process.id] = "";
         });
-
         setProcessProgress(initialProgress);
-        setProcessNotes(initialNotes);
 
         setError(null);
       } catch (err) {
@@ -208,281 +203,149 @@ const StandaloneWorkOrderPrintPage = () => {
         </Box>
 
         {/* Printable Content */}
-        <Box ref={printRef} sx={{ maxWidth: "210mm", margin: "0 auto", p: 2 }}>
-          {/* Work Order Header */}
-          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-            <Box>
-              <Typography variant="h5" sx={{ fontSize: { xs: "1.2rem", sm: "1.5rem" } }}>
-                WORK ORDER: {order.orderNumber}
-              </Typography>
-              <Typography variant="subtitle2">{order.description}</Typography>
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Box
+            ref={printRef}
+            className="print-container"
+            sx={{ maxWidth: "210mm", margin: "0 auto" }}
+          >
+            {/* Work Order Header - More compact */}
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+              className="header"
+            >
+              <Box>
+                <Typography
+                  variant="h6"
+                  sx={{ fontSize: "1rem", fontWeight: "bold", lineHeight: 1.2 }}
+                >
+                  WORK ORDER: {order.orderNumber}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                  {order.description}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: "right" }}>
+                <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                  Status:{" "}
+                  <span style={{ color: getStatusColor(order.status), fontWeight: "bold" }}>
+                    {order.status}
+                  </span>
+                </Typography>
+                <Typography variant="caption">
+                  Date: {order.updated ? formatDate(order.updated.toDate()) : "N/A"}
+                </Typography>
+              </Box>
             </Box>
-            <Box sx={{ textAlign: "right" }}>
-              <Typography variant="body2">
-                Status:{" "}
-                <span style={{ color: getStatusColor(order.status), fontWeight: "bold" }}>
-                  {order.status}
-                </span>
-              </Typography>
-              <Typography variant="caption">
-                Date: {order.updated ? formatDate(order.updated.toDate()) : "N/A"}
-              </Typography>
-            </Box>
-          </Box>
 
-          <Divider sx={{ mb: 2 }} />
-
-          {/* Order Details - Compact layout */}
-          <Typography variant="h6" sx={{ fontSize: "1rem", fontWeight: "bold", mt: 2, mb: 1 }}>
-            Order Details
-          </Typography>
-          <Grid container spacing={1} sx={{ mb: 2 }}>
-            <Grid item xs={6}>
-              <Paper variant="outlined" sx={{ p: 1 }}>
-                <Grid container spacing={1}>
-                  <Grid item xs={5}>
+            <Box sx={{ px: 1 }}>
+              {/* Order Details Section - Compact Grid Layout */}
+              <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
+                Order Details
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 1,
+                  mb: 1,
+                }}
+              >
+                <Paper variant="outlined" sx={{ p: 0.5 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
                       Part Number:
                     </Typography>
-                  </Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">{order.partNo}</Typography>
-                  </Grid>
+                    <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                      {order.partNo}
+                    </Typography>
 
-                  <Grid item xs={5}>
                     <Typography variant="caption" color="text.secondary">
                       Quantity:
                     </Typography>
-                  </Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">{order.quantity}</Typography>
-                  </Grid>
+                    <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                      {order.quantity}
+                    </Typography>
 
-                  <Grid item xs={5}>
                     <Typography variant="caption" color="text.secondary">
                       Priority:
                     </Typography>
-                  </Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">{order.priority || "Medium"}</Typography>
-                  </Grid>
+                    <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                      {order.priority || "Medium"}
+                    </Typography>
 
-                  {order.customer && (
-                    <>
-                      <Grid item xs={5}>
+                    {order.customer && (
+                      <>
                         <Typography variant="caption" color="text.secondary">
                           Customer:
                         </Typography>
-                      </Grid>
-                      <Grid item xs={7}>
-                        <Typography variant="body2">{order.customer}</Typography>
-                      </Grid>
-                    </>
-                  )}
-                </Grid>
-              </Paper>
-            </Grid>
+                        <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                          {order.customer}
+                        </Typography>
+                      </>
+                    )}
+                  </Box>
+                </Paper>
 
-            <Grid item xs={6}>
-              <Paper variant="outlined" sx={{ p: 1 }}>
-                <Grid container spacing={1}>
-                  <Grid item xs={5}>
+                <Paper variant="outlined" sx={{ p: 0.5 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
                       Start Date:
                     </Typography>
-                  </Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">{formatDate(order.start.toDate())}</Typography>
-                  </Grid>
+                    <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                      {formatDate(order.start.toDate())}
+                    </Typography>
 
-                  <Grid item xs={5}>
                     <Typography variant="caption" color="text.secondary">
                       End Date:
                     </Typography>
-                  </Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">{formatDate(order.end.toDate())}</Typography>
-                  </Grid>
+                    <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                      {formatDate(order.end.toDate())}
+                    </Typography>
 
-                  <Grid item xs={5}>
                     <Typography variant="caption" color="text.secondary">
                       Duration:
                     </Typography>
-                  </Grid>
-                  <Grid item xs={7}>
-                    <Typography variant="body2">
+                    <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
                       {Math.ceil(
                         (order.end.toDate().getTime() - order.start.toDate().getTime()) /
                           (1000 * 60 * 60 * 24)
                       )}{" "}
                       days
                     </Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
-          </Grid>
+                  </Box>
+                </Paper>
+              </Box>
 
-          {/* Process Tracking - More compact table */}
-          <Typography variant="h6" sx={{ fontSize: "1rem", fontWeight: "bold", mt: 2, mb: 1 }}>
-            Process Tracking
-          </Typography>
-          {processes.length > 0 ? (
-            <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox" align="center">
-                      Seq
-                    </TableCell>
-                    <TableCell>Process</TableCell>
-                    <TableCell>Date Range</TableCell>
-                    <TableCell>Resource</TableCell>
-                    <TableCell align="center">Progress Checkpoints</TableCell>
-                    <TableCell>Notes</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {processes.map(process => (
-                    <TableRow key={process.id} className="process-row">
-                      <TableCell align="center">{process.sequence}</TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: "medium", fontSize: "0.8rem" }}
-                        >
-                          {process.name}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ fontSize: "0.7rem" }}
-                        >
-                          {process.type}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        <Typography variant="caption">
-                          {formatDate(process.startDate.toDate())} -{" "}
-                          {formatDate(process.endDate.toDate())}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{process.assignedResource || "—"}</TableCell>
-                      <TableCell>
-                        <Box className="progress-section" sx={{ width: "100%" }}>
-                          {/* Progress checkboxes in a row */}
-                          <Box
-                            sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}
-                          >
-                            {[0, 25, 50, 75, 100].map(value => (
-                              <Box
-                                key={value}
-                                sx={{
-                                  textAlign: "center",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                }}
-                              >
-                                <Checkbox
-                                  checked={processProgress[process.id] >= value}
-                                  onChange={() => handleProgressChange(process.id, value)}
-                                  sx={{ p: 0, m: 0 }}
-                                  className="progress-checkbox"
-                                  size="small"
-                                />
-                                <Typography
-                                  variant="caption"
-                                  sx={{ fontSize: "0.6rem", display: "block", mt: -0.5 }}
-                                >
-                                  {value}%
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box
-                          sx={{
-                            height: "35px",
-                            border: "1px solid #ddd",
-                            width: "100%",
-                          }}
-                        >
-                          &nbsp;
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No processes found for this order.
-            </Typography>
-          )}
+              {/* Process Tracking */}
+              <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
+                Process Tracking
+              </Typography>
+              <CompactProcessesTable
+                processes={processes}
+                processProgress={processProgress}
+                onProgressChange={handleProgressChange}
+                isPrintMode={false}
+              />
 
-          {/* Quality Sign-off Section - More compact */}
-          <Typography variant="h6" sx={{ fontSize: "1rem", fontWeight: "bold", mt: 2, mb: 1 }}>
-            Quality Verification
-          </Typography>
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={6}>
-              <Paper variant="outlined" sx={{ p: 1 }}>
-                <Typography variant="caption" gutterBottom>
-                  Inspected By:
+              {/* Quality Verification */}
+              <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
+                Quality Verification
+              </Typography>
+              <CompactSignatureSection isPrintMode={false} />
+
+              {/* Notes Section */}
+              <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
+                Additional Notes
+              </Typography>
+              <Paper variant="outlined" sx={{ p: 0.5, minHeight: "40px", mb: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {order.notes || "No additional notes for this order."}
                 </Typography>
-                <Box
-                  className="signature-box"
-                  sx={{
-                    border: "1px dashed #ccc",
-                    height: "60px",
-                    mt: 0.5,
-                  }}
-                ></Box>
-                <Box sx={{ mt: 0.5 }}>
-                  <Typography variant="caption">Name: ____________________________</Typography>
-                  <Typography variant="caption" display="block">
-                    Date: ____________________________
-                  </Typography>
-                </Box>
               </Paper>
-            </Grid>
-            <Grid item xs={6}>
-              <Paper variant="outlined" sx={{ p: 1 }}>
-                <Typography variant="caption" gutterBottom>
-                  Approved By:
-                </Typography>
-                <Box
-                  className="signature-box"
-                  sx={{
-                    border: "1px dashed #ccc",
-                    height: "60px",
-                    mt: 0.5,
-                  }}
-                ></Box>
-                <Box sx={{ mt: 0.5 }}>
-                  <Typography variant="caption">Name: ____________________________</Typography>
-                  <Typography variant="caption" display="block">
-                    Date: ____________________________
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-          </Grid>
-
-          {/* Notes Section - Smaller */}
-          <Typography variant="h6" sx={{ fontSize: "1rem", fontWeight: "bold", mt: 2, mb: 1 }}>
-            Additional Notes
-          </Typography>
-          <Paper variant="outlined" sx={{ p: 1, minHeight: "80px", mb: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              {order.notes || "No additional notes for this order."}
-            </Typography>
-          </Paper>
-        </Box>
+            </Box>
+          </Box>
+        </Paper>
       </Box>
 
       {/* Print Styles */}
@@ -496,8 +359,8 @@ const StandaloneWorkOrderPrintPage = () => {
           body {
             margin: 0;
             padding: 0;
-            font-size: 11pt;
-            line-height: 1.3;
+            font-size: 10pt;
+            line-height: 1.2;
           }
 
           .no-print {
@@ -506,12 +369,12 @@ const StandaloneWorkOrderPrintPage = () => {
 
           table {
             page-break-inside: avoid;
-            font-size: 10pt;
+            font-size: 9pt;
           }
 
           th,
           td {
-            padding: 4px 8px !important;
+            padding: 3px 5px !important;
           }
 
           .process-row {
@@ -524,6 +387,57 @@ const StandaloneWorkOrderPrintPage = () => {
 
           .progress-checkbox {
             padding: 2px !important;
+          }
+
+          /* Reduce vertical spacing between sections */
+          h6,
+          .MuiTypography-subtitle2 {
+            margin-top: 6px !important;
+            margin-bottom: 3px !important;
+            font-size: 11pt !important;
+          }
+
+          .MuiTypography-body2,
+          .MuiTypography-body1 {
+            font-size: 9pt !important;
+          }
+
+          .MuiTypography-caption {
+            font-size: 8pt !important;
+          }
+
+          /* Reduce padding in cards */
+          .MuiCard-root,
+          .MuiCardContent-root,
+          .MuiPaper-root {
+            padding: 4px !important;
+          }
+
+          /* Fix Divider appearance */
+          .MuiDivider-root {
+            border-color: #888 !important;
+            margin: 2px 0 !important;
+          }
+
+          /* Make signature areas smaller */
+          .signature-box {
+            height: 30px !important;
+          }
+
+          /* Ensure checkboxes are small */
+          .MuiCheckbox-root {
+            transform: scale(0.7) !important;
+          }
+
+          /* Print container padding adjustments */
+          .print-container {
+            padding: 0 !important;
+            max-width: 100% !important;
+          }
+
+          /* Thinner borders */
+          .MuiPaper-outlined {
+            border: 1px solid #ddd !important;
           }
         }
       `}</style>
