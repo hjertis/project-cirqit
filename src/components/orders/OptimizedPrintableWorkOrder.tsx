@@ -298,11 +298,13 @@ const OptimizedPrintableWorkOrder = ({
             />
 
             {/* Quality Verification */}
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 2, mb: 0.5 }}>
-              Quality Verification
-            </Typography>
-            <Box sx={{ width: "100%" }}>
-              <CompactSignatureSection isPrintMode={printMode} />
+            <Box className="quality-verification-section">
+              <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 2, mb: 0.5 }}>
+                Quality Verification
+              </Typography>
+              <Box sx={{ width: "100%" }}>
+                <CompactSignatureSection isPrintMode={printMode} />
+              </Box>
             </Box>
 
             {/* Notes Section */}
