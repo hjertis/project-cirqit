@@ -1,4 +1,4 @@
-// src/components/orders/CompactSignatureSection.tsx
+// Updated src/components/orders/CompactSignatureSection.tsx
 import { Grid, Typography, Paper, Box } from "@mui/material";
 
 interface CompactSignatureSectionProps {
@@ -7,9 +7,9 @@ interface CompactSignatureSectionProps {
 
 const CompactSignatureSection = ({ isPrintMode = false }: CompactSignatureSectionProps) => {
   return (
-    <Grid container spacing={isPrintMode ? 1 : 2} sx={{ mb: isPrintMode ? 1 : 2 }}>
+    <Grid container spacing={isPrintMode ? 1 : 2} sx={{ mb: isPrintMode ? 1 : 2, width: "100%" }}>
       <Grid item xs={6}>
-        <Paper variant="outlined" sx={{ p: isPrintMode ? 0.5 : 1 }}>
+        <Paper variant="outlined" sx={{ p: isPrintMode ? 0.5 : 1, width: "100%" }}>
           <Typography
             variant="caption"
             sx={{
@@ -25,6 +25,7 @@ const CompactSignatureSection = ({ isPrintMode = false }: CompactSignatureSectio
               border: "1px dashed #ccc",
               height: isPrintMode ? "30px" : "40px",
               mt: 0.5,
+              width: "100%",
             }}
           />
           <Box sx={{ mt: 0.5 }}>
@@ -50,7 +51,7 @@ const CompactSignatureSection = ({ isPrintMode = false }: CompactSignatureSectio
         </Paper>
       </Grid>
       <Grid item xs={6}>
-        <Paper variant="outlined" sx={{ p: isPrintMode ? 0.5 : 1 }}>
+        <Paper variant="outlined" sx={{ p: isPrintMode ? 0.5 : 1, width: "100%" }}>
           <Typography
             variant="caption"
             sx={{
@@ -66,6 +67,7 @@ const CompactSignatureSection = ({ isPrintMode = false }: CompactSignatureSectio
               border: "1px dashed #ccc",
               height: isPrintMode ? "30px" : "40px",
               mt: 0.5,
+              width: "100%",
             }}
           />
           <Box sx={{ mt: 0.5 }}>

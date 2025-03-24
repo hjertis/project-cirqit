@@ -1,9 +1,9 @@
-/* src/styles/CompactPrintStyles.css */
+/* src/styles/CompactPrintStyles.css - Updated with better print layout */
 @media print {
   /* General print settings */
   @page {
     size: A4;
-    margin: 10mm;
+    margin: 12mm;
   }
 
   body {
@@ -11,47 +11,114 @@
     padding: 0;
     font-size: 10pt;
     line-height: 1.2;
+    background-color: white !important;
+    color: black !important;
   }
 
   /* Hide non-printable elements */
   .no-print,
   button,
-  .MuiButtonBase-root {
+  .MuiButtonBase-root,
+  .MuiDialog-root .MuiDialogTitle-root,
+  .MuiDialog-root .MuiDialogActions-root {
     display: none !important;
+  }
+
+  /* Ensure dialog content takes full page */
+  .MuiDialog-paper,
+  .MuiDialogContent-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* Main print container */
+  .print-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Ensure boxes fit within page */
   .MuiPaper-root {
     box-shadow: none !important;
-    border: 1px solid #ddd !important;
+    border: 1px solid #000 !important;
     padding: 4px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Adjust table for printing */
   table {
-    page-break-inside: avoid;
-    font-size: 9pt;
-    border-collapse: collapse;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    font-size: 9pt !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin-bottom: 8px !important;
   }
 
   th,
   td {
-    padding: 3px 5px !important;
-    border: 1px solid #ddd;
+    padding: 2px 3px !important;
+    border: 1px solid #000 !important;
+    text-align: left !important;
+  }
+
+  /* Details grid */
+  .details-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+  }
+
+  .details-card {
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .detail-row {
+    display: grid !important;
+    grid-template-columns: 40% 60% !important;
+    margin-bottom: 2px !important;
+  }
+
+  .detail-label {
+    color: #444 !important;
+    font-size: 9pt !important;
+  }
+
+  .detail-value {
+    font-size: 9pt !important;
   }
 
   /* Make process rows more compact */
   .process-row {
-    page-break-inside: avoid;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     height: auto !important;
   }
 
   /* Ensure progress section is condensed */
   .progress-section {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
     height: auto !important;
     min-height: 24px !important;
   }
@@ -79,9 +146,10 @@
   /* Reduce vertical spacing between sections */
   h6,
   .MuiTypography-subtitle2 {
-    margin-top: 6px !important;
-    margin-bottom: 3px !important;
+    margin-top: 8px !important;
+    margin-bottom: 4px !important;
     font-size: 11pt !important;
+    font-weight: bold !important;
   }
 
   .MuiTypography-body2,
@@ -93,47 +161,57 @@
     font-size: 8pt !important;
   }
 
-  /* Reduce padding in cards */
-  .MuiCard-root,
-  .MuiCardContent-root {
-    padding: 4px !important;
-  }
-
-  /* Ensure each major section starts on a new page if needed */
-  .page-break-before {
-    page-break-before: always;
-  }
-
   /* Fix Divider appearance */
   .MuiDivider-root {
-    border-color: #888 !important;
-    margin: 2px 0 !important;
+    border-color: #000 !important;
+    margin: 4px 0 !important;
+    border-bottom-width: 1px !important;
   }
 
-  /* Make signature areas smaller */
+  /* Make signature areas smaller but visible */
   .signature-box {
-    height: 30px !important;
+    height: 40px !important;
+    border: 1px dashed #000 !important;
+    margin: 4px 0 !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Signature label */
+  .signature-label {
+    font-size: 9pt !important;
+    margin-top: 4px !important;
+  }
+
+  /* Notes section */
+  .notes-section {
+    min-height: 60px !important;
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+    margin-bottom: 8px !important;
+    page-break-inside: avoid !important;
   }
 
   /* Specific styles for process table */
   .process-table th,
   .process-table td {
     font-size: 8.5pt !important;
-  }
-
-  /* Set consistent margins for the printable area */
-  .print-container {
-    padding: 0 !important;
-    max-width: 100% !important;
+    padding: 3px !important;
   }
 
   /* Scale down checkboxes */
   .MuiCheckbox-root {
     transform: scale(0.7) !important;
+    padding: 2px !important;
   }
 
-  /* Notes section height */
-  .notes-field {
-    height: 25px !important;
+  /* Force headers to be printed */
+  thead {
+    display: table-header-group !important;
+  }
+
+  /* Ensure white background */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
