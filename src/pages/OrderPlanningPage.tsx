@@ -1,39 +1,18 @@
 // src/pages/OrderPlanningPage.tsx
+import { useState } from "react";
 import { Box, Breadcrumbs, Typography, Link, Paper, Tabs, Tab } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
-import { useState } from "react";
-import OrderPlanningGantt from "../components/orders/OrderPlanningGantt";
 import OrderWorkflowTimeline from "../components/orders/OrderWorkflowTimeline";
-import SimplifiedGanttChart from "../components/orders/SimplifiedGanttChart";
+import OrderPlanningGantt from "../components/orders/OrderPlanningGantt";
+// Remove or comment out this line:
+// import SimplifiedGanttChart from "../components/orders/SimplifiedGanttChart";
 import ContentWrapper from "../components/layout/ContentWrapper";
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`planning-tabpanel-${index}`}
-      aria-labelledby={`planning-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
-    </div>
-  );
-}
 
 const OrderPlanningPage = () => {
   const [tabValue, setTabValue] = useState(0);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
@@ -55,26 +34,15 @@ const OrderPlanningPage = () => {
             <Typography color="text.primary">Planning</Typography>
           </Breadcrumbs>
         </Box>
-
-        {/* Planning Tabs */}
-        <Paper sx={{ mb: 3 }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="planning tabs">
-            <Tab label="Workflow Timeline" />
-            <Tab label="Timeline View" />
-            <Tab label="Detailed Gantt" />
+        <Paper sx={{ mb: 3, p: 2 }}>
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="Order Planning Tabs">
+            <Tab label="Workflow View" />
+            <Tab label="Gantt Chart" />
           </Tabs>
-
-          <TabPanel value={tabValue} index={0}>
-            <OrderWorkflowTimeline />
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={1}>
-            <SimplifiedGanttChart />
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={2}>
-            <OrderPlanningGantt />
-          </TabPanel>
+          <Box sx={{ mt: 2 }}>
+            {tabValue === 0 && <OrderWorkflowTimeline />}
+            {tabValue === 1 && <OrderPlanningGantt />} {/* Use the new Gantt */}
+          </Box>
         </Paper>
       </Box>
     </ContentWrapper>

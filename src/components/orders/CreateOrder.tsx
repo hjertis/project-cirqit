@@ -303,8 +303,15 @@ const CreateOrder = () => {
         assignedResourceId: formData.assignedResourceId || null,
       };
 
-      // Add the order to Firestore
-      const orderRef = await setDoc(doc(db, "orders", formData.orderNumber), orderData);
+      const orderNumber = formData.orderNumber || `ORD-${Date.now()}`; // Example auto-generation
+
+      // Create the order document
+      const orderRef = doc(db, "orders", orderNumber);
+      await setDoc(orderRef, {
+        ...orderData,
+        orderNumber: orderNumber, // Ensure the final orderNumber is saved
+        createdAt: Timestamp.fromDate(new Date()),
+      });
 
       // Create processes for the order
       for (const process of formData.processes) {
@@ -341,9 +348,9 @@ const CreateOrder = () => {
 
       setSuccess(true);
 
-      // Navigate back to orders after a delay
+      // Navigate back to orders list after a delay
       setTimeout(() => {
-        navigate(`/orders/${formData.orderNumber}`);
+        navigate(`/orders`); // Changed from `/orders/${orderNumber}`
       }, 1500);
     } catch (err) {
       console.error("Error creating order:", err);

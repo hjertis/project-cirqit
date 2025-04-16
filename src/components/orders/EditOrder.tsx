@@ -146,6 +146,7 @@ const processStatusOptions = ["Not Started", "Pending", "In Progress", "Complete
 
 const EditOrder = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<OrderFormData>(initialFormData);
   const [originalProcesses, setOriginalProcesses] = useState<FirebaseProcess[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,8 +157,6 @@ const EditOrder = () => {
 
   const [resources, setResources] = useState<Resource[]>([]);
   const [loadingResources, setLoadingResources] = useState<boolean>(false);
-
-  const navigate = useNavigate();
 
   // Fetch order and processes data
   useEffect(() => {
@@ -472,9 +471,9 @@ const EditOrder = () => {
 
       setSuccess(true);
 
-      // Navigate back to order details after a short delay
+      // Navigate back to the orders list after a short delay
       setTimeout(() => {
-        navigate(`/orders/${id}`);
+        navigate(`/orders`); // Changed from `/orders/${id}`
       }, 1500);
     } catch (err) {
       console.error("Error updating order:", err);
@@ -486,7 +485,7 @@ const EditOrder = () => {
 
   // Handle cancel
   const handleCancel = () => {
-    navigate(`/orders/${id}`);
+    navigate(`/orders`); // Changed from `/orders/${id}`
   };
 
   if (loading) {

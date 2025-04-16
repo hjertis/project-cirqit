@@ -18,8 +18,8 @@ import ProtectedRoute from "./ProtectedRoute";
 import TimeDashboardPage from "../pages/TimeDashboardPage";
 import ResourceCalendarPage from "../pages/ResourceCalendarPage";
 import ResourceManagementPage from "../pages/ResourceManagementPage";
-import PrintOrderPage from "../pages/PrintOrderPage";
 import StandaloneWorkOrderPrintPage from "../pages/StandaloneWorkOrderPrintPage";
+import FaultParetoChart from "../components/dashboard/FaultParetoChart";
 
 /**
  * Main application routes configuration
@@ -64,6 +64,7 @@ const AppRoutes = () => {
         <Route path="/employees" element={<div>Employees Page</div>} />
         {/* Reports module */}
         <Route path="/reports" element={<div>Reports Page</div>} />
+        <Route path="/reports/fault-analysis" element={<FaultParetoChart />} />
         <Route path="/time" element={<TimeDashboardPage />} />
         {/* Resource Management */}
         <Route path="/resources" element={<ResourceManagementPage />} />

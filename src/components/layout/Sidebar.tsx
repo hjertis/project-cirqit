@@ -25,6 +25,7 @@ import {
   ExpandLess,
   ExpandMore,
   PeopleAlt as PeopleAltIcon,
+  ErrorOutline as FaultIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 
@@ -83,7 +84,11 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     {
       text: "Reports",
       icon: <ReportsIcon />,
-      path: "/reports",
+      path: "/reports", // Base path for reports section
+      children: [
+        { text: "Overview", icon: <ReportsIcon />, path: "/reports" }, // Link to the main reports page
+        { text: "Fault Analysis", icon: <FaultIcon />, path: "/reports/fault-analysis" }, // Link to the new chart
+      ],
     },
     {
       text: "Time Tracking",

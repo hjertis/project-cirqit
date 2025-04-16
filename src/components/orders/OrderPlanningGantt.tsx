@@ -60,19 +60,7 @@ interface Process {
 interface OrderWithProcesses {
   order: Order;
   processes: Process[];
-}
-
-// Types for the Gantt chart
-interface GanttBar {
-  id: string;
-  text: string;
-  start: Date;
-  end: Date;
-  progress: number;
-  type: "order" | "process";
-  status: string;
-  resourceName?: string;
-  parentId?: string; // For processes to link to parent orders
+  progress: number; // Overall progress for the order
 }
 
 // Helper functions
@@ -103,15 +91,15 @@ const formatDate = (date: Date): string => {
 // Timeline configuration
 const DAY_WIDTH_DEFAULT = 40; // pixels per day
 const HEADER_HEIGHT = 50;
-const ROW_HEIGHT = 50;
+const ROW_HEIGHT = 40; // Reduced height
 const TODAY = new Date();
 
 const OrderPlanningGantt: React.FC = () => {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ordersWithProcesses, setOrdersWithProcesses] = useState<OrderWithProcesses[]>([]);
-  const [ganttBars, setGanttBars] = useState<GanttBar[]>([]);
+  const [orders, setOrders] = useState<OrderWithProcesses[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<OrderWithProcesses[]>([]);
 
   // Gantt view state
   const [startDate, setStartDate] = useState<Date>(dayjs().subtract(7, "day").toDate());
@@ -168,81 +156,50 @@ const OrderPlanningGantt: React.FC = () => {
           }
         });
 
-        // Group processes by order
+        // Group processes by order and calculate progress
         const groupedData: OrderWithProcesses[] = ordersData.map(order => {
           const orderProcesses = processesData
             .filter(process => process.workOrderId === order.id)
             .sort((a, b) => a.sequence - b.sequence);
 
+          // Calculate total progress for the order
+          let totalProgress = 0;
+          if (orderProcesses.length > 0) {
+            totalProgress = Math.round(
+              orderProcesses.reduce((sum, process) => sum + process.progress, 0) /
+                orderProcesses.length
+            );
+          }
+
           return {
             order,
             processes: orderProcesses,
+            progress: totalProgress,
           };
         });
 
-        setOrdersWithProcesses(groupedData);
+        setOrders(groupedData);
+        setFilteredOrders(groupedData);
         setResources(Array.from(resourceSet).sort());
 
-        // Create gantt bars
-        const bars: GanttBar[] = [];
+        // Update date range if needed
+        let minDate = startDate;
+        let maxDate = endDate;
 
-        groupedData.forEach(({ order, processes }) => {
-          // Add order bar
-          bars.push({
-            id: `order-${order.id}`,
-            text: `${order.orderNumber}: ${order.description}`,
-            start: order.start.toDate(),
-            end: order.end.toDate(),
-            progress: 0, // Calculate based on process progress
-            type: "order",
-            status: order.status,
-          });
-
-          // Set earliest start and latest end date to adjust view
+        groupedData.forEach(({ order }) => {
           const orderStart = order.start.toDate();
           const orderEnd = order.end.toDate();
 
-          // Calculate order progress based on processes
-          let totalProgress = 0;
-
-          // Add process bars
-          processes.forEach(process => {
-            const processStart = process.startDate.toDate();
-            const processEnd = process.endDate.toDate();
-
-            bars.push({
-              id: `process-${process.id}`,
-              text: `${process.name}`,
-              start: processStart,
-              end: processEnd,
-              progress: process.progress,
-              type: "process",
-              status: process.status,
-              resourceName: process.assignedResource || undefined,
-              parentId: `order-${order.id}`,
-            });
-
-            totalProgress += process.progress;
-          });
-
-          // Update order progress
-          if (processes.length > 0) {
-            const orderBar = bars.find(bar => bar.id === `order-${order.id}`);
-            if (orderBar) {
-              orderBar.progress = Math.round(totalProgress / processes.length);
-            }
+          if (dayjs(orderStart).isBefore(dayjs(minDate))) {
+            minDate = orderStart;
           }
-
-          // Update chart date range if needed to show all orders
-          if (dayjs(orderStart).isBefore(dayjs(startDate))) {
-            setStartDate(orderStart);
-          }
-          if (dayjs(orderEnd).isAfter(dayjs(endDate))) {
-            setEndDate(orderEnd);
+          if (dayjs(orderEnd).isAfter(dayjs(maxDate))) {
+            maxDate = orderEnd;
           }
         });
 
-        setGanttBars(bars);
+        setStartDate(minDate);
+        setEndDate(maxDate);
         setError(null);
       } catch (err) {
         console.error("Error fetching orders and processes:", err);
@@ -257,61 +214,33 @@ const OrderPlanningGantt: React.FC = () => {
     fetchOrdersAndProcesses();
   }, []);
 
-  // Filter gantt bars based on status and resource
-  const filteredBars = ganttBars.filter(bar => {
-    // Status filter
-    if (filterStatus && bar.status !== filterStatus) {
-      // Keep parent orders of filtered processes
-      const hasMatchingChild =
-        bar.type === "order" &&
-        ganttBars.some(
-          childBar => childBar.parentId === bar.id && childBar.status === filterStatus
-        );
+  // Apply filters
+  useEffect(() => {
+    if (!orders.length) return;
 
-      if (!hasMatchingChild) {
-        return false;
-      }
+    let result = [...orders];
+
+    // Filter by status
+    if (filterStatus) {
+      result = result.filter(item => {
+        // Filter on order status
+        if (item.order.status === filterStatus) return true;
+
+        // Or if any process has this status
+        return item.processes.some(process => process.status === filterStatus);
+      });
     }
 
-    // Resource filter
-    if (filterResource && bar.type === "process") {
-      if (bar.resourceName !== filterResource) {
-        return false;
-      }
-    } else if (filterResource && bar.type === "order") {
-      // Keep orders that have processes with the filtered resource
-      const hasMatchingResource = ganttBars.some(
-        childBar => childBar.parentId === bar.id && childBar.resourceName === filterResource
-      );
-
-      if (!hasMatchingResource) {
-        return false;
-      }
+    // Filter by resource
+    if (filterResource) {
+      result = result.filter(item => {
+        // Check if any process has this resource
+        return item.processes.some(process => process.assignedResource === filterResource);
+      });
     }
 
-    return true;
-  });
-
-  // Group bars by orders and their processes
-  interface BarGroup {
-    order: GanttBar;
-    processes: GanttBar[];
-  }
-
-  // Group the filtered bars
-  const barGroups: BarGroup[] = [];
-  const orderBars = filteredBars.filter(bar => bar.type === "order");
-
-  orderBars.forEach(orderBar => {
-    const processes = filteredBars.filter(
-      bar => bar.type === "process" && bar.parentId === orderBar.id
-    );
-
-    barGroups.push({
-      order: orderBar,
-      processes,
-    });
-  });
+    setFilteredOrders(result);
+  }, [orders, filterStatus, filterResource]);
 
   // Zoom in/out handlers
   const handleZoomIn = () => {
@@ -354,8 +283,13 @@ const OrderPlanningGantt: React.FC = () => {
     return Math.max(0, durationDays * dayWidth);
   };
 
-  // Get status options from all bars
-  const statusOptions = [...new Set(ganttBars.map(bar => bar.status))].sort();
+  // Get status options from all orders and processes
+  const statusOptions = [
+    ...new Set([
+      ...orders.map(o => o.order.status),
+      ...orders.flatMap(o => o.processes.map(p => p.status)),
+    ]),
+  ].sort();
 
   if (loading) {
     return (
@@ -443,7 +377,8 @@ const OrderPlanningGantt: React.FC = () => {
         )}
 
         <Typography variant="body2" color="text.secondary">
-          Showing {barGroups.length} orders with {filteredBars.length - barGroups.length} processes
+          Showing {filteredOrders.length} orders with{" "}
+          {filteredOrders.reduce((sum, o) => sum + o.processes.length, 0)} processes
         </Typography>
       </Box>
 
@@ -452,15 +387,32 @@ const OrderPlanningGantt: React.FC = () => {
       <Box sx={{ display: "flex", mb: 2 }}>
         {/* Timeline header with dates */}
         <Box sx={{ width: 300, flexShrink: 0 }}>
-          <Box sx={{ height: HEADER_HEIGHT, display: "flex", alignItems: "center", pl: 2 }}>
+          <Box
+            sx={{
+              height: HEADER_HEIGHT,
+              display: "flex",
+              alignItems: "center",
+              pl: 2,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
+          >
             <Typography variant="body2" fontWeight="bold">
-              Order / Process
+              Order / Description
             </Typography>
           </Box>
         </Box>
 
         <Box sx={{ overflow: "auto", position: "relative" }}>
-          <Box sx={{ minWidth: chartWidth, height: HEADER_HEIGHT, display: "flex" }}>
+          <Box
+            sx={{
+              minWidth: chartWidth,
+              height: HEADER_HEIGHT,
+              display: "flex",
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
+          >
             {dates.map((date, index) => {
               const isWeekend = dayjs(date).day() === 0 || dayjs(date).day() === 6;
               const isToday = dayjs(date).isSame(dayjs(), "day");
@@ -506,207 +458,147 @@ const OrderPlanningGantt: React.FC = () => {
         </Box>
       </Box>
 
-      <Box
-        sx={{
-          display: "flex",
-          position: "relative",
-          height: `${barGroups.length * (ROW_HEIGHT * 2 + 10)}px`,
-        }}
-      >
-        {/* Order and process names */}
+      {/* Main Gantt content */}
+      <Box sx={{ display: "flex" }}>
+        {/* Left side - Order names column */}
         <Box sx={{ width: 300, flexShrink: 0 }}>
-          {barGroups.map((group, groupIndex) => (
-            <Box key={group.order.id} sx={{ mb: 1 }}>
-              {/* Order name */}
-              <Box
+          {filteredOrders.map(item => (
+            <Box
+              key={`name-${item.order.id}`}
+              sx={{
+                height: ROW_HEIGHT,
+                borderBottom: "1px solid #eee",
+                display: "flex",
+                alignItems: "center",
+                px: 2,
+              }}
+            >
+              <Typography
                 sx={{
-                  height: ROW_HEIGHT,
-                  display: "flex",
-                  alignItems: "center",
-                  pl: 2,
-                  pr: 1,
-                  backgroundColor: "background.default",
-                  borderRadius: 1,
-                  mb: 0.5,
+                  fontSize: "0.875rem",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
+                title={`${item.order.orderNumber}: ${item.order.description}`}
               >
-                <Typography variant="body2" noWrap title={group.order.text} fontWeight="bold">
-                  {group.order.text}
-                </Typography>
-              </Box>
-
-              {/* Process names */}
-              <Box sx={{ pl: 4 }}>
-                {group.processes.map(process => (
-                  <Box
-                    key={process.id}
-                    sx={{
-                      height: ROW_HEIGHT,
-                      display: "flex",
-                      alignItems: "center",
-                      pl: 2,
-                      mb: 0.5,
-                    }}
-                  >
-                    <Typography variant="body2" noWrap title={process.text}>
-                      {process.text}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
+                {item.order.orderNumber}: {item.order.description}
+              </Typography>
             </Box>
           ))}
         </Box>
 
-        {/* Gantt chart */}
-        <Box sx={{ overflow: "auto", position: "relative", flexGrow: 1 }}>
-          <Box sx={{ minWidth: chartWidth, position: "relative" }}>
-            {/* Background grid */}
-            <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}>
-              {dates.map((date, index) => {
-                const isWeekend = dayjs(date).day() === 0 || dayjs(date).day() === 6;
-                const isToday = dayjs(date).isSame(dayjs(), "day");
-
-                return (
-                  <Box
-                    key={index}
-                    sx={{
-                      position: "absolute",
-                      top: 0,
-                      bottom: 0,
-                      width: dayWidth,
-                      left: index * dayWidth,
-                      backgroundColor: isWeekend ? "action.hover" : "transparent",
-                      borderRight: "1px solid",
-                      borderColor: "divider",
-                    }}
-                  >
-                    {isToday && (
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 0,
-                          bottom: 0,
-                          width: "2px",
-                          backgroundColor: "error.main",
-                          left: "calc(50% - 1px)",
-                        }}
-                      />
-                    )}
-                  </Box>
-                );
-              })}
-            </Box>
-
-            {/* Gantt bars */}
-            {barGroups.map((group, groupIndex) => {
-              let currentTop = groupIndex * (ROW_HEIGHT * 2 + 10);
+        {/* Right side - Gantt chart */}
+        <Box sx={{ overflow: "auto", flexGrow: 1, position: "relative" }}>
+          {/* Background grid */}
+          <Box
+            sx={{
+              position: "relative",
+              minWidth: chartWidth,
+              height: filteredOrders.length * ROW_HEIGHT,
+              borderLeft: "1px solid #eee",
+            }}
+          >
+            {/* Vertical date dividers */}
+            {dates.map((date, index) => {
+              const isWeekend = dayjs(date).day() === 0 || dayjs(date).day() === 6;
+              const isToday = dayjs(date).isSame(dayjs(), "day");
 
               return (
-                <Box key={group.order.id}>
-                  {/* Order bar */}
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      top: currentTop,
-                      left: getBarPosition(group.order.start),
-                      width: getBarWidth(group.order.start, group.order.end),
-                      height: ROW_HEIGHT,
-                      backgroundColor: getStatusColor(group.order.status),
-                      opacity: 0.8,
-                      borderRadius: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      cursor: "pointer",
-                      "&:hover": {
-                        opacity: 1,
-                        boxShadow: 2,
-                      },
-                    }}
-                    title={`${group.order.text} (${formatDate(group.order.start)} - ${formatDate(group.order.end)})`}
-                  >
-                    {/* Progress bar */}
+                <Box
+                  key={`grid-${index}`}
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: index * dayWidth,
+                    width: dayWidth,
+                    height: "100%",
+                    borderRight: "1px solid #eee",
+                    backgroundColor: isWeekend ? "rgba(0,0,0,0.02)" : "transparent",
+                    zIndex: 1,
+                  }}
+                >
+                  {isToday && (
                     <Box
                       sx={{
                         position: "absolute",
                         top: 0,
-                        left: 0,
-                        height: "100%",
-                        width: `${group.order.progress}%`,
-                        backgroundColor: "rgba(255, 255, 255, 0.3)",
-                        borderRadius: 1,
+                        bottom: 0,
+                        width: 2,
+                        backgroundColor: "error.main",
+                        left: dayWidth / 2 - 1,
                       }}
                     />
+                  )}
+                </Box>
+              );
+            })}
 
-                    <Typography variant="caption" sx={{ zIndex: 1 }}>
-                      {group.order.progress}%
-                    </Typography>
-                  </Box>
+            {/* Horizontal row dividers */}
+            {filteredOrders.map((_, index) => (
+              <Box
+                key={`row-divider-${index}`}
+                sx={{
+                  position: "absolute",
+                  top: (index + 1) * ROW_HEIGHT - 1,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  backgroundColor: "#eee",
+                  zIndex: 1,
+                }}
+              />
+            ))}
 
-                  {/* Process bars */}
-                  {group.processes.map((process, processIndex) => {
-                    const top = currentTop + ROW_HEIGHT + 5 + processIndex * ROW_HEIGHT;
+            {/* Today marker - Moving this to its own section for better visibility */}
+            {dates.findIndex(date => dayjs(date).isSame(dayjs(), "day")) >= 0 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: getBarPosition(new Date()),
+                  width: 2,
+                  backgroundColor: "#f44336", // error.main color
+                  zIndex: 2,
+                }}
+              />
+            )}
 
-                    return (
-                      <Box
-                        key={process.id}
-                        sx={{
-                          position: "absolute",
-                          top,
-                          left: getBarPosition(process.start),
-                          width: getBarWidth(process.start, process.end),
-                          height: ROW_HEIGHT - 10,
-                          backgroundColor: getStatusColor(process.status),
-                          opacity: 0.7,
-                          borderRadius: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          color: "white",
-                          px: 1,
-                          cursor: "pointer",
-                          "&:hover": {
-                            opacity: 1,
-                            boxShadow: 1,
-                          },
-                        }}
-                        title={`${process.text} (${formatDate(process.start)} - ${formatDate(process.end)})`}
-                      >
-                        {/* Progress bar */}
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            height: "100%",
-                            width: `${process.progress}%`,
-                            backgroundColor: "rgba(255, 255, 255, 0.3)",
-                            borderRadius: 1,
-                          }}
-                        />
+            {/* Order bars */}
+            {filteredOrders.map((item, index) => {
+              // Calculate bar position and size
+              const barLeft = getBarPosition(item.order.start.toDate());
+              const barWidth = getBarWidth(item.order.start.toDate(), item.order.end.toDate());
 
-                        <Typography variant="caption" sx={{ zIndex: 1 }}>
-                          {process.progress}%
-                        </Typography>
+              // Only show the bar if it has real width, otherwise just show text
+              const hasRealWidth = barWidth > 30;
 
-                        {process.resourceName && (
-                          <Chip
-                            label={process.resourceName}
-                            size="small"
-                            sx={{
-                              height: 18,
-                              fontSize: "0.6rem",
-                              backgroundColor: "rgba(255, 255, 255, 0.2)",
-                              color: "white",
-                              zIndex: 1,
-                            }}
-                          />
-                        )}
-                      </Box>
-                    );
-                  })}
+              return (
+                <Box
+                  key={`bar-${item.order.id}`}
+                  sx={{
+                    position: "absolute",
+                    top: index * ROW_HEIGHT + 8, // Centered in the row
+                    left: hasRealWidth ? barLeft : barLeft,
+                    height: ROW_HEIGHT - 16,
+                    width: hasRealWidth ? barWidth : "auto",
+                    backgroundColor: hasRealWidth
+                      ? getStatusColor(item.order.status)
+                      : "transparent",
+                    borderRadius: 0.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: hasRealWidth ? "white" : getStatusColor(item.order.status),
+                    fontSize: "0.75rem",
+                    fontWeight: "bold",
+                    zIndex: 3,
+                    px: hasRealWidth ? undefined : 1,
+                  }}
+                  title={`${item.order.orderNumber}: ${item.order.description} (${formatDate(item.order.start.toDate())} - ${formatDate(item.order.end.toDate())})`}
+                >
+                  {item.progress}%
                 </Box>
               );
             })}

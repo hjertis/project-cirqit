@@ -136,7 +136,7 @@ const StandaloneWorkOrderPrintPage = () => {
   }, [id]);
 
   const handleBack = () => {
-    navigate(`/orders/${id}`);
+    navigate(`/orders`); // Changed from `/orders/${id}`
   };
 
   const handlePrint = () => {

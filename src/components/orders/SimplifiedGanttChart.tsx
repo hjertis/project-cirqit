@@ -1,5 +1,5 @@
 // src/components/orders/SimplifiedGanttChart.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -12,8 +12,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
-  useTheme,
+  SelectChangeEvent,
   ToggleButtonGroup,
   ToggleButton,
 } from "@mui/material";
@@ -21,10 +20,8 @@ import {
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
   Today as TodayIcon,
-  FilterList as FilterListIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import dayjs from "dayjs";
@@ -45,6 +42,12 @@ interface Order {
   end: Timestamp;
   priority?: string;
   customer?: string;
+}
+
+interface TimeLabel {
+  label: string;
+  date: Date;
+  width: number;
 }
 
 // Get status color
@@ -86,7 +89,7 @@ const getPriorityColor = (priority: string = "Medium"): string => {
   }
 };
 
-// Configuration
+// Configuration constants
 const DAY_WIDTH_DEFAULT = 30; // pixels per day
 const HEADER_HEIGHT = 60;
 const ROW_HEIGHT = 40;
@@ -95,31 +98,29 @@ const TODAY = new Date();
 // View options
 type TimeScale = "week" | "month" | "quarter";
 
-const SimplifiedGanttChart = () => {
-  const theme = useTheme();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+const SimplifiedGanttChart: React.FC = () => {
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("Released");
+  const [filterPriority, setFilterPriority] = useState<string>(""); // Add state for priority
+  const [timeScale, setTimeScale] = useState<TimeScale>("month");
+  const [dayWidth, setDayWidth] = useState<number>(DAY_WIDTH_DEFAULT);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState<boolean>(false);
 
   // Gantt view state
   const [startDate, setStartDate] = useState<Date>(dayjs().subtract(7, "day").toDate());
   const [endDate, setEndDate] = useState<Date>(dayjs().add(60, "day").toDate());
-  const [dayWidth, setDayWidth] = useState(DAY_WIDTH_DEFAULT);
-  const [timeScale, setTimeScale] = useState<TimeScale>("month");
-
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   // Number of days to display
   const daysDiff = dayjs(endDate).diff(dayjs(startDate), "day");
 
-  // Calculate total width of the chart
-  const chartWidth = daysDiff * dayWidth;
+  /*   // Calculate total width of the chart
+  const chartWidth = daysDiff * dayWidth; */
 
-  // Generate dates for the header based on the time scale
-  const generateTimeScaleLabels = () => {
+  // Calculate time labels using useMemo to improve performance
+  const timeLabels = useMemo((): TimeLabel[] => {
     const labels = [];
     let currentDate = dayjs(startDate);
     const endDateTime = dayjs(endDate);
@@ -147,7 +148,7 @@ const SimplifiedGanttChart = () => {
         });
         currentDate = currentDate.add(1, "month");
       }
-    } else if (timeScale === "quarter") {
+    } /* else if (timeScale === "quarter") {
       // Generate quarterly labels
       while (currentDate.isBefore(endDateTime)) {
         const quarterStart = currentDate.startOf("quarter");
@@ -160,32 +161,42 @@ const SimplifiedGanttChart = () => {
         });
         currentDate = currentDate.add(1, "quarter");
       }
-    }
+    } */
 
     return labels;
-  };
+  }, [timeScale, dayWidth, startDate, endDate]);
 
-  const timeLabels = generateTimeScaleLabels();
+  // Calculate chart width
+  const chartWidthMemo = useMemo((): number => {
+    return timeLabels.reduce((total, label) => total + label.width, 0);
+  }, [timeLabels]);
 
   // Generate dates for the day markers
   const dates = Array.from({ length: daysDiff }, (_, i) => dayjs(startDate).add(i, "day").toDate());
 
   // Fetch orders
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchOrders = async (): Promise<void> => {
       setLoading(true);
+      setError(null);
       try {
-        // Create a query to fetch orders
-        const ordersQuery = filterStatus
-          ? query(
-              collection(db, "orders"),
-              where("status", "==", filterStatus),
-              orderBy("end", "asc"),
-              limit(50)
-            )
-          : query(collection(db, "orders"), orderBy("end", "asc"), limit(50));
+        const queryConstraints: (
+          | QueryConstraint
+          | QueryOrderByConstraint
+          | QueryLimitConstraint
+        )[] = [];
 
-        // Fetch orders
+        if (filterStatus) {
+          queryConstraints.push(where("status", "==", filterStatus));
+        }
+        if (filterPriority) {
+          queryConstraints.push(where("priority", "==", filterPriority));
+        }
+
+        queryConstraints.push(orderBy("end", "asc"));
+        queryConstraints.push(limit(50));
+
+        const ordersQuery = query(collection(db, "orders"), ...queryConstraints);
         const ordersSnapshot = await getDocs(ordersQuery);
         const ordersData: Order[] = [];
 
@@ -198,79 +209,88 @@ const SimplifiedGanttChart = () => {
 
         setOrders(ordersData);
         setError(null);
-
-        // Update chart date range if needed to show all orders
-        let earliestStart = dayjs(startDate);
-        let latestEnd = dayjs(endDate);
-
-        ordersData.forEach(order => {
-          const orderStart = dayjs(order.start.toDate());
-          const orderEnd = dayjs(order.end.toDate());
-
-          if (orderStart.isBefore(earliestStart)) {
-            earliestStart = orderStart;
-          }
-
-          if (orderEnd.isAfter(latestEnd)) {
-            latestEnd = orderEnd;
-          }
-        });
-
-        // Add padding to the dates
-        setStartDate(earliestStart.subtract(7, "day").toDate());
-        setEndDate(latestEnd.add(7, "day").toDate());
       } catch (err) {
-        console.error("Error fetching orders:", err);
-        setError(`Failed to load orders: ${err instanceof Error ? err.message : String(err)}`);
+        if (err instanceof Error && err.message.includes("requires an index")) {
+          setError(
+            `Query requires a Firestore index. Please check the console for the creation link. Error: ${err.message}`
+          );
+        } else {
+          setError(`Failed to load orders: ${err instanceof Error ? err.message : String(err)}`);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchOrders();
-  }, [filterStatus]);
+    void fetchOrders();
+  }, [filterStatus, filterPriority]); // Removed startDate and endDate
 
-  // Handle filter change
-  const handleFilterChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+  // Separate effect for updating date range based on orders
+  useEffect(() => {
+    if (orders.length > 0) {
+      let earliestStart = dayjs(startDate);
+      let latestEnd = dayjs(endDate);
+
+      orders.forEach(order => {
+        const orderStart = dayjs(order.start.toDate());
+        const orderEnd = dayjs(order.end.toDate());
+
+        if (orderStart.isBefore(earliestStart)) {
+          earliestStart = orderStart;
+        }
+        if (orderEnd.isAfter(latestEnd)) {
+          latestEnd = orderEnd;
+        }
+      });
+
+      // Add padding to the dates
+      setStartDate(earliestStart.subtract(7, "day").toDate());
+      setEndDate(latestEnd.add(7, "day").toDate());
+    }
+  }, [orders]); // Only run when orders change
+
+  // Handle filter change for Status
+  const handleStatusFilterChange = (event: SelectChangeEvent<string>) => {
+    // Use specific type
     setFilterStatus(event.target.value as string);
+  };
+
+  // Handle filter change for Priority
+  const handlePriorityFilterChange = (event: SelectChangeEvent<string>) => {
+    // Use specific type
+    setFilterPriority(event.target.value as string);
   };
 
   // Handle time scale change
   const handleTimeScaleChange = (
-    event: React.MouseEvent<HTMLElement>,
-    newTimeScale: TimeScale | null
+    _event: React.MouseEvent<HTMLElement>,
+    newTimeScale: TimeScale
   ) => {
-    if (newTimeScale !== null) {
+    if (newTimeScale) {
       setTimeScale(newTimeScale);
-
-      // Adjust zoom level based on time scale
-      if (newTimeScale === "week") {
-        setDayWidth(40);
-      } else if (newTimeScale === "month") {
-        setDayWidth(25);
-      } else if (newTimeScale === "quarter") {
-        setDayWidth(15);
-      }
     }
   };
 
-  // Zoom in/out handlers
-  const handleZoomIn = () => {
-    setDayWidth(prev => Math.min(prev + 5, 60));
+  // Handle zoom
+  const handleZoom = (factor: number): void => {
+    setDayWidth(prev => Math.max(20, Math.min(100, prev + factor)));
   };
 
-  const handleZoomOut = () => {
-    setDayWidth(prev => Math.max(prev - 5, 10));
+  // Handle scroll to today
+  const scrollToToday = (): void => {
+    const todayPosition = getTodayPosition();
+    const container = document.querySelector(".gantt-container");
+    if (container) {
+      container.scrollLeft = todayPosition - container.clientWidth / 2;
+    }
   };
 
-  // Go to today
-  const handleGoToToday = () => {
-    const today = new Date();
-    const newStartDate = dayjs(today).subtract(7, "day").toDate();
-    const newEndDate = dayjs(today).add(60, "day").toDate();
-
-    setStartDate(newStartDate);
-    setEndDate(newEndDate);
+  // Get position for today marker
+  const getTodayPosition = (): number => {
+    const dateObj = dayjs(TODAY);
+    const timelineStart = dayjs(startDate);
+    const diffDays = dateObj.diff(timelineStart, "day", true);
+    return Math.max(0, diffDays * dayWidth);
   };
 
   // View order details
@@ -310,6 +330,16 @@ const SimplifiedGanttChart = () => {
     { value: "Finished", label: "Finished" },
   ];
 
+  /*   // Priority options for filter
+  const priorityOptions = [
+    { value: "", label: "All Priorities" },
+    { value: "Critical", label: "Critical" },
+    { value: "High", label: "High" },
+    { value: "Medium-High", label: "Medium-High" },
+    { value: "Medium", label: "Medium" },
+    { value: "Low", label: "Low" },
+  ]; */
+
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
@@ -333,6 +363,7 @@ const SimplifiedGanttChart = () => {
         <Typography variant="h6">Order Timeline</Typography>
 
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+          {/* Status Filter */}
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel id="status-filter-label">Status</InputLabel>
             <Select
@@ -340,7 +371,7 @@ const SimplifiedGanttChart = () => {
               id="status-filter"
               value={filterStatus}
               label="Status"
-              onChange={handleFilterChange}
+              onChange={handleStatusFilterChange} // Use specific handler
             >
               {statusOptions.map(option => (
                 <MenuItem key={option.value} value={option.value}>
@@ -350,6 +381,26 @@ const SimplifiedGanttChart = () => {
             </Select>
           </FormControl>
 
+          {/* Priority Filter */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel id="priority-filter-label">Priority</InputLabel>
+            <Select
+              labelId="priority-filter-label"
+              id="priority-filter"
+              value={filterPriority}
+              label="Priority"
+              onChange={handlePriorityFilterChange} // Use specific handler
+            >
+              <MenuItem value="">All Priorities</MenuItem>
+              <MenuItem value="Critical">Critical</MenuItem>
+              <MenuItem value="High">High</MenuItem>
+              <MenuItem value="Medium-High">Medium-High</MenuItem>
+              <MenuItem value="Medium">Medium</MenuItem>
+              <MenuItem value="Low">Low</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Time Scale Toggle */}
           <ToggleButtonGroup
             value={timeScale}
             exclusive
@@ -370,17 +421,17 @@ const SimplifiedGanttChart = () => {
 
           <Box sx={{ display: "flex", gap: 0.5 }}>
             <Tooltip title="Zoom In">
-              <IconButton onClick={handleZoomIn} size="small">
+              <IconButton onClick={() => handleZoom(5)} size="small">
                 <ZoomInIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Zoom Out">
-              <IconButton onClick={handleZoomOut} size="small">
+              <IconButton onClick={() => handleZoom(-5)} size="small">
                 <ZoomOutIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Go to Today">
-              <IconButton onClick={handleGoToToday} size="small">
+              <IconButton onClick={scrollToToday} size="small">
                 <TodayIcon />
               </IconButton>
             </Tooltip>
@@ -424,7 +475,7 @@ const SimplifiedGanttChart = () => {
               height: `calc(100% - ${HEADER_HEIGHT}px)`,
             }}
           >
-            {orders.map((order, index) => (
+            {orders.map(order => (
               <Box
                 key={order.id}
                 sx={{
@@ -494,7 +545,7 @@ const SimplifiedGanttChart = () => {
             {/* Time labels (months/weeks/quarters) */}
             <Box
               sx={{
-                minWidth: chartWidth,
+                minWidth: chartWidthMemo,
                 height: HEADER_HEIGHT,
                 position: "relative",
                 display: "flex",
@@ -575,7 +626,7 @@ const SimplifiedGanttChart = () => {
           {/* Orders timeline */}
           <Box
             sx={{
-              minWidth: chartWidth,
+              minWidth: chartWidthMemo,
               position: "relative",
               height: `${orders.length * ROW_HEIGHT}px`,
             }}
@@ -592,7 +643,7 @@ const SimplifiedGanttChart = () => {
             >
               {dates.map((date, index) => {
                 const isWeekend = dayjs(date).day() === 0 || dayjs(date).day() === 6;
-                const isToday = dayjs(date).isSame(dayjs(TODAY), "day");
+                /* const isToday = dayjs(date).isSame(dayjs(TODAY), "day"); */
 
                 return (
                   <Box
@@ -616,61 +667,97 @@ const SimplifiedGanttChart = () => {
             {orders.map((order, index) => {
               const startPos = getBarPosition(order.start.toDate());
               const width = getBarWidth(order.start.toDate(), order.end.toDate());
+              const orderStartDate = order.start.toDate();
+              const orderEndDate = order.end.toDate();
 
-              return (
-                <Box
-                  key={order.id}
-                  sx={{
-                    position: "absolute",
-                    top: index * ROW_HEIGHT + 5,
-                    left: startPos,
-                    width: width,
-                    height: ROW_HEIGHT - 10,
-                    backgroundColor: getStatusColor(order.status),
-                    opacity: 0.8,
-                    borderRadius: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    px: 1,
-                    cursor: "pointer",
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    "&:hover": {
-                      opacity: 1,
-                      zIndex: 5,
-                    },
-                  }}
-                  onClick={() => handleViewOrder(order.id)}
-                  title={`${order.orderNumber}: ${formatDate(order.start.toDate())} - ${formatDate(order.end.toDate())}`}
-                >
-                  {/* Left border with priority color */}
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: "4px",
-                      backgroundColor: getPriorityColor(order.priority),
-                    }}
-                  />
-
-                  {/* Only show text if there's enough space */}
-                  {width > 80 && (
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        ml: 1,
-                        color: "white",
-                        fontWeight: "medium",
-                        textShadow: "0px 0px 2px rgba(0,0,0,0.5)",
-                      }}
-                    >
-                      {order.orderNumber}
+              // Tooltip Content
+              const tooltipTitle = (
+                <Box sx={{ p: 0.5 }}>
+                  <Typography component="div" variant="subtitle2">
+                    {order.orderNumber}
+                  </Typography>
+                  <Typography component="div" variant="caption" display="block">
+                    Part: {order.partNo}
+                  </Typography>
+                  <Typography component="div" variant="caption" display="block">
+                    Desc: {order.description}
+                  </Typography>
+                  <Typography component="div" variant="caption" display="block">
+                    Status: {order.status}
+                  </Typography>
+                  {order.priority && (
+                    <Typography component="div" variant="caption" display="block">
+                      Priority: {order.priority}
                     </Typography>
                   )}
+                  <Typography component="div" variant="caption" display="block">
+                    Start: {formatDate(orderStartDate)}
+                  </Typography>
+                  <Typography component="div" variant="caption" display="block">
+                    End: {formatDate(orderEndDate)}
+                  </Typography>
                 </Box>
+              );
+
+              return (
+                <Tooltip title={tooltipTitle} key={order.id} placement="top" arrow>
+                  <Box
+                    // key={order.id} // Key moved to Tooltip
+                    sx={{
+                      position: "absolute",
+                      top: index * ROW_HEIGHT + 5,
+                      left: startPos,
+                      width: width,
+                      height: ROW_HEIGHT - 10,
+                      backgroundColor: getStatusColor(order.status),
+                      opacity: 0.8,
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      px: 1,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      "&:hover": {
+                        opacity: 1,
+                        zIndex: 5,
+                      },
+                    }}
+                    onClick={() => handleViewOrder(order.id)}
+                    // title removed, using MUI Tooltip now
+                  >
+                    {/* Left border with priority color */}
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: "4px",
+                        backgroundColor: getPriorityColor(order.priority),
+                        borderTopLeftRadius: "4px", // Match parent radius
+                        borderBottomLeftRadius: "4px", // Match parent radius
+                      }}
+                    />
+
+                    {/* Only show text if there's enough space */}
+                    {width > 80 && (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          ml: 1, // Adjust margin left due to priority border
+                          color: "white",
+                          fontWeight: "medium",
+                          textShadow: "0px 0px 2px rgba(0,0,0,0.5)",
+                          pointerEvents: "none", // Prevent text from interfering with Box click
+                        }}
+                      >
+                        {order.orderNumber}
+                      </Typography>
+                    )}
+                  </Box>
+                </Tooltip>
               );
             })}
 
