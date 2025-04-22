@@ -26,8 +26,11 @@ import {
   ExpandMore,
   PeopleAlt as PeopleAltIcon,
   ErrorOutline as FaultIcon,
+  CalendarViewWeek as CalendarViewWeekIcon, // <-- Import an appropriate icon
+  CalendarToday as CalendarTodayIcon, // Example icon
+  ViewKanban as ViewKanbanIcon, // Example icon
 } from "@mui/icons-material";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Drawer width
 const drawerWidth = 240;
@@ -64,11 +67,13 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     {
       text: "Orders",
       icon: <OrdersIcon />,
-      path: "/orders",
+      path: "/orders", // Base path for the section
       children: [
         { text: "All Orders", icon: <OrdersIcon />, path: "/orders" },
         { text: "Create Order", icon: <OrdersIcon />, path: "/orders/create" },
         { text: "Planning", icon: <OrdersIcon />, path: "/orders/planning" },
+        { text: "Resource Calendar", icon: <CalendarTodayIcon />, path: "/orders/calendar" }, // Existing Calendar
+        { text: "Resource Board", icon: <ViewKanbanIcon />, path: "/orders/resource-board" }, // <-- Add new board link
       ],
     },
     {
@@ -109,6 +114,22 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     }
   };
 
+  // Function to determine if a submenu should be open based on current path
+  useEffect(() => {
+    const currentTopLevelPath = location.pathname.split("/")[1]; // e.g., "orders"
+    const parentItem = navItems.find(
+      item =>
+        item.path === `/${currentTopLevelPath}` || location.pathname.startsWith(item.path + "/")
+    );
+
+    if (parentItem && parentItem.children) {
+      setOpenSubmenu(parentItem.text);
+    } else {
+      // Optional: Close other submenus if not in a submenu section
+      // setOpenSubmenu(null);
+    }
+  }, [location.pathname, navItems]); // Re-run when path changes
+
   const drawer = (
     <div>
       <Toolbar />
@@ -121,17 +142,13 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                 <ListItem disablePadding>
                   <ListItemButton
                     onClick={() => handleSubmenuToggle(item.text)}
-                    selected={location.pathname.startsWith(item.path)}
+                    selected={location.pathname.startsWith(item.path)} // Highlight parent if any child is active
                     sx={{
-                      "&.Mui-selected": {
-                        backgroundColor: "primary.light",
-                        color: "primary.contrastText",
-                        "&:hover": {
-                          backgroundColor: "primary.main",
-                        },
-                        "& .MuiListItemIcon-root": {
-                          color: "primary.contrastText",
-                        },
+                      backgroundColor: location.pathname.startsWith(item.path)
+                        ? theme.palette.action.selected
+                        : "transparent",
+                      "&:hover": {
+                        backgroundColor: theme.palette.action.hover,
                       },
                     }}
                   >
@@ -146,23 +163,40 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                       <ListItemButton
                         key={child.text}
                         onClick={() => handleNavClick(child.path)}
-                        selected={location.pathname === child.path}
+                        selected={location.pathname === child.path} // Exact match for child selection
                         sx={{
-                          pl: 4,
-                          "&.Mui-selected": {
-                            backgroundColor: "primary.light",
-                            color: "primary.contrastText",
-                            "&:hover": {
-                              backgroundColor: "primary.main",
-                            },
-                            "& .MuiListItemIcon-root": {
-                              color: "primary.contrastText",
-                            },
+                          pl: 4, // Indent child items
+                          backgroundColor:
+                            location.pathname === child.path
+                              ? theme.palette.primary.lighter
+                              : "transparent", // Highlight selected child
+                          color:
+                            location.pathname === child.path
+                              ? theme.palette.primary.main
+                              : "inherit",
+                          fontWeight: location.pathname === child.path ? "bold" : "normal",
+                          "&:hover": {
+                            backgroundColor: theme.palette.action.hover,
+                          },
+                          "& .MuiListItemIcon-root": {
+                            // Ensure icon color matches
+                            color:
+                              location.pathname === child.path
+                                ? theme.palette.primary.main
+                                : "inherit",
                           },
                         }}
                       >
                         <ListItemIcon>{child.icon}</ListItemIcon>
-                        <ListItemText primary={child.text} />
+                        <ListItemText
+                          primary={child.text}
+                          sx={{
+                            "& .MuiTypography-root": {
+                              // Target the typography inside ListItemText
+                              fontWeight: location.pathname === child.path ? "bold" : "normal",
+                            },
+                          }}
+                        />
                       </ListItemButton>
                     ))}
                   </List>
@@ -172,22 +206,32 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
               <ListItem disablePadding>
                 <ListItemButton
                   onClick={() => handleNavClick(item.path)}
-                  selected={location.pathname === item.path}
+                  selected={location.pathname === item.path} // Exact match for top-level selection
                   sx={{
-                    "&.Mui-selected": {
-                      backgroundColor: "primary.light",
-                      color: "primary.contrastText",
-                      "&:hover": {
-                        backgroundColor: "primary.main",
-                      },
-                      "& .MuiListItemIcon-root": {
-                        color: "primary.contrastText",
-                      },
+                    backgroundColor:
+                      location.pathname === item.path
+                        ? theme.palette.primary.lighter
+                        : "transparent", // Highlight selected top-level
+                    color: location.pathname === item.path ? theme.palette.primary.main : "inherit",
+                    fontWeight: location.pathname === item.path ? "bold" : "normal",
+                    "&:hover": {
+                      backgroundColor: theme.palette.action.hover,
+                    },
+                    "& .MuiListItemIcon-root": {
+                      color:
+                        location.pathname === item.path ? theme.palette.primary.main : "inherit",
                     },
                   }}
                 >
                   <ListItemIcon>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.text} />
+                  <ListItemText
+                    primary={item.text}
+                    sx={{
+                      "& .MuiTypography-root": {
+                        fontWeight: location.pathname === item.path ? "bold" : "normal",
+                      },
+                    }}
+                  />
                 </ListItemButton>
               </ListItem>
             )}
@@ -197,11 +241,33 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       <Divider />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick("/settings")}>
+          <ListItemButton
+            onClick={() => handleNavClick("/settings")}
+            selected={location.pathname === "/settings"}
+            sx={{
+              backgroundColor:
+                location.pathname === "/settings" ? theme.palette.primary.lighter : "transparent", // Highlight settings
+              color: location.pathname === "/settings" ? theme.palette.primary.main : "inherit",
+              fontWeight: location.pathname === "/settings" ? "bold" : "normal",
+              "&:hover": {
+                backgroundColor: theme.palette.action.hover,
+              },
+              "& .MuiListItemIcon-root": {
+                color: location.pathname === "/settings" ? theme.palette.primary.main : "inherit",
+              },
+            }}
+          >
             <ListItemIcon>
               <SettingsIcon />
             </ListItemIcon>
-            <ListItemText primary="Settings" />
+            <ListItemText
+              primary="Settings"
+              sx={{
+                "& .MuiTypography-root": {
+                  fontWeight: location.pathname === "/settings" ? "bold" : "normal",
+                },
+              }}
+            />
           </ListItemButton>
         </ListItem>
       </List>

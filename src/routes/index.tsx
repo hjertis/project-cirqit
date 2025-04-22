@@ -20,6 +20,7 @@ import ResourceCalendarPage from "../pages/ResourceCalendarPage";
 import ResourceManagementPage from "../pages/ResourceManagementPage";
 import StandaloneWorkOrderPrintPage from "../pages/StandaloneWorkOrderPrintPage";
 import FaultParetoChart from "../components/dashboard/FaultParetoChart";
+import ResourceBoardPage from "../pages/ResourceBoardPage"; // <-- Import the new page
 
 /**
  * Main application routes configuration
@@ -50,6 +51,8 @@ const AppRoutes = () => {
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
         <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
+        <Route path="/orders/resource-board" element={<ResourceBoardPage />} />{" "}
+        {/* <-- Add this route */}
         {/* <Route path="/orders/:id/print" element={<PrintOrderPage />} /> */}
         <Route path="/orders/:id/print" element={<StandaloneWorkOrderPrintPage />} />
         {/* New calendar route */}

@@ -4,9 +4,8 @@ import { Box, Breadcrumbs, Typography, Link, Paper, Tabs, Tab } from "@mui/mater
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
 import OrderWorkflowTimeline from "../components/orders/OrderWorkflowTimeline";
-import OrderPlanningGantt from "../components/orders/OrderPlanningGantt";
 // Remove or comment out this line:
-// import SimplifiedGanttChart from "../components/orders/SimplifiedGanttChart";
+import SimplifiedGanttChart from "../components/orders/SimplifiedGanttChart"; // <-- Import the new chart
 import ContentWrapper from "../components/layout/ContentWrapper";
 
 const OrderPlanningPage = () => {
@@ -34,14 +33,27 @@ const OrderPlanningPage = () => {
             <Typography color="text.primary">Planning</Typography>
           </Breadcrumbs>
         </Box>
-        <Paper sx={{ mb: 3, p: 2 }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="Order Planning Tabs">
+
+        {/* Wrap tabs and content in a Paper component */}
+        <Paper
+          sx={
+            {
+              /* Removed mb: 3, p: 2 */
+            }
+          }
+        >
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            aria-label="Order Planning Tabs"
+            sx={{ borderBottom: 1, borderColor: "divider" }}
+          >
             <Tab label="Workflow View" />
             <Tab label="Gantt Chart" />
           </Tabs>
-          <Box sx={{ mt: 2 }}>
+          <Box>
             {tabValue === 0 && <OrderWorkflowTimeline />}
-            {tabValue === 1 && <OrderPlanningGantt />} {/* Use the new Gantt */}
+            {tabValue === 1 && <SimplifiedGanttChart />}
           </Box>
         </Paper>
       </Box>

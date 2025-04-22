@@ -22,7 +22,16 @@ import {
   Today as TodayIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
-import { collection, query, where, getDocs, orderBy, limit, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+  Timestamp,
+  QueryConstraint,
+} from "firebase/firestore";
 import { db } from "../../config/firebase";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
@@ -148,7 +157,7 @@ const SimplifiedGanttChart: React.FC = () => {
         });
         currentDate = currentDate.add(1, "month");
       }
-    } /* else if (timeScale === "quarter") {
+    } else if (timeScale === "quarter") {
       // Generate quarterly labels
       while (currentDate.isBefore(endDateTime)) {
         const quarterStart = currentDate.startOf("quarter");
@@ -161,7 +170,7 @@ const SimplifiedGanttChart: React.FC = () => {
         });
         currentDate = currentDate.add(1, "quarter");
       }
-    } */
+    }
 
     return labels;
   }, [timeScale, dayWidth, startDate, endDate]);
@@ -180,11 +189,7 @@ const SimplifiedGanttChart: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const queryConstraints: (
-          | QueryConstraint
-          | QueryOrderByConstraint
-          | QueryLimitConstraint
-        )[] = [];
+        const queryConstraints: QueryConstraint[] = [];
 
         if (filterStatus) {
           queryConstraints.push(where("status", "==", filterStatus));
@@ -193,8 +198,9 @@ const SimplifiedGanttChart: React.FC = () => {
           queryConstraints.push(where("priority", "==", filterPriority));
         }
 
+        // Default sort, can be made dynamic later
         queryConstraints.push(orderBy("end", "asc"));
-        queryConstraints.push(limit(50));
+        queryConstraints.push(limit(50)); // Limit for performance
 
         const ordersQuery = query(collection(db, "orders"), ...queryConstraints);
         const ordersSnapshot = await getDocs(ordersQuery);
@@ -210,6 +216,7 @@ const SimplifiedGanttChart: React.FC = () => {
         setOrders(ordersData);
         setError(null);
       } catch (err) {
+        // Specific check for Firestore index errors
         if (err instanceof Error && err.message.includes("requires an index")) {
           setError(
             `Query requires a Firestore index. Please check the console for the creation link. Error: ${err.message}`
@@ -223,7 +230,7 @@ const SimplifiedGanttChart: React.FC = () => {
     };
 
     void fetchOrders();
-  }, [filterStatus, filterPriority]); // Removed startDate and endDate
+  }, [filterStatus, filterPriority]); // Removed startDate and endDate dependencies for now to simplify fetching
 
   // Separate effect for updating date range based on orders
   useEffect(() => {
@@ -279,9 +286,10 @@ const SimplifiedGanttChart: React.FC = () => {
   // Handle scroll to today
   const scrollToToday = (): void => {
     const todayPosition = getTodayPosition();
-    const container = document.querySelector(".gantt-container");
+    // Find the container element (you might need a ref or a more specific selector)
+    const container = document.querySelector(".gantt-timeline-container"); // Add this class to the Box
     if (container) {
-      container.scrollLeft = todayPosition - container.clientWidth / 2;
+      container.scrollLeft = todayPosition - container.clientWidth / 2; // Scroll to center Today
     }
   };
 
@@ -289,7 +297,7 @@ const SimplifiedGanttChart: React.FC = () => {
   const getTodayPosition = (): number => {
     const dateObj = dayjs(TODAY);
     const timelineStart = dayjs(startDate);
-    const diffDays = dateObj.diff(timelineStart, "day", true);
+    const diffDays = dateObj.diff(timelineStart, "day", true); // Use true for floating point days
     return Math.max(0, diffDays * dayWidth);
   };
 
@@ -308,7 +316,7 @@ const SimplifiedGanttChart: React.FC = () => {
   const getBarPosition = (date: Date): number => {
     const dateObj = dayjs(date);
     const timelineStart = dayjs(startDate);
-    const diffDays = dateObj.diff(timelineStart, "day", true);
+    const diffDays = dateObj.diff(timelineStart, "day", true); // Use float for accuracy
     return Math.max(0, diffDays * dayWidth);
   };
 
@@ -316,8 +324,8 @@ const SimplifiedGanttChart: React.FC = () => {
   const getBarWidth = (start: Date, end: Date): number => {
     const startDate = dayjs(start);
     const endDate = dayjs(end);
-    const durationDays = endDate.diff(startDate, "day", true);
-    return Math.max(dayWidth, durationDays * dayWidth); // Ensure minimum width for visibility
+    const durationDays = endDate.diff(startDate, "day", true); // Use float for accuracy
+    return Math.max(dayWidth / 2, durationDays * dayWidth); // Ensure minimum width for visibility
   };
 
   // Status options for filter
@@ -330,7 +338,7 @@ const SimplifiedGanttChart: React.FC = () => {
     { value: "Finished", label: "Finished" },
   ];
 
-  /*   // Priority options for filter
+  // Priority options for filter
   const priorityOptions = [
     { value: "", label: "All Priorities" },
     { value: "Critical", label: "Critical" },
@@ -338,7 +346,7 @@ const SimplifiedGanttChart: React.FC = () => {
     { value: "Medium-High", label: "Medium-High" },
     { value: "Medium", label: "Medium" },
     { value: "Low", label: "Low" },
-  ]; */
+  ];
 
   if (loading) {
     return (
@@ -391,12 +399,11 @@ const SimplifiedGanttChart: React.FC = () => {
               label="Priority"
               onChange={handlePriorityFilterChange} // Use specific handler
             >
-              <MenuItem value="">All Priorities</MenuItem>
-              <MenuItem value="Critical">Critical</MenuItem>
-              <MenuItem value="High">High</MenuItem>
-              <MenuItem value="Medium-High">Medium-High</MenuItem>
-              <MenuItem value="Medium">Medium</MenuItem>
-              <MenuItem value="Low">Low</MenuItem>
+              {priorityOptions.map(option => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
 
@@ -467,14 +474,8 @@ const SimplifiedGanttChart: React.FC = () => {
               Orders
             </Typography>
           </Box>
-
           {/* Order list */}
-          <Box
-            sx={{
-              overflowY: "auto",
-              height: `calc(100% - ${HEADER_HEIGHT}px)`,
-            }}
-          >
+          <Box sx={{ overflowY: "auto", height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
             {orders.map(order => (
               <Box
                 key={order.id}
@@ -486,9 +487,7 @@ const SimplifiedGanttChart: React.FC = () => {
                   pr: 1,
                   borderBottom: "1px solid",
                   borderColor: "divider",
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
+                  "&:hover": { backgroundColor: "action.hover" },
                 }}
               >
                 <Box
@@ -523,11 +522,8 @@ const SimplifiedGanttChart: React.FC = () => {
 
         {/* Timeline area */}
         <Box
-          sx={{
-            flexGrow: 1,
-            overflow: "auto",
-            position: "relative",
-          }}
+          className="gantt-timeline-container" // Add class for scrolling
+          sx={{ flexGrow: 1, overflow: "auto", position: "relative" }}
         >
           {/* Time scale header */}
           <Box
@@ -588,6 +584,7 @@ const SimplifiedGanttChart: React.FC = () => {
                         // Calculate if this day exists in this month/quarter
                         const dayDate = dayjs(label.date).date(day);
                         if (dayDate.month() === dayjs(label.date).month()) {
+                          // Simple check for month
                           return (
                             <Typography
                               key={day}
@@ -615,7 +612,7 @@ const SimplifiedGanttChart: React.FC = () => {
                     bottom: 0,
                     width: "2px",
                     backgroundColor: "error.main",
-                    left: getBarPosition(TODAY),
+                    left: getTodayPosition(), // Use function here
                     zIndex: 20,
                   }}
                 />
@@ -632,18 +629,10 @@ const SimplifiedGanttChart: React.FC = () => {
             }}
           >
             {/* Background grid */}
-            <Box
-              sx={{
-                position: "absolute",
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: 0,
-              }}
-            >
+            <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}>
               {dates.map((date, index) => {
                 const isWeekend = dayjs(date).day() === 0 || dayjs(date).day() === 6;
-                /* const isToday = dayjs(date).isSame(dayjs(TODAY), "day"); */
+                /* const isToday = dayjs(date).isSame(dayjs(TODAY), "day"); */ // Today line handled separately
 
                 return (
                   <Box
@@ -721,7 +710,7 @@ const SimplifiedGanttChart: React.FC = () => {
                       whiteSpace: "nowrap",
                       "&:hover": {
                         opacity: 1,
-                        zIndex: 5,
+                        zIndex: 5, // Bring to front on hover
                       },
                     }}
                     onClick={() => handleViewOrder(order.id)}
@@ -770,7 +759,7 @@ const SimplifiedGanttChart: React.FC = () => {
                   bottom: 0,
                   width: "2px",
                   backgroundColor: "error.main",
-                  left: getBarPosition(TODAY),
+                  left: getTodayPosition(),
                 }}
               />
             )}
