@@ -104,7 +104,7 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
     // We need both conditions to catch orders that span across our range
     const q = query(
       ordersRef,
-      where("status", "in", ["Open", "Released", "In Progress", "Delayed"]), // Only active orders
+      where("status", "in", ["Open", "Released", "In Progress", "Delayed", "Firm Planned"]), // Only active orders
       orderBy("start", "asc"),
       limit(200) // Reasonable limit for performance
     );
@@ -273,6 +273,10 @@ const ResourcePlanningBoard: React.FC = () => {
     setDetailsDialogOpen(true);
   };
 
+  const handleGoToToday = () => {
+    setCurrentWeekStart(dayjs().startOf("week").toDate());
+  };
+
   // --- Render Helpers ---
   const getLoadColor = (load: number, capacity: number): string => {
     if (capacity <= 0) return theme.palette.text.disabled; // No capacity defined
@@ -290,6 +294,12 @@ const ResourcePlanningBoard: React.FC = () => {
     return "transparent"; // Use 'transparent' or a subtle success color if needed
   };
 
+  const getOrderBackgroundColor = (status?: string, isDragging?: boolean): string => {
+    if (isDragging) return theme.palette.action.selected;
+    if (status === "Firm Planned") return "#e3f2fd"; // Light blue (Material UI blue[50])
+    return "background.paper";
+  };
+
   // --- Main Render ---
   if (loading) {
     return (
@@ -304,7 +314,7 @@ const ResourcePlanningBoard: React.FC = () => {
   }
 
   return (
-    <Paper sx={{ p: 2, overflow: "hidden" }}>
+    <Paper sx={{ p: 2, overflow: "hidden", width: "100%" }}>
       {/* Header with Navigation */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h6">Resource Planning Board</Typography>
@@ -325,6 +335,11 @@ const ResourcePlanningBoard: React.FC = () => {
           </Typography>
           <IconButton onClick={handleNextWeek} aria-label="Next Week" size="small">
             <NextIcon />
+          </IconButton>
+          <IconButton onClick={handleGoToToday} aria-label="Go to Today" size="small">
+            <Tooltip title="Go to current week">
+              <span>Today</span>
+            </Tooltip>
           </IconButton>
         </Box>
         {/* Add Filter/Zoom controls here if needed */}
@@ -517,9 +532,10 @@ const ResourcePlanningBoard: React.FC = () => {
                                     "&:hover": { boxShadow: 3, zIndex: 10 },
                                     position: "relative",
                                     overflow: "hidden",
-                                    backgroundColor: snapshot.isDragging
-                                      ? theme.palette.action.selected
-                                      : "background.paper",
+                                    backgroundColor: getOrderBackgroundColor(
+                                      order.status,
+                                      snapshot.isDragging
+                                    ),
                                   }}
                                   onClick={() => handleViewOrder(order.id)}
                                 >
@@ -650,9 +666,10 @@ const ResourcePlanningBoard: React.FC = () => {
                                   "&:hover": { boxShadow: 3, zIndex: 10 },
                                   position: "relative",
                                   overflow: "hidden",
-                                  backgroundColor: snapshot.isDragging
-                                    ? theme.palette.action.selected
-                                    : "background.paper",
+                                  backgroundColor: getOrderBackgroundColor(
+                                    order.status,
+                                    snapshot.isDragging
+                                  ),
                                 }}
                                 onClick={() => handleViewOrder(order.id)}
                               >

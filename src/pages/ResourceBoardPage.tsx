@@ -8,9 +8,9 @@ import ResourcePlanningBoard from "../components/planning/ResourcePlanningBoard"
 const ResourceBoardPage = () => {
   return (
     <ContentWrapper>
-      <Box>
+      <Box sx={{ width: "100%" }}>
         {/* Page Header with Breadcrumbs */}
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3, width: "100%" }}>
           <Typography variant="h4" gutterBottom>
             Resource Planning Board
           </Typography>
@@ -26,6 +26,7 @@ const ResourceBoardPage = () => {
         </Box>
 
         {/* Render the Resource Planning Board Component */}
+
         <form onSubmit={e => e.preventDefault()}>
           <ResourcePlanningBoard />
         </form>

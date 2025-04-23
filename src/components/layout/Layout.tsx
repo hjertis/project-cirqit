@@ -28,13 +28,14 @@ const Layout = () => {
       >
         <Toolbar /> {/* This adds space below the app bar */}
         <Container
-          maxWidth="xl"
+          maxWidth={false}
           sx={{
             flexGrow: 1,
             py: 3,
             px: { xs: 2, sm: 3 },
             display: "flex",
             flexDirection: "column",
+            width: { xs: "100%", md: "65%" },
           }}
         >
           <Outlet />
