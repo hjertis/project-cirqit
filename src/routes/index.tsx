@@ -21,6 +21,7 @@ import ResourceManagementPage from "../pages/ResourceManagementPage";
 import StandaloneWorkOrderPrintPage from "../pages/StandaloneWorkOrderPrintPage";
 import FaultParetoChart from "../components/dashboard/FaultParetoChart";
 import ResourceBoardPage from "../pages/ResourceBoardPage"; // <-- Import the new page
+import ProductionDashboardPage from "../pages/ProductionDashboardPage";
 
 /**
  * Main application routes configuration
@@ -68,6 +69,7 @@ const AppRoutes = () => {
         {/* Reports module */}
         <Route path="/reports" element={<div>Reports Page</div>} />
         <Route path="/reports/fault-analysis" element={<FaultParetoChart />} />
+        <Route path="/reports/production-dashboard" element={<ProductionDashboardPage />} />
         <Route path="/time" element={<TimeDashboardPage />} />
         {/* Resource Management */}
         <Route path="/resources" element={<ResourceManagementPage />} />

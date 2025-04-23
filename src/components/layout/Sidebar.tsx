@@ -93,6 +93,11 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       children: [
         { text: "Overview", icon: <ReportsIcon />, path: "/reports" }, // Link to the main reports page
         { text: "Fault Analysis", icon: <FaultIcon />, path: "/reports/fault-analysis" }, // Link to the new chart
+        {
+          text: "Production Dashboard",
+          icon: <ReportsIcon />,
+          path: "/reports/production-dashboard",
+        }, // Link to the production dashboard
       ],
     },
     {
