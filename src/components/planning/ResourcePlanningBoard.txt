@@ -171,9 +171,7 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
         description: orderData.description || "",
         estimatedHours: estimatedHours,
         assignedResourceId: orderData.assignedResourceId || null,
-        plannedWeekStartDate:
-          orderData.plannedWeekStartDate ||
-          dayjs(orderStartDate).startOf("week").format("YYYY-MM-DD"),
+        plannedWeekStartDate: weekStartDate,
         priority: orderData.priority || "Medium",
         partNo: orderData.partNo || "",
         status: orderData.status || "Open",
@@ -207,54 +205,55 @@ const ResourcePlanningBoard: React.FC = () => {
   );
 
   // --- Data Fetching ---
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch Resources
-      const fetchedResources = await getResources(true); // Get only active resources
-
-      // 2. Fetch Orders for the visible weeks + buffer
-      const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("week").toDate();
-      const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("week").toDate();
-      const fetchedOrders = await fetchPlanningData(startDate, endDate); // Fetch orders from Firebase
-
-      // Filter orders to only include those within the visible weeks
-      const filteredOrders = fetchedOrders.filter(order => {
-        const orderDate = dayjs(order.plannedWeekStartDate);
-        return orderDate.isBetween(dayjs(startDate), dayjs(endDate), null, "[]"); // Inclusive of start and end
-      });
-
-      // Set the filtered orders to state
-      setOrders(filteredOrders);
-
-      // 3. Calculate Load and add to resources
-      const resourcesWithLoad = fetchedResources.map(res => {
-        const weeklyLoad: { [weekStartDate: string]: number } = {};
-        visibleWeeks.forEach(weekDate => {
-          const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
-          // Calculate load based on orders assigned to this resource AND this week
-          const load = fetchedOrders
-            .filter(o => o.assignedResourceId === res.id && o.plannedWeekStartDate === weekStartStr)
-            .reduce((sum, o) => sum + (o.estimatedHours || 0), 0); // Use estimatedHours
-          weeklyLoad[weekStartStr] = load;
-        });
-        return { ...res, weeklyLoad }; // Add the calculated load object to the resource
-      });
-
-      setResources(resourcesWithLoad);
-    } catch (err) {
-      console.error("Error fetching planning data:", err);
-      setError(
-        `Failed to load planning board: ${err instanceof Error ? err.message : String(err)}`
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch Resources
+        const fetchedResources = await getResources(true); // Get only active resources
+
+        // 2. Fetch Orders for the visible weeks + buffer
+        const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("week").toDate();
+        const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("week").toDate();
+        const fetchedOrders = await fetchPlanningData(startDate, endDate); // Fetch orders from Firebase
+
+        // Filter orders to only include those within the visible weeks
+        const filteredOrders = fetchedOrders.filter(order => {
+          const orderDate = dayjs(order.plannedWeekStartDate);
+          return orderDate.isBetween(dayjs(startDate), dayjs(endDate), null, "[]"); // Inclusive of start and end
+        });
+
+        // Set the filtered orders to state
+        setOrders(filteredOrders);
+
+        // 3. Calculate Load and add to resources
+        const resourcesWithLoad = fetchedResources.map(res => {
+          const weeklyLoad: { [weekStartDate: string]: number } = {};
+          visibleWeeks.forEach(weekDate => {
+            const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
+            // Calculate load based on orders assigned to this resource AND this week
+            const load = fetchedOrders
+              .filter(
+                o => o.assignedResourceId === res.id && o.plannedWeekStartDate === weekStartStr
+              )
+              .reduce((sum, o) => sum + (o.estimatedHours || 0), 0); // Use estimatedHours
+            weeklyLoad[weekStartStr] = load;
+          });
+          return { ...res, weeklyLoad }; // Add the calculated load object to the resource
+        });
+
+        setResources(resourcesWithLoad);
+      } catch (err) {
+        console.error("Error fetching planning data:", err);
+        setError(
+          `Failed to load planning board: ${err instanceof Error ? err.message : String(err)}`
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWeekStart]); // Re-fetch data when the displayed week changes
@@ -277,16 +276,16 @@ const ResourcePlanningBoard: React.FC = () => {
   const getLoadColor = (load: number, capacity: number): string => {
     if (capacity <= 0) return theme.palette.text.disabled; // No capacity defined
     const percentage = (load / capacity) * 100;
-    if (percentage > 100) return "#b71c1c";
-    if (percentage > 85) return "#b26a00";
+    if (percentage > 100) return theme.palette.error.main;
+    if (percentage > 85) return theme.palette.warning.main;
     return theme.palette.success.main;
   };
 
   const getLoadBackgroundColor = (load: number, capacity: number): string => {
     if (capacity <= 0) return "transparent";
     const percentage = (load / capacity) * 100;
-    if (percentage > 100) return "#ffebee";
-    if (percentage > 85) return "#fff3e0";
+    if (percentage > 100) return theme.palette.error.light || "#ffcdd2";
+    if (percentage > 85) return theme.palette.warning.light || "#fff9c4";
     return "transparent"; // Use 'transparent' or a subtle success color if needed
   };
 
@@ -332,28 +331,37 @@ const ResourcePlanningBoard: React.FC = () => {
 
       <DragDropContext
         onDragEnd={async result => {
-          console.log("Drag result: ", result);
           if (!result.destination) return;
           const [destResourceId, destWeekStart] = result.destination.droppableId.split("|");
           const orderId = result.draggableId;
 
-          const newPlannedWeekStartDate = dayjs(destWeekStart).format("YYYY-MM-DD");
-          console.log("Saving to Firestore:", {
-            assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
-            plannedWeekStartDate: newPlannedWeekStartDate,
-          });
+          // Find the order
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
 
+          // Update Firestore
           try {
             await updateDoc(doc(db, "orders", orderId), {
               assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
-              plannedWeekStartDate: newPlannedWeekStartDate,
+              plannedWeekStartDate: destWeekStart,
             });
-            console.log("Firestore updated!");
-            // Refetch orders after update
-            fetchData();
           } catch (err) {
-            setError("Failed to update order in Firestore.");
+            console.error("Failed to update order in Firestore:", err);
+            // Optionally show an error to the user
           }
+
+          // Update local state optimistically
+          setOrders(prev =>
+            prev.map(o =>
+              o.id === orderId
+                ? {
+                    ...o,
+                    assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
+                    plannedWeekStartDate: destWeekStart,
+                  }
+                : o
+            )
+          );
         }}
       >
         <Box sx={{ overflowX: "auto", pb: 1 }}>

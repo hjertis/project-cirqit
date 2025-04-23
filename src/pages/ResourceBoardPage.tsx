@@ -26,7 +26,9 @@ const ResourceBoardPage = () => {
         </Box>
 
         {/* Render the Resource Planning Board Component */}
-        <ResourcePlanningBoard />
+        <form onSubmit={e => e.preventDefault()}>
+          <ResourcePlanningBoard />
+        </form>
       </Box>
     </ContentWrapper>
   );
