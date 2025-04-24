@@ -72,8 +72,13 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
         { text: "All Orders", icon: <OrdersIcon />, path: "/orders" },
         { text: "Create Order", icon: <OrdersIcon />, path: "/orders/create" },
         { text: "Planning", icon: <OrdersIcon />, path: "/orders/planning" },
-        { text: "Resource Calendar", icon: <CalendarTodayIcon />, path: "/orders/calendar" }, // Existing Calendar
-        { text: "Resource Board", icon: <ViewKanbanIcon />, path: "/orders/resource-board" }, // <-- Add new board link
+        { text: "Resource Calendar", icon: <CalendarTodayIcon />, path: "/orders/calendar" },
+        { text: "Resource Board", icon: <ViewKanbanIcon />, path: "/orders/resource-board" },
+        {
+          text: "Daily Scheduler",
+          icon: <CalendarViewWeekIcon />,
+          path: "/orders/resource-scheduler",
+        },
       ],
     },
     {

@@ -19,6 +19,7 @@ import {
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import dayjs from "dayjs";
 import weekOfYear from "dayjs/plugin/weekOfYear";
+import isoWeek from "dayjs/plugin/isoWeek"; // Needed for week calculations
 import isBetween from "dayjs/plugin/isBetween"; // Needed for date checks later if implemented
 import { getResources, Resource } from "../../services/resourceService"; // Use your actual service
 import OrderDetailsDialog from "../orders/OrderDetailsDialog"; // Import the dialog
@@ -36,6 +37,7 @@ import {
 import { db } from "../../config/firebase";
 
 dayjs.extend(weekOfYear);
+dayjs.extend(isoWeek);
 dayjs.extend(isBetween);
 
 // --- Define Types ---
@@ -125,7 +127,7 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
 
       // Convert the order's start date to the start of its week for planning
       const orderStartDate = orderData.start ? orderData.start.toDate() : new Date();
-      const weekStartDate = dayjs(orderStartDate).startOf("week").format("YYYY-MM-DD");
+      const weekStartDate = dayjs(orderStartDate).startOf("isoWeek").format("YYYY-MM-DD");
 
       // Calculate estimated hours from order metadata
       // You might need to adjust this logic based on your actual data model
@@ -173,7 +175,7 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
         assignedResourceId: orderData.assignedResourceId || null,
         plannedWeekStartDate:
           orderData.plannedWeekStartDate ||
-          dayjs(orderStartDate).startOf("week").format("YYYY-MM-DD"),
+          dayjs(orderStartDate).startOf("isoWeek").format("YYYY-MM-DD"),
         priority: orderData.priority || "Medium",
         partNo: orderData.partNo || "",
         status: orderData.status || "Open",
@@ -189,7 +191,7 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
 
 const ResourcePlanningBoard: React.FC = () => {
   const theme = useTheme(); // Access theme for colors
-  const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("week").toDate());
+  const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
   const [resources, setResources] = useState<ResourceWithLoad[]>([]);
   const [orders, setOrders] = useState<PlanningOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,8 +218,8 @@ const ResourcePlanningBoard: React.FC = () => {
       const fetchedResources = await getResources(true); // Get only active resources
 
       // 2. Fetch Orders for the visible weeks + buffer
-      const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("week").toDate();
-      const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("week").toDate();
+      const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("isoWeek").toDate();
+      const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("isoWeek").toDate();
       const fetchedOrders = await fetchPlanningData(startDate, endDate); // Fetch orders from Firebase
 
       // Filter orders to only include those within the visible weeks
@@ -274,7 +276,7 @@ const ResourcePlanningBoard: React.FC = () => {
   };
 
   const handleGoToToday = () => {
-    setCurrentWeekStart(dayjs().startOf("week").toDate());
+    setCurrentWeekStart(dayjs().startOf("isoWeek").toDate());
   };
 
   // --- Render Helpers ---
@@ -330,7 +332,7 @@ const ResourcePlanningBoard: React.FC = () => {
             {dayjs(currentWeekStart).format("MMM D")} -{" "}
             {dayjs(currentWeekStart)
               .add(WEEKS_TO_SHOW - 1, "week")
-              .endOf("week")
+              .endOf("isoWeek")
               .format("MMM D, YYYY")}
           </Typography>
           <IconButton onClick={handleNextWeek} aria-label="Next Week" size="small">

@@ -117,7 +117,7 @@ const ResourceCalendarView = ({
 
   // View configuration
   const [cellHeight, setCellHeight] = useState(100); // Height of a calendar cell in pixels
-  const [cellWidth, setCellWidth] = useState(150); // Width of a calendar cell in pixels
+  const [cellWidth, setCellWidth] = useState(223); // Width of a calendar cell in pixels
   const [resourceFilter, setResourceFilter] = useState<string | null>(null);
 
   // Compute calendar dates based on view and current date
@@ -272,39 +272,6 @@ const ResourceCalendarView = ({
   const isWeekend = (date: Date): boolean => {
     const day = dayjs(date).day();
     return day === 0 || day === 6; // Sunday or Saturday
-  };
-
-  // Determine position of an order in the calendar grid
-  const getOrderPosition = (order: Order, resourceId: string): any => {
-    // Check if the order is assigned to this resource
-    if (order.assignedResourceId !== resourceId) {
-      return null;
-    }
-
-    // Calculate which days the order spans
-    const orderStart = dayjs(order.start.toDate());
-    const orderEnd = dayjs(order.end.toDate());
-
-    // Check where the order should be positioned in our current view
-    const startIndex = calendarDates.findIndex(
-      date => dayjs(date).isSame(orderStart, "day") || dayjs(date).isAfter(orderStart)
-    );
-
-    const endIndex = calendarDates.findIndex(
-      date => dayjs(date).isSame(orderEnd, "day") || dayjs(date).isAfter(orderEnd)
-    );
-
-    // If the order doesn't fit in our current view, we need to adjust
-    const adjustedStartIndex = startIndex === -1 ? 0 : startIndex;
-    const adjustedEndIndex = endIndex === -1 ? calendarDates.length - 1 : endIndex;
-
-    // Calculate span based on the indexes
-    const span = adjustedEndIndex - adjustedStartIndex + 1;
-
-    return {
-      startIndex: adjustedStartIndex,
-      span: span,
-    };
   };
 
   // Handle drag end for order reassignment
@@ -514,7 +481,7 @@ const ResourceCalendarView = ({
           </Box>
 
           {/* Calendar Cells */}
-          <Box sx={{ flexGrow: 1, position: "relative" }}>
+          <Box sx={{ flexGrow: 1 }}>
             {/* Date headers */}
             <Box sx={{ display: "flex", height: 60 }}>
               {calendarDates.map((date, index) => (
@@ -561,92 +528,84 @@ const ResourceCalendarView = ({
                 key={resource.id}
                 sx={{
                   display: "flex",
-                  height: cellHeight,
-                  position: "relative",
+                  minHeight: cellHeight,
+                  borderTop: 1,
+                  borderColor: "divider",
                 }}
               >
-                {calendarDates.map((date, dateIndex) => (
-                  <Box
-                    key={`${resource.id}_${date.toISOString()}`}
-                    sx={{
-                      width: cellWidth,
-                      height: "100%",
-                      borderBottom: 1,
-                      borderRight: 1,
-                      borderColor: "divider",
-                      backgroundColor: isToday(date)
-                        ? "primary.lighter"
-                        : isWeekend(date)
-                          ? "action.hover"
-                          : "background.paper",
-                      p: 0.5,
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  />
-                ))}
+                {calendarDates.map((date, dateIndex) => {
+                  // Find orders for this specific resource and date cell
+                  const cellOrders = orders.filter(order => {
+                    if (order.assignedResourceId !== resource.id) return false;
+                    const orderStart = dayjs(order.start.toDate());
+                    const orderEnd = dayjs(order.end.toDate());
+                    // Check if the current date cell falls within the order's duration
+                    return dayjs(date).isBetween(
+                      orderStart.subtract(1, "day"),
+                      orderEnd.add(1, "day"),
+                      "day",
+                      "()"
+                    ); // Inclusive check needed adjustment
+                  });
+
+                  return (
+                    <Box
+                      key={`${resource.id}_${date.toISOString()}`}
+                      sx={{
+                        width: cellWidth,
+                        minHeight: cellHeight, // Use minHeight
+                        borderBottom: 1,
+                        borderRight: 1,
+                        borderColor: "divider",
+                        backgroundColor: isToday(date)
+                          ? theme.palette.action.hover // Lighter background for today
+                          : isWeekend(date)
+                            ? theme.palette.action.disabledBackground // Different background for weekend
+                            : "background.paper",
+                        p: 0.5,
+                        display: "flex", // Use flexbox for stacking
+                        flexDirection: "column", // Stack orders vertically
+                        gap: 0.5, // Add gap between orders
+                        overflowY: "auto", // Allow scrolling if orders exceed cell height
+                      }}
+                      // Add Droppable props here if re-implementing drag and drop
+                    >
+                      {/* Render orders for this cell */}
+                      {cellOrders.map(order => (
+                        <Paper
+                          key={order.id}
+                          elevation={1}
+                          sx={{
+                            p: 0.5,
+                            fontSize: "0.7rem",
+                            backgroundColor: getStatusColor(order.status),
+                            color: theme.palette.getContrastText(getStatusColor(order.status)),
+                            borderLeft: `3px solid ${getPriorityColor(order.priority)}`,
+                            cursor: "pointer",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            "&:hover": {
+                              opacity: 0.9,
+                              boxShadow: 2,
+                            },
+                          }}
+                          onClick={() => handleViewOrder(order.id)}
+                          title={`${order.orderNumber}: ${order.description}`} // Tooltip for full text
+                        >
+                          <Typography variant="caption" component="div" fontWeight="bold" noWrap>
+                            {order.orderNumber}
+                          </Typography>
+                          <Typography variant="caption" component="div" noWrap>
+                            {order.description}
+                          </Typography>
+                        </Paper>
+                      ))}
+                    </Box>
+                  );
+                })}
               </Box>
             ))}
-
-            {/* Overlay the orders on the grid */}
-            {orders.map(order =>
-              resources.map(resource => {
-                const position = getOrderPosition(order, resource.id);
-                if (!position) return null;
-
-                const resourceIndex = resources.findIndex(r => r.id === resource.id);
-                const topPosition = 60 + resourceIndex * cellHeight; // 60px for header
-                const leftPosition = position.startIndex * cellWidth;
-                const width = position.span * cellWidth - 5; // 5px for padding
-
-                return (
-                  <Box
-                    key={`order-${order.id}-${resource.id}`}
-                    sx={{
-                      position: "absolute",
-                      top: topPosition + 5, // 5px padding
-                      left: leftPosition + 5, // 5px padding
-                      width: width,
-                      height: cellHeight - 10, // 10px for padding
-                      backgroundColor: getStatusColor(order.status),
-                      color: "white",
-                      borderRadius: 1,
-                      p: 1,
-                      boxShadow: 1,
-                      opacity: 0.8,
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      borderLeft: `4px solid ${getPriorityColor(order.priority)}`,
-                      "&:hover": {
-                        opacity: 1,
-                        boxShadow: 3,
-                      },
-                      zIndex: 1,
-                    }}
-                    onClick={() => handleViewOrder(order.id)}
-                  >
-                    <Typography variant="body2" fontWeight="bold" noWrap>
-                      {order.orderNumber}
-                    </Typography>
-                    <Typography variant="caption" noWrap>
-                      {order.description}
-                    </Typography>
-                    <Chip
-                      label={order.status}
-                      size="small"
-                      sx={{
-                        position: "absolute",
-                        bottom: 5,
-                        right: 5,
-                        backgroundColor: "rgba(255,255,255,0.3)",
-                        height: 18,
-                        fontSize: "0.6rem",
-                      }}
-                    />
-                  </Box>
-                );
-              })
-            )}
           </Box>
         </Box>
       </Paper>

@@ -18,10 +18,12 @@ import ProtectedRoute from "./ProtectedRoute";
 import TimeDashboardPage from "../pages/TimeDashboardPage";
 import ResourceCalendarPage from "../pages/ResourceCalendarPage";
 import ResourceManagementPage from "../pages/ResourceManagementPage";
-import StandaloneWorkOrderPrintPage from "../pages/StandaloneWorkOrderPrintPage";
 import FaultParetoChart from "../components/dashboard/FaultParetoChart";
 import ResourceBoardPage from "../pages/ResourceBoardPage"; // <-- Import the new page
 import ProductionDashboardPage from "../pages/ProductionDashboardPage";
+import PrintOrderPage from "../pages/PrintOrderPage";
+import DailySchedulerPage from "../pages/DailySchedulerPage";
+import MigratePlannedWeekStartDateButton from "../pages/admin/MigrateDates";
 
 /**
  * Main application routes configuration
@@ -52,10 +54,10 @@ const AppRoutes = () => {
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
         <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
-        <Route path="/orders/resource-board" element={<ResourceBoardPage />} />{" "}
+        <Route path="/orders/resource-board" element={<ResourceBoardPage />} />
+        <Route path="/orders/resource-scheduler" element={<DailySchedulerPage />} />
         {/* <-- Add this route */}
-        {/* <Route path="/orders/:id/print" element={<PrintOrderPage />} /> */}
-        <Route path="/orders/:id/print" element={<StandaloneWorkOrderPrintPage />} />
+        <Route path="/orders/:id/print" element={<PrintOrderPage />} />
         {/* New calendar route */}
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
@@ -82,6 +84,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route path="/admin/migrate-dates" element={<MigratePlannedWeekStartDateButton />} />
         {/* Settings */}
         <Route path="/settings" element={<div>Settings Page</div>} />
         {/* User Profile */}
