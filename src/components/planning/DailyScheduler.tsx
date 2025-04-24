@@ -8,12 +8,19 @@ import {
   useTheme,
   IconButton,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
 } from "@mui/material";
 import {
   ChevronLeft as PrevIcon,
   ChevronRight as NextIcon,
   Today as TodayIcon,
 } from "@mui/icons-material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
@@ -61,7 +68,7 @@ const calculateEndDate = (startDate: Date, estimatedHours: number): Date => {
 
 const DailyScheduler: React.FC = () => {
   const theme = useTheme();
-  const [currentDate, setCurrentDate] = useState(dayjs().startOf("week").toDate());
+  const [currentDate, setCurrentDate] = useState(dayjs().startOf("isoWeek").toDate());
   const [viewType, setViewType] = useState<"week" | "month">("week");
   const [resources, setResources] = useState<Resource[]>([]);
   const [loadingResources, setLoadingResources] = useState(true);
@@ -82,9 +89,13 @@ const DailyScheduler: React.FC = () => {
   const calendarDates = useMemo(() => {
     const dates: Date[] = [];
     const start = dayjs(currentDate).startOf("isoWeek");
-    const range = viewType === "week" ? 7 : start.daysInMonth();
-    for (let i = 0; i < range; i++) {
-      dates.push(start.add(i, "day").toDate());
+    for (let i = 0; i < 7; i++) {
+      const date = start.add(i, "day");
+      const dayOfWeek = date.day();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        // 0 = Sunday, 6 = Saturday
+        dates.push(date.toDate());
+      }
     }
     return dates;
   }, [currentDate, viewType]);
@@ -213,7 +224,29 @@ const DailyScheduler: React.FC = () => {
     setCurrentDate(dayjs(currentDate).add(1, viewType).toDate());
   };
   const handleToday = () => {
-    setCurrentDate(dayjs().startOf(viewType).toDate());
+    setCurrentDate(
+      dayjs()
+        .startOf(viewType === "week" ? "isoWeek" : viewType)
+        .toDate()
+    );
+  };
+
+  // --- Dialog Logic ---
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [orderToMove, setOrderToMove] = useState<SchedulerOrder | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<Date | null>(null);
+
+  const handleOpenMoveDialog = (order: SchedulerOrder) => {
+    setOrderToMove(order);
+    setSelectedWeek(
+      order.start ? dayjs(order.start.toDate()).startOf("isoWeek").toDate() : new Date()
+    );
+    setMoveDialogOpen(true);
+  };
+
+  const handleCloseMoveDialog = () => {
+    setMoveDialogOpen(false);
+    setOrderToMove(null);
   };
 
   // --- Render Logic ---
@@ -235,53 +268,52 @@ const DailyScheduler: React.FC = () => {
   }
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <Box sx={{ p: 2 }}>
-        {/* Header with Navigation */}
-        {/* ... (keep the header Box as provided before) ... */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-          <Typography variant="h6">Daily Scheduler</Typography>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <IconButton onClick={handlePrev} aria-label={`Previous ${viewType}`} size="small">
-              <PrevIcon />
-            </IconButton>
-            <Typography
-              variant="subtitle1"
-              component="span"
-              sx={{ mx: 2, textAlign: "center", minWidth: "150px" }}
-            >
-              {viewType === "week" && calendarDates.length >= 7
-                ? `${dayjs(calendarDates[0]).format("MMM D")} - ${dayjs(calendarDates[6]).format("MMM D, YYYY")}`
-                : dayjs(currentDate).format("MMMM YYYY")}
-            </Typography>
-            <IconButton onClick={handleNext} aria-label={`Next ${viewType}`} size="small">
-              <NextIcon />
-            </IconButton>
-            <Tooltip title={`Go to current ${viewType}`}>
-              <IconButton
-                onClick={handleToday}
-                aria-label="Go to Today"
-                size="small"
-                sx={{ ml: 1 }}
-              >
-                <TodayIcon />
+    <React.Fragment>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Box sx={{ p: 2 }}>
+          {/* Header with Navigation */}
+          {/* ... (keep the header Box as provided before) ... */}
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}
+          >
+            <Typography variant="h6">Daily Scheduler</Typography>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <IconButton onClick={handlePrev} aria-label={`Previous ${viewType}`} size="small">
+                <PrevIcon />
               </IconButton>
-            </Tooltip>
+              <Typography
+                variant="subtitle1"
+                component="span"
+                sx={{ mx: 2, textAlign: "center", minWidth: "150px" }}
+              >
+                {viewType === "week" && calendarDates.length >= 7
+                  ? `${dayjs(calendarDates[0]).format("MMM D")} - ${dayjs(calendarDates[6]).format("MMM D, YYYY")}`
+                  : dayjs(currentDate).format("MMMM YYYY")}
+              </Typography>
+              <IconButton onClick={handleNext} aria-label={`Next ${viewType}`} size="small">
+                <NextIcon />
+              </IconButton>
+              <Tooltip title={`Go to current ${viewType}`}>
+                <IconButton
+                  onClick={handleToday}
+                  aria-label="Go to Today"
+                  size="small"
+                  sx={{ ml: 1 }}
+                >
+                  <TodayIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
-        </Box>
-
-        {/* Main Grid */}
-        <Paper sx={{ overflowX: "auto", border: `1px solid ${theme.palette.divider}` }}>
-          <Box sx={{ display: "flex" }}>
-            {/* Resource Header Column */}
-            {/* ... (keep the resource header Box as provided before) ... */}
+          {/* Main Grid */}
+          <Paper sx={{ overflowX: "auto", border: `1px solid ${theme.palette.divider}` }}>
             <Box
               sx={{
-                width: RESOURCE_HEADER_WIDTH,
-                flexShrink: 0,
-                borderRight: `1px solid ${theme.palette.divider}`,
+                display: "grid",
+                gridTemplateColumns: `${RESOURCE_HEADER_WIDTH}px repeat(${calendarDates.length}, 1fr)`,
               }}
             >
+              {/* Header Row */}
               <Box
                 sx={{
                   height: 50,
@@ -290,86 +322,70 @@ const DailyScheduler: React.FC = () => {
                   justifyContent: "center",
                   borderBottom: `1px solid ${theme.palette.divider}`,
                   backgroundColor: "background.default",
+                  fontWeight: "bold",
                 }}
               >
-                <Typography variant="subtitle2">Resource</Typography>
+                Resource
               </Box>
-              {resources.map(resource => (
+              {calendarDates.map(date => (
                 <Box
-                  key={resource.id}
+                  key={date.toISOString()}
                   sx={{
-                    height: 100,
-                    p: 1,
-                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    height: 50,
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
-                    backgroundColor: "background.paper",
+                    justifyContent: "center",
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    borderRight: `1px solid ${theme.palette.divider}`,
+                    backgroundColor: dayjs(date).isSame(dayjs(), "day")
+                      ? theme.palette.action.hover
+                      : "inherit",
                   }}
                 >
+                  <Typography variant="caption" color="text.secondary">
+                    {dayjs(date).format("ddd")}
+                  </Typography>
                   <Typography variant="body2" fontWeight="medium">
-                    {resource.name}
+                    {dayjs(date).format("D")}
                   </Typography>
                 </Box>
               ))}
-            </Box>
-
-            {/* Grid Content */}
-            <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
-              {/* Date Header Row */}
-              {/* ... (keep the date header Box as provided before) ... */}
-              <Box
-                sx={{
-                  display: "flex",
-                  height: 50,
-                  borderBottom: `1px solid ${theme.palette.divider}`,
-                  backgroundColor: "background.default",
-                }}
-              >
-                {calendarDates.map(date => (
-                  <Box
-                    key={date.toISOString()}
-                    sx={{
-                      flexGrow: 1,
-                      flexBasis: 0,
-                      minWidth: 100,
-                      borderRight: `1px solid ${theme.palette.divider}`,
-                      p: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: dayjs(date).isSame(dayjs(), "day")
-                        ? theme.palette.action.hover
-                        : "inherit",
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      {dayjs(date).format("ddd")}
-                    </Typography>
-                    <Typography variant="body2" fontWeight="medium">
-                      {dayjs(date).format("D")}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
 
               {/* Resource Rows */}
               {resources.map(resource => (
-                <Box
-                  key={resource.id}
-                  sx={{ display: "flex", borderBottom: `1px solid ${theme.palette.divider}` }}
-                >
-                  {/* Cells */}
+                <React.Fragment key={resource.id}>
+                  {/* Resource Name Cell */}
+                  <Box
+                    sx={{
+                      borderBottom: `1px solid ${theme.palette.divider}`,
+                      display: "flex",
+                      alignItems: "center",
+                      backgroundColor: "background.paper",
+                      p: 1,
+                      minHeight: 100,
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight="medium">
+                      {resource.name}
+                    </Typography>
+                  </Box>
+                  {/* Calendar Cells */}
                   {calendarDates.map(date => {
                     const dateString = dayjs(date).format("YYYY-MM-DD");
                     const droppableId = `${resource.id}|${dateString}`;
                     const cellOrders = schedulerOrders.filter(
                       o =>
                         o.assignedResourceId === resource.id &&
-                        o.plannedWeekStartDate ===
-                          dayjs(date).startOf("isoWeek").format("YYYY-MM-DD")
+                        o.start &&
+                        o.end &&
+                        dayjs(date).isBetween(
+                          dayjs(o.start.toDate()),
+                          dayjs(o.end.toDate()),
+                          "day",
+                          "[]"
+                        )
                     );
-
                     return (
                       <Droppable droppableId={droppableId} key={droppableId}>
                         {(provided, snapshot) => (
@@ -377,11 +393,9 @@ const DailyScheduler: React.FC = () => {
                             ref={provided.innerRef}
                             {...provided.droppableProps}
                             sx={{
-                              flexGrow: 1,
-                              flexBasis: 0,
-                              minWidth: 100,
-                              minHeight: 100,
+                              borderBottom: `1px solid ${theme.palette.divider}`,
                               borderRight: `1px solid ${theme.palette.divider}`,
+                              minHeight: 100,
                               p: 0.5,
                               backgroundColor: snapshot.isDraggingOver
                                 ? theme.palette.action.focus
@@ -394,7 +408,6 @@ const DailyScheduler: React.FC = () => {
                               overflowY: "auto",
                             }}
                           >
-                            {/* Render cellOrders as Draggables */}
                             {cellOrders.map((order, index) => (
                               <Draggable draggableId={order.id} index={index} key={order.id}>
                                 {(providedDraggable, snapshotDraggable) => (
@@ -412,6 +425,13 @@ const DailyScheduler: React.FC = () => {
                                     }}
                                     title={`${order.orderNumber}: ${order.description}`}
                                   >
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleOpenMoveDialog(order)}
+                                      sx={{ ml: 1 }}
+                                    >
+                                      <TodayIcon fontSize="inherit" />
+                                    </IconButton>
                                     <Typography
                                       variant="caption"
                                       component="div"
@@ -438,13 +458,65 @@ const DailyScheduler: React.FC = () => {
                       </Droppable>
                     );
                   })}
-                </Box>
+                </React.Fragment>
               ))}
             </Box>
-          </Box>
-        </Paper>
-      </Box>
-    </DragDropContext>
+          </Paper>
+        </Box>
+      </DragDropContext>
+      <Dialog open={moveDialogOpen} onClose={handleCloseMoveDialog}>
+        <DialogTitle>Move Order to Another Week</DialogTitle>
+        <DialogContent>
+          <DatePicker
+            label="Select week"
+            value={selectedWeek ? dayjs(selectedWeek) : null}
+            onChange={date => setSelectedWeek(dayjs(date).startOf("isoWeek").toDate())}
+            views={["year", "month", "day"]}
+            format="DD-MM-YYYY"
+            renderInput={params => <TextField {...params} />}
+            sx={{ mt: 1, mb: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseMoveDialog}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              if (!orderToMove || !selectedWeek) return;
+              // Calculate new start and end dates (start of selected week, 8:00)
+              const newStartDate = dayjs(selectedWeek).hour(8).minute(0).second(0).toDate();
+              const newEndDate = calculateEndDate(newStartDate, orderToMove.estimatedHours || 8);
+              const newPlannedWeekStartDate = dayjs(newStartDate)
+                .startOf("isoWeek")
+                .format("YYYY-MM-DD");
+
+              // Update Firestore and local state
+              await updateDoc(doc(db, "orders", orderToMove.id), {
+                start: Timestamp.fromDate(newStartDate),
+                end: Timestamp.fromDate(newEndDate),
+                plannedWeekStartDate: newPlannedWeekStartDate,
+                updated: Timestamp.now(),
+              });
+              setSchedulerOrders(prev =>
+                prev.map(o =>
+                  o.id === orderToMove.id
+                    ? {
+                        ...o,
+                        start: Timestamp.fromDate(newStartDate),
+                        end: Timestamp.fromDate(newEndDate),
+                        plannedWeekStartDate: newPlannedWeekStartDate,
+                      }
+                    : o
+                )
+              );
+              handleCloseMoveDialog();
+            }}
+            variant="contained"
+          >
+            Move
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </React.Fragment>
   );
 }; // <-- This is the single, correct closing brace for the component
 

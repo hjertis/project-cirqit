@@ -6,6 +6,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DashboardProvider } from "./context/DashboardContext";
 import { AuthProvider } from "./context/AuthContext";
 import AppRoutes from "./routes";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import "dayjs/locale/sv"; // Import Swedish locale for dayjs
+import dayjs from "dayjs";
 
 // Initialize React Query client
 const queryClient = new QueryClient({
@@ -78,19 +82,22 @@ const theme = createTheme({
 });
 
 function App() {
+  dayjs.locale("sv"); // Set the locale to Swedish for dayjs
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {/* Wrap everything with AuthProvider */}
-        <AuthProvider>
-          <DashboardProvider>
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </DashboardProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="sv">
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          {/* Wrap everything with AuthProvider */}
+          <AuthProvider>
+            <DashboardProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </DashboardProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </LocalizationProvider>
     </QueryClientProvider>
   );
 }
