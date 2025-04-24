@@ -4,8 +4,6 @@ import { Box, Breadcrumbs, Typography, Link, Paper, Tabs, Tab } from "@mui/mater
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
 import OrderWorkflowTimeline from "../components/orders/OrderWorkflowTimeline";
-// Remove or comment out this line:
-import SimplifiedGanttChart from "../components/orders/SimplifiedGanttChart"; // <-- Import the new chart
 import ContentWrapper from "../components/layout/ContentWrapper";
 
 const OrderPlanningPage = () => {
@@ -35,13 +33,7 @@ const OrderPlanningPage = () => {
         </Box>
 
         {/* Wrap tabs and content in a Paper component */}
-        <Paper
-          sx={
-            {
-              /* Removed mb: 3, p: 2 */
-            }
-          }
-        >
+        <Paper>
           <Tabs
             value={tabValue}
             onChange={handleTabChange}
@@ -49,12 +41,8 @@ const OrderPlanningPage = () => {
             sx={{ borderBottom: 1, borderColor: "divider" }}
           >
             <Tab label="Workflow View" />
-            <Tab label="Gantt Chart" />
           </Tabs>
-          <Box>
-            {tabValue === 0 && <OrderWorkflowTimeline />}
-            {tabValue === 1 && <SimplifiedGanttChart />}
-          </Box>
+          <Box>{tabValue === 0 && <OrderWorkflowTimeline />}</Box>
         </Paper>
       </Box>
     </ContentWrapper>

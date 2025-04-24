@@ -6,13 +6,25 @@
     margin: 20mm;
   }
 
+  html,
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     font-size: 10pt;
     line-height: 1.2;
-    background-color: white !important;
+    background: none !important;
     color: black !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  /* Hide everything on the page initially */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #root {
+    background: none !important;
   }
 
   /* Hide non-printable elements */
@@ -24,29 +36,37 @@
     display: none !important;
   }
 
-  /* Ensure dialog content takes full page */
-  .MuiDialog-paper,
-  .MuiDialogContent-root {
+  main,
+  main > .MuiContainer-root {
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .MuiAppBar-root,
+  .MuiDrawer-root {
+    display: none !important;
+  }
+
+  /* Make only the print container and its children visible */
+  /* Target the container INSIDE DialogContent */
+  .print-container,
+  .print-container * {
+    visibility: visible !important;
+  }
+
+  /* Position the print container at the top-left of the page */
+  .print-container {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    max-height: none !important;
+    width: 100% !important; /* Use full printable width */
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 0 !important; /* Reset padding, rely on @page margin */
     border: none !important;
     box-shadow: none !important;
-    overflow: visible !important;
-  }
-
-  /* Main print container */
-  .print-container {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    background: white !important; /* Explicitly set print container background */
   }
 
   /* Ensure boxes fit within page */
@@ -216,6 +236,45 @@
   /* Force headers to be printed */
   thead {
     display: table-header-group !important;
+  }
+
+  .no-print,
+  button,
+  .MuiButtonBase-root,
+  .MuiDialogTitle-root,
+  .MuiDialogActions-root,
+  .MuiAppBar-root,
+  .MuiDrawer-root {
+    display: none !important;
+    visibility: hidden !important; /* Reinforce hiding */
+  }
+
+  /* Reset backgrounds just in case */
+  #root,
+  main,
+  main > .MuiContainer-root {
+    background: none !important;
+  }
+
+  /* Style the actual content for print */
+  .MuiPaper-root {
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    background: white !important; /* Ensure paper background is white */
+  }
+
+  table {
+    /* ... keep existing table styles ... */
+    background: white !important; /* Ensure table background is white */
+  }
+
+  th,
+  td {
+    /* ... keep existing cell styles ... */
+    background: white !important; /* Ensure cell background is white */
   }
 
   /* Ensure white background */
