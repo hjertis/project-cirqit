@@ -41,6 +41,8 @@ import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
 import OrderTimeTracking from "./OrderTimeTracking";
 import PrintableWorkOrder from "./PrintableWorkOrder";
+// Import the EditOrderDialog component
+import EditOrderDialog from "./EditOrderDialog";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -138,57 +140,56 @@ const OrderDetailsDialog = ({
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveResult, setArchiveResult] = useState<string | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const handlePrintOrder = () => {
-    setPrintDialogOpen(true);
+  // Extract the fetch function to reuse after edits
+  const fetchOrderDetails = async () => {
+    if (!orderId || !open) return;
+
+    setLoading(true);
+    try {
+      // Fetch order details
+      const orderDoc = await getDoc(doc(db, "orders", orderId));
+
+      if (!orderDoc.exists()) {
+        setError("Order not found");
+        setLoading(false);
+        return;
+      }
+
+      setOrder({ id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder);
+
+      // Fetch order processes
+      const processesQuery = query(
+        collection(db, "processes"),
+        where("workOrderId", "==", orderId)
+      );
+
+      const processesSnapshot = await getDocs(processesQuery);
+      const processesData: Process[] = [];
+
+      processesSnapshot.forEach(doc => {
+        processesData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Process);
+      });
+
+      // Sort processes by sequence
+      processesData.sort((a, b) => a.sequence - b.sequence);
+      setProcesses(processesData);
+
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching order details:", err);
+      setError("Failed to load order details. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Update the useEffect to use the extracted function
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!orderId || !open) return;
-
-      setLoading(true);
-      try {
-        // Fetch order details
-        const orderDoc = await getDoc(doc(db, "orders", orderId));
-
-        if (!orderDoc.exists()) {
-          setError("Order not found");
-          setLoading(false);
-          return;
-        }
-
-        setOrder({ id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder);
-
-        // Fetch order processes
-        const processesQuery = query(
-          collection(db, "processes"),
-          where("workOrderId", "==", orderId)
-        );
-
-        const processesSnapshot = await getDocs(processesQuery);
-        const processesData: Process[] = [];
-
-        processesSnapshot.forEach(doc => {
-          processesData.push({
-            id: doc.id,
-            ...doc.data(),
-          } as Process);
-        });
-
-        // Sort processes by sequence
-        processesData.sort((a, b) => a.sequence - b.sequence);
-        setProcesses(processesData);
-
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching order details:", err);
-        setError("Failed to load order details. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchOrderDetails();
   }, [orderId, open]);
 
@@ -219,9 +220,15 @@ const OrderDetailsDialog = ({
   };
 
   const handleEdit = () => {
-    if (order) {
-      navigate(`/orders/${order.id}/edit`);
-      onClose();
+    setEditDialogOpen(true);
+  };
+
+  const handleOrderUpdated = () => {
+    setEditDialogOpen(false);
+
+    // Refresh order data
+    if (orderId) {
+      fetchOrderDetails();
     }
   };
 
@@ -234,6 +241,10 @@ const OrderDetailsDialog = ({
       navigate(`/orders/${order.id}`);
       onClose();
     }
+  };
+
+  const handlePrintOrder = () => {
+    setPrintDialogOpen(true);
   };
 
   const renderContent = () => {
@@ -547,8 +558,8 @@ const OrderDetailsDialog = ({
 
         <DialogActions>
           <Button onClick={onClose}>Close</Button>
-          <Button onClick={handleViewFull} startIcon={<EditIcon />}>
-            {fullPage ? "Edit Order" : "View Full Details"}
+          <Button onClick={handleEdit} startIcon={<EditIcon />}>
+            Edit Order
           </Button>
           <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrintOrder}>
             Print Work Order
@@ -589,6 +600,14 @@ const OrderDetailsDialog = ({
             processes={processes}
           />
         )}
+
+        {/* Edit Order Dialog */}
+        <EditOrderDialog
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          orderId={orderId}
+          onOrderUpdated={handleOrderUpdated}
+        />
       </>
     );
   };

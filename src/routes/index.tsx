@@ -5,7 +5,6 @@ import Dashboard from "../pages/Dashboard";
 import OrdersPage from "../pages/Orders";
 import ImportOrdersPage from "../pages/ImportOrdersPage";
 import CreateOrderPage from "../pages/CreateOrderPage";
-import EditOrderPage from "../pages/EditOrderPage";
 import OrderDetailsPage from "../pages/OrderDetailsPage";
 import OrderPlanningPage from "../pages/OrderPlanningPage";
 import ArchivedOrdersPage from "../pages/ArchivedOrdersPage";
@@ -61,7 +60,6 @@ const AppRoutes = () => {
         {/* New calendar route */}
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
-        <Route path="/orders/:id/edit" element={<EditOrderPage />} />
         {/* Products module */}
         <Route path="/products" element={<div>Products Page</div>} />
         <Route path="/products/create" element={<div>Create Product Page</div>} />

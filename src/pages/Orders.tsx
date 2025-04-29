@@ -49,6 +49,7 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
+import EditOrderDialog from "../components/orders/EditOrderDialog"; // Import the EditOrderDialog
 import useOrders, { OrderFilter } from "../hooks/useOrders";
 import { doc, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -111,7 +112,8 @@ const OrdersPage = () => {
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [order, setOrder] = useState<"asc" | "asc">("asc");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [orderBy, setOrderBy] = useState<string>("start");
 
   // Get the initial filter based on the tab
@@ -232,8 +234,21 @@ const OrdersPage = () => {
     setSelectedOrderId(orderId);
     setDetailsDialogOpen(true);
   };
+
   const handleEditOrder = (orderId: string) => {
-    navigate(`/orders/${orderId}/edit`);
+    setSelectedOrderId(orderId);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditComplete = () => {
+    setEditDialogOpen(false);
+
+    // Refresh the orders list
+    refreshOrders();
+
+    // Show success message
+    setSuccessMessage("Order updated successfully");
+    setSnackbarOpen(true);
   };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, orderId: string) => {
@@ -245,6 +260,7 @@ const OrdersPage = () => {
     setMenuAnchorEl(null);
     // Don't reset selectedOrder here
   };
+
   const handleDeleteClick = () => {
     // Store the selected order before closing the menu
     setOrderToDelete(selectedOrder);
@@ -528,7 +544,7 @@ const OrdersPage = () => {
             }}
           >
             <EditIcon fontSize="small" sx={{ mr: 1 }} />
-            Edit
+            Edit Order
           </MenuItem>
           <Divider />
           <MenuItem onClick={handleDeleteClick} sx={{ color: "error.main" }}>
@@ -559,6 +575,29 @@ const OrdersPage = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Order Details Dialog */}
+        <OrderDetailsDialog
+          open={detailsDialogOpen}
+          onClose={() => setDetailsDialogOpen(false)}
+          orderId={selectedOrderId}
+        />
+
+        {/* Edit Order Dialog */}
+        <EditOrderDialog
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          orderId={selectedOrderId}
+          onOrderUpdated={handleEditComplete}
+        />
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={() => setSnackbarOpen(false)}
+          message={successMessage}
+        />
       </Box>
     </ContentWrapper>
   );
@@ -692,22 +731,6 @@ const OrdersPage = () => {
             </TableBody>
           </Table>
         </TableContainer>
-        <Snackbar
-          open={snackbarOpen}
-          autoHideDuration={6000}
-          onClose={() => setSnackbarOpen(false)}
-          message={successMessage || error}
-          ContentProps={{
-            sx: {
-              backgroundColor: error ? "error.main" : "success.main",
-            },
-          }}
-        />
-        <OrderDetailsDialog
-          open={detailsDialogOpen}
-          onClose={() => setDetailsDialogOpen(false)}
-          orderId={selectedOrderId}
-        />
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
