@@ -1,4 +1,3 @@
-// src/pages/ProductionDashboardPage.tsx
 import { useState, useEffect, useRef } from "react";
 import {
   Box,
@@ -12,7 +11,6 @@ import {
   Breadcrumbs,
   Link,
   Chip,
-  Divider,
   Table,
   TableBody,
   TableCell,
@@ -49,7 +47,6 @@ import ContentWrapper from "../components/layout/ContentWrapper";
 import {
   BarChart,
   Bar,
-  LineChart,
   Line,
   PieChart,
   Pie,
@@ -57,7 +54,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   ComposedChart,
@@ -95,10 +91,8 @@ const ProductionDashboardPage = () => {
   const [error, setError] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Refs for export
   const dashboardRef = useRef(null);
 
-  // Filter states
   const [filterOpen, setFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState([]);
   const [dateFilter, setDateFilter] = useState({
@@ -110,7 +104,6 @@ const ProductionDashboardPage = () => {
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [availableProducts, setAvailableProducts] = useState([]);
 
-  // Export states
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
   const [exportFormat, setExportFormat] = useState("pdf");
   const [exportLoading, setExportLoading] = useState(false);
@@ -119,7 +112,6 @@ const ProductionDashboardPage = () => {
     fetchFirebaseData();
   }, [refreshTrigger]);
 
-  // Apply filters whenever filter values change
   useEffect(() => {
     if (orders.length > 0) {
       applyFilters();
@@ -130,28 +122,18 @@ const ProductionDashboardPage = () => {
     try {
       setIsLoading(true);
 
-      // Query orders from Firestore
       const ordersRef = collection(db, "orders");
 
-      // Query both active and archived orders
-      const activeOrdersQuery = query(
-        ordersRef,
-        orderBy("updated", "desc") // Sort by last updated
-      );
+      const activeOrdersQuery = query(ordersRef, orderBy("updated", "desc"));
 
       const archivedOrdersRef = collection(db, "archivedOrders");
-      const archivedOrdersQuery = query(
-        archivedOrdersRef,
-        orderBy("updated", "desc") // Sort by last updated
-      );
+      const archivedOrdersQuery = query(archivedOrdersRef, orderBy("updated", "desc"));
 
-      // Execute both queries
       const [activeSnapshot, archivedSnapshot] = await Promise.all([
         getDocs(activeOrdersQuery),
         getDocs(archivedOrdersQuery),
       ]);
 
-      // Combine active and archived orders
       const allOrders: Order[] = [];
 
       activeSnapshot.forEach(doc => {
@@ -173,44 +155,37 @@ const ProductionDashboardPage = () => {
       console.log(`Loaded ${allOrders.length} orders from Firebase`);
       setOrders(allOrders);
 
-      // Extract available statuses and products for filters
       const statuses = [...new Set(allOrders.map(order => order.status))].filter(Boolean);
       setAvailableStatuses(statuses);
 
       const products = [...new Set(allOrders.map(order => order.partNo))].filter(Boolean);
       setAvailableProducts(products);
 
-      // Initially, filtered orders are the same as all orders
       setFilteredOrders(allOrders);
 
-      // Process the data for visualizations
       processOrderData(allOrders);
       setError(null);
     } catch (err) {
       console.error("Error fetching data from Firebase:", err);
       setError(`Failed to load production data: ${err.message || "Unknown error"}`);
 
-      // If Firebase query fails, use sample data as fallback
       useSampleData();
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Filter application
   const applyFilters = () => {
     let filtered = [...orders];
 
-    // Apply status filter
     if (statusFilter.length > 0) {
       filtered = filtered.filter(order => statusFilter.includes(order.status));
     }
 
-    // Apply date range filter
     if (dateFilter.start && dateFilter.end) {
       const startDate = new Date(dateFilter.start);
       const endDate = new Date(dateFilter.end);
-      endDate.setHours(23, 59, 59, 999); // Include the entire end date
+      endDate.setHours(23, 59, 59, 999);
 
       filtered = filtered.filter(order => {
         const orderDate = order.start?.toDate ? order.start.toDate() : new Date(order.start);
@@ -231,7 +206,6 @@ const ProductionDashboardPage = () => {
       });
     }
 
-    // Apply search filter (on order number, description, etc.)
     if (searchFilter) {
       const searchLower = searchFilter.toLowerCase();
       filtered = filtered.filter(
@@ -241,18 +215,15 @@ const ProductionDashboardPage = () => {
       );
     }
 
-    // Apply product filter
     if (productFilter) {
       filtered = filtered.filter(order => order.partNo === productFilter);
     }
 
     setFilteredOrders(filtered);
 
-    // Process the filtered data
     processOrderData(filtered);
   };
 
-  // Reset all filters
   const resetFilters = () => {
     setStatusFilter([]);
     setDateFilter({ start: "", end: "" });
@@ -262,12 +233,10 @@ const ProductionDashboardPage = () => {
     processOrderData(orders);
   };
 
-  // Handle refresh button click
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  // Fallback to sample data if needed
   const useSampleData = () => {
     const sampleOrders = generateSampleOrders();
     setOrders(sampleOrders);
@@ -275,9 +244,7 @@ const ProductionDashboardPage = () => {
     processOrderData(sampleOrders);
   };
 
-  // Process the order data for visualizations
   const processOrderData = orderData => {
-    // 1. Process monthly production
     const monthlyData = {};
     const today = new Date();
 
@@ -328,7 +295,6 @@ const ProductionDashboardPage = () => {
 
     setProductionByMonth(monthlyChartData);
 
-    // 2. Process top products
     const productsByPartNo = {};
     orderData.forEach(order => {
       const partNo = order.partNo || "Unknown";
@@ -353,7 +319,6 @@ const ProductionDashboardPage = () => {
 
     setTopProducts(topProductsData);
 
-    // 3. Process status distribution
     const statusCounts = {};
     orderData.forEach(order => {
       const status = order.status || "Unknown";
@@ -367,7 +332,6 @@ const ProductionDashboardPage = () => {
 
     setStatusDistribution(statusData);
 
-    // 4. Process efficiency data - for orders that have start/end dates
     const efficiencyItems = orderData
       .filter(
         order =>
@@ -384,7 +348,6 @@ const ProductionDashboardPage = () => {
           plannedEnd = new Date(order.end);
         }
 
-        // For actual end, use updated timestamp or end date
         if (order.updated) {
           if (order.updated instanceof Timestamp) {
             actualEnd = order.updated.toDate();
@@ -398,7 +361,7 @@ const ProductionDashboardPage = () => {
         }
 
         if (plannedEnd && actualEnd) {
-          const diff = (actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24); // days difference
+          const diff = (actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24);
           return {
             order: order.orderNumber || order.id,
             description:
@@ -417,7 +380,6 @@ const ProductionDashboardPage = () => {
     setEfficiencyData(efficiencyItems);
   };
 
-  // Format date helper
   const formatDate = date => {
     if (!date) return "N/A";
     return date.toLocaleDateString("en-US", {
@@ -427,7 +389,6 @@ const ProductionDashboardPage = () => {
     });
   };
 
-  // Generate sample orders if Firebase data isn't available
   const generateSampleOrders = (): Order[] => {
     const now = new Date();
     const oneMonthAgo = new Date(now);
@@ -498,7 +459,6 @@ const ProductionDashboardPage = () => {
     ];
   };
 
-  // Export functions
   const handleExportClick = event => {
     setExportMenuAnchor(event.currentTarget);
   };
@@ -551,15 +511,12 @@ const ProductionDashboardPage = () => {
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("p", "mm", "a4");
 
-    // Add report title
     pdf.setFontSize(16);
     pdf.text("Production Dashboard Report", 105, 15, { align: "center" });
 
-    // Add date
     pdf.setFontSize(10);
     pdf.text(`Generated on ${new Date().toLocaleString()}`, 105, 22, { align: "center" });
 
-    // Add filter summary if any filters are applied
     let filtersApplied = false;
     let filterText = "Filters applied: ";
 
@@ -588,23 +545,18 @@ const ProductionDashboardPage = () => {
       pdf.text(filterText, 105, 29, { align: "center" });
     }
 
-    // Calculate aspect ratio to fit image on the page
-    const imgWidth = 210 - 20; // A4 width (210mm) minus margins
+    const imgWidth = 210 - 20;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    // Add the image
     const yPosition = filtersApplied ? 35 : 30;
     pdf.addImage(imgData, "PNG", 10, yPosition, imgWidth, imgHeight);
 
-    // Save the PDF
     pdf.save(`production_dashboard_${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const exportToExcel = () => {
-    // Create workbook
     const wb = XLSX.utils.book_new();
 
-    // Add filtered orders sheet
     const ordersWS = XLSX.utils.json_to_sheet(
       filteredOrders.map(order => ({
         "Order Number": order.orderNumber || order.id,
@@ -626,7 +578,6 @@ const ProductionDashboardPage = () => {
     );
     XLSX.utils.book_append_sheet(wb, ordersWS, "Orders");
 
-    // Add monthly production sheet
     const monthlyWS = XLSX.utils.json_to_sheet(
       productionByMonth.map(item => ({
         Month: item.month,
@@ -635,7 +586,6 @@ const ProductionDashboardPage = () => {
     );
     XLSX.utils.book_append_sheet(wb, monthlyWS, "Monthly Production");
 
-    // Add product distribution sheet
     const productsWS = XLSX.utils.json_to_sheet(
       topProducts.map(item => ({
         "Part Number": item.partNo,
@@ -646,7 +596,6 @@ const ProductionDashboardPage = () => {
     );
     XLSX.utils.book_append_sheet(wb, productsWS, "Product Distribution");
 
-    // Add efficiency data sheet if available
     if (efficiencyData.length > 0) {
       const efficiencyWS = XLSX.utils.json_to_sheet(
         efficiencyData.map(item => ({
@@ -661,16 +610,13 @@ const ProductionDashboardPage = () => {
       XLSX.utils.book_append_sheet(wb, efficiencyWS, "Order Efficiency");
     }
 
-    // Save the workbook
     XLSX.writeFile(wb, `production_dashboard_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const exportRawData = () => {
-    // Create JSON file with the filtered orders data
     const dataStr = JSON.stringify(filteredOrders, null, 2);
     const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
 
-    // Create download link
     const exportFileDefaultName = `production_data_${new Date().toISOString().split("T")[0]}.json`;
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
@@ -700,7 +646,6 @@ const ProductionDashboardPage = () => {
         )}
 
         <Box>
-          {/* Page Header with Breadcrumbs */}
           <Box
             sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}
           >
@@ -771,7 +716,6 @@ const ProductionDashboardPage = () => {
             </Box>
           </Box>
 
-          {/* Filters dialog */}
           <Dialog open={filterOpen} onClose={() => setFilterOpen(false)} maxWidth="md" fullWidth>
             <DialogTitle
               sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
@@ -894,7 +838,6 @@ const ProductionDashboardPage = () => {
           </Dialog>
         </Box>
 
-        {/* Filter chips */}
         {(statusFilter.length > 0 ||
           dateFilter.start ||
           dateFilter.end ||
@@ -971,12 +914,10 @@ const ProductionDashboardPage = () => {
           </Paper>
         )}
 
-        {/* Data summary */}
         <Alert severity="info" sx={{ mb: 3 }}>
           Displaying data from {filteredOrders.length} orders (out of {orders.length} total)
         </Alert>
 
-        {/* View selection buttons */}
         <ButtonGroup variant="outlined" sx={{ mb: 3 }}>
           <Button
             variant={selectedView === "overview" ? "contained" : "outlined"}
@@ -1006,7 +947,6 @@ const ProductionDashboardPage = () => {
 
         {selectedView === "overview" && (
           <Grid container spacing={3}>
-            {/* Status Distribution */}
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
@@ -1038,7 +978,6 @@ const ProductionDashboardPage = () => {
               </Paper>
             </Grid>
 
-            {/* Production Quantity By Month */}
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
@@ -1062,7 +1001,6 @@ const ProductionDashboardPage = () => {
               </Paper>
             </Grid>
 
-            {/* Top Products */}
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
@@ -1093,7 +1031,6 @@ const ProductionDashboardPage = () => {
               </Paper>
             </Grid>
 
-            {/* Efficiency Overview */}
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>

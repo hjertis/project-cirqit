@@ -3,13 +3,11 @@ import { collection, getDocs, writeBatch, doc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { Button, Alert, Typography, CircularProgress } from "@mui/material";
 
-// Legacy to standard mapping
 const LEGACY_TO_STANDARD: Record<string, string> = {
   setup: "Setup",
   production: "SMT",
   "quality check": "Inspection",
   packaging: "Delivery",
-  // Add more mappings if needed
 };
 
 function mapToStandard(value: string): string {
@@ -44,7 +42,6 @@ const StandardizeProcessesCollectionPage: React.FC = () => {
           `Doc: ${processDoc.id}, name: "${processData.name}" -> "${newName}", type: "${processData.type}" -> "${newType}"`
         );
 
-        // Only update if changed
         if (processData.name !== newName || processData.type !== newType) {
           const docRef = doc(db, "processes", processDoc.id);
           batch.update(docRef, { name: newName, type: newType });

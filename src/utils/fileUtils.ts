@@ -1,5 +1,3 @@
-// src/utils/fileUtils.ts
-
 /**
  * Safely reads a file using the window.fs API if available
  * @param fileName The name of the file to read
@@ -10,13 +8,11 @@ export const safeReadFile = async (
   fileName: string,
   options?: { encoding?: string }
 ): Promise<string | ArrayBuffer | null> => {
-  // Check if we're in a browser environment
   if (typeof window === "undefined") {
     console.warn("Not in browser environment, cannot read file");
     return null;
   }
 
-  // Check if the fs API is available
   if (!window.fs || typeof window.fs.readFile !== "function") {
     console.warn("window.fs.readFile API not available");
     return null;
@@ -136,10 +132,8 @@ export const getSampleData = (
         },
       ];
     case "orders":
-      // Sample order data
       return [];
     case "resources":
-      // Sample resource data
       return [];
     default:
       return [];

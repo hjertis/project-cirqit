@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// src/components/orders/OrdersImporter.tsx
 import { useState, useRef } from "react";
 import {
   Box,
@@ -30,18 +28,17 @@ import {
 } from "@mui/icons-material";
 import Papa from "papaparse";
 
-// Define expected CSV structure based on the old implementation
 interface OrderCsvRow {
   No: string;
   Description: string;
-  SourceNo: string; // partNo
+  SourceNo: string;
   Quantity: string | number;
   StartingDateTime: string;
   EndingDateTime: string;
   Status: string;
   Notes?: string;
   State?: string;
-  [key: string]: string | number | undefined; // Allow for additional fields
+  [key: string]: string | number | undefined;
 }
 
 interface ValidationError {
@@ -76,17 +73,15 @@ const OrdersImporter = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle file selection
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       setCsvFile(files[0]);
-      setActiveStep(1); // Move to validation step
+      setActiveStep(1);
       parseCSV(files[0]);
     }
   };
 
-  // Parse CSV file
   const parseCSV = (file: File) => {
     setIsLoading(true);
     Papa.parse(file, {
@@ -105,13 +100,11 @@ const OrdersImporter = () => {
     });
   };
 
-  // Validate the parsed data
   const validateData = (data: OrderCsvRow[]) => {
     setIsLoading(true);
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
 
-    // Check for required columns
     const requiredFields = [
       "No",
       "Description",
@@ -141,9 +134,7 @@ const OrdersImporter = () => {
       return;
     }
 
-    // Validate each row
     data.forEach((row, index) => {
-      // Check required fields
       requiredFields.forEach(field => {
         if (!row[field] && field !== "Notes" && field !== "State") {
           errors.push({
@@ -154,7 +145,6 @@ const OrdersImporter = () => {
         }
       });
 
-      // Validate order number format
       if (!row.No || row.No.trim() === "") {
         errors.push({
           row: index + 1,
@@ -163,7 +153,6 @@ const OrdersImporter = () => {
         });
       }
 
-      // Validate status
       const validStatuses = ["Released", "Finished", "In Progress", "Firm Planned"];
       if (row.Status && !validStatuses.includes(row.Status)) {
         warnings.push({
@@ -173,7 +162,6 @@ const OrdersImporter = () => {
         });
       }
 
-      // Validate date format (DD-MM-YYYY)
       const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
 
       if (row.StartingDateTime) {
@@ -196,7 +184,6 @@ const OrdersImporter = () => {
         }
       }
 
-      // Validate quantity is a number
       if (row.Quantity && isNaN(Number(row.Quantity))) {
         errors.push({
           row: index + 1,
@@ -205,10 +192,8 @@ const OrdersImporter = () => {
         });
       }
 
-      // Check for duplicate order numbers
       const duplicates = data.filter(r => r.No === row.No);
       if (duplicates.length > 1) {
-        // Only add this error once per duplicate
         const isDuplicate = duplicates.findIndex(r => r.No === row.No) === index;
         if (isDuplicate) {
           warnings.push({
@@ -229,22 +214,18 @@ const OrdersImporter = () => {
     setIsLoading(false);
   };
 
-  // Helper function to validate date in DD-MM-YYYY format
   const isValidDate = (dateString: string): boolean => {
-    // Extract day, month, and year
     const parts = dateString.split("-");
     if (parts.length !== 3) return false;
 
     const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // 0-indexed month
+    const month = parseInt(parts[1], 10) - 1;
     const year = parseInt(parts[2], 10);
 
-    // Create a date object and check if it's valid
     const date = new Date(year, month, day);
     return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day;
   };
 
-  // Handle import of validated data
   const handleImport = async () => {
     if (validationResult.data.length === 0) {
       console.log("No data to import");
@@ -255,23 +236,19 @@ const OrdersImporter = () => {
     setImportError(null);
 
     try {
-      // Import the order import service
       const orderImportService = await import("../../services/orderImportService");
 
-      // Use the import service to process all orders
       const importResults = await orderImportService.importOrdersBatch(validationResult.data);
 
       if (importResults.errors > 0) {
-        // If there are errors, show first error but continue
         const errorMessage = importResults.errorMessages[0];
         setImportError(`Some orders could not be imported. ${errorMessage}`);
       }
 
-      // Even with some errors, continue to completion if some were successful
       if (importResults.created > 0 || importResults.updated > 0) {
         setImportSuccess(true);
-        setImportResults(importResults); // Store the results for the completion step
-        setActiveStep(3); // Move to completion step
+        setImportResults(importResults);
+        setActiveStep(3);
       }
     } catch (error) {
       console.error("Error importing orders:", error);
@@ -283,7 +260,6 @@ const OrdersImporter = () => {
     }
   };
 
-  // Reset the import process
   const handleReset = () => {
     setCsvFile(null);
     setParsedData([]);
@@ -297,20 +273,17 @@ const OrdersImporter = () => {
     setImportError(null);
     setActiveStep(0);
 
-    // Clear the file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  // Trigger file dialog
   const handleBrowseClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // Render functions for each step
   const renderUploadStep = () => (
     <Box sx={{ p: 3, textAlign: "center" }}>
       <input

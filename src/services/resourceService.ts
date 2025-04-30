@@ -1,4 +1,3 @@
-// src/services/resourceService.ts
 import {
   collection,
   doc,
@@ -14,23 +13,19 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
-// Define resource types
 export interface Resource {
   id: string;
   name: string;
   type: "person" | "machine" | "tool" | "area";
   email?: string;
   department?: string;
-  capacity?: number; // Capacity in hours per day
+  capacity?: number;
   color?: string;
   active: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
-/**
- * Fetch all resources
- */
 export const getResources = async (activeOnly = true): Promise<Resource[]> => {
   try {
     const resourcesRef = collection(db, "resources");
@@ -58,9 +53,6 @@ export const getResources = async (activeOnly = true): Promise<Resource[]> => {
   }
 };
 
-/**
- * Get a single resource by ID
- */
 export const getResourceById = async (resourceId: string): Promise<Resource | null> => {
   try {
     const resourceRef = doc(db, "resources", resourceId);
@@ -80,9 +72,6 @@ export const getResourceById = async (resourceId: string): Promise<Resource | nu
   }
 };
 
-/**
- * Create a new resource
- */
 export const createResource = async (
   resource: Omit<Resource, "id" | "createdAt" | "updatedAt">
 ): Promise<Resource> => {
@@ -105,9 +94,6 @@ export const createResource = async (
   }
 };
 
-/**
- * Update an existing resource
- */
 export const updateResource = async (
   resourceId: string,
   updates: Partial<Resource>
@@ -115,7 +101,6 @@ export const updateResource = async (
   try {
     const resourceRef = doc(db, "resources", resourceId);
 
-    // Add updated timestamp
     const updatedData = {
       ...updates,
       updatedAt: Timestamp.now(),
@@ -128,9 +113,6 @@ export const updateResource = async (
   }
 };
 
-/**
- * Delete a resource
- */
 export const deleteResource = async (resourceId: string): Promise<void> => {
   try {
     const resourceRef = doc(db, "resources", resourceId);
@@ -141,9 +123,6 @@ export const deleteResource = async (resourceId: string): Promise<void> => {
   }
 };
 
-/**
- * Get resources of a specific type
- */
 export const getResourcesByType = async (type: Resource["type"]): Promise<Resource[]> => {
   try {
     const resourcesRef = collection(db, "resources");
@@ -169,9 +148,6 @@ export const getResourcesByType = async (type: Resource["type"]): Promise<Resour
   }
 };
 
-/**
- * Get resources by department
- */
 export const getResourcesByDepartment = async (department: string): Promise<Resource[]> => {
   try {
     const resourcesRef = collection(db, "resources");
@@ -197,9 +173,6 @@ export const getResourcesByDepartment = async (department: string): Promise<Reso
   }
 };
 
-/**
- * Set a resource as inactive instead of deleting it
- */
 export const deactivateResource = async (resourceId: string): Promise<void> => {
   try {
     const resourceRef = doc(db, "resources", resourceId);
@@ -213,9 +186,6 @@ export const deactivateResource = async (resourceId: string): Promise<void> => {
   }
 };
 
-/**
- * Reactivate a previously deactivated resource
- */
 export const reactivateResource = async (resourceId: string): Promise<void> => {
   try {
     const resourceRef = doc(db, "resources", resourceId);

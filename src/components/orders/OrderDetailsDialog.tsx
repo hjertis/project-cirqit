@@ -1,4 +1,3 @@
-// src/components/orders/OrderDetailsDialog.tsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -41,7 +40,7 @@ import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
 import OrderTimeTracking from "./OrderTimeTracking";
 import PrintableWorkOrder from "./PrintableWorkOrder";
-// Import the EditOrderDialog component
+
 import EditOrderDialog from "./EditOrderDialog";
 
 interface TabPanelProps {
@@ -99,7 +98,7 @@ interface OrderDetailsDialogProps {
   open: boolean;
   onClose: () => void;
   orderId: string | null;
-  fullPage?: boolean; // Add this prop
+  fullPage?: boolean;
 }
 
 const getStatusColor = (status: string) => {
@@ -126,7 +125,7 @@ const OrderDetailsDialog = ({
   open,
   onClose,
   orderId,
-  fullPage = false, // Default to dialog mode
+  fullPage = false,
 }: OrderDetailsDialogProps) => {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -142,13 +141,11 @@ const OrderDetailsDialog = ({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  // Extract the fetch function to reuse after edits
   const fetchOrderDetails = async () => {
     if (!orderId || !open) return;
 
     setLoading(true);
     try {
-      // Fetch order details
       const orderDoc = await getDoc(doc(db, "orders", orderId));
 
       if (!orderDoc.exists()) {
@@ -159,7 +156,6 @@ const OrderDetailsDialog = ({
 
       setOrder({ id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder);
 
-      // Fetch order processes
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderId)
@@ -175,7 +171,6 @@ const OrderDetailsDialog = ({
         } as Process);
       });
 
-      // Sort processes by sequence
       processesData.sort((a, b) => a.sequence - b.sequence);
       setProcesses(processesData);
 
@@ -188,7 +183,6 @@ const OrderDetailsDialog = ({
     }
   };
 
-  // Update the useEffect to use the extracted function
   useEffect(() => {
     fetchOrderDetails();
   }, [orderId, open]);
@@ -226,7 +220,6 @@ const OrderDetailsDialog = ({
   const handleOrderUpdated = () => {
     setEditDialogOpen(false);
 
-    // Refresh order data
     if (orderId) {
       fetchOrderDetails();
     }
@@ -234,10 +227,8 @@ const OrderDetailsDialog = ({
 
   const handleViewFull = () => {
     if (fullPage) {
-      // Already in full view, so just navigate to edit
       handleEdit();
     } else if (order) {
-      // Navigate to full view
       navigate(`/orders/${order.id}`);
       onClose();
     }
@@ -267,7 +258,6 @@ const OrderDetailsDialog = ({
     const handleArchiveOrder = async () => {
       if (!order) return;
 
-      // Show a confirmation dialog
       const confirm = window.confirm(
         `Are you sure you want to archive order ${order.orderNumber}? This will move it to the archive collection.`
       );
@@ -282,7 +272,7 @@ const OrderDetailsDialog = ({
 
         if (result.success) {
           setArchiveResult(`Successfully archived: ${result.message}`);
-          // Redirect to the orders list after a short delay
+
           setTimeout(() => {
             navigate("/orders");
           }, 2000);
@@ -301,7 +291,6 @@ const OrderDetailsDialog = ({
     const handleRestoreOrder = async () => {
       if (!order) return;
 
-      // Show a confirmation dialog
       const confirm = window.confirm(
         `Are you sure you want to restore order ${order.orderNumber} from the archive? This will move it back to active orders.`
       );
@@ -316,7 +305,7 @@ const OrderDetailsDialog = ({
 
         if (result.success) {
           setArchiveResult(`Successfully restored: ${result.message}`);
-          // Redirect to the orders list after a short delay
+
           setTimeout(() => {
             navigate("/orders");
           }, 2000);
@@ -334,7 +323,6 @@ const OrderDetailsDialog = ({
 
     return (
       <>
-        {/* Order summary header */}
         <Box sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <Typography variant="h5">Order: {order.orderNumber}</Typography>
@@ -351,7 +339,6 @@ const OrderDetailsDialog = ({
         </Box>
         <Divider />
 
-        {/* Order summary cards */}
         <DialogContent>
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={12} md={6}>
@@ -476,7 +463,6 @@ const OrderDetailsDialog = ({
             </Grid>
           </Grid>
 
-          {/* Tabs for order details, processes, etc. */}
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="order details tabs">
               <Tab label="Processes" />
@@ -591,7 +577,6 @@ const OrderDetailsDialog = ({
           onClose={() => setArchiveResult(null)}
           message={archiveResult || ""}
         />
-        {/* Printable Work Order Dialog */}
         {order && (
           <PrintableWorkOrder
             open={printDialogOpen}
@@ -601,7 +586,6 @@ const OrderDetailsDialog = ({
           />
         )}
 
-        {/* Edit Order Dialog */}
         <EditOrderDialog
           open={editDialogOpen}
           onClose={() => setEditDialogOpen(false)}

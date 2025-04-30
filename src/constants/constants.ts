@@ -1,6 +1,3 @@
-/**
- * Standard process names used across the application, including Kanban columns.
- */
 export const STANDARD_PROCESS_NAMES = [
   "Setup",
   "SMT",
@@ -11,7 +8,6 @@ export const STANDARD_PROCESS_NAMES = [
   "Cut",
   "Test",
   "Delivery",
-] as const; // Use 'as const' for stricter typing if needed
+] as const;
 
-// Optional: Define a type for these names
 export type StandardProcessName = (typeof STANDARD_PROCESS_NAMES)[number];

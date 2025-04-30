@@ -1,4 +1,3 @@
-// src/components/time/TimeEntriesList.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -29,7 +28,7 @@ import { formatDuration, formatDurationHumanReadable, formatDateTime } from "../
 
 interface TimeEntriesListProps {
   orderId: string;
-  reloadTrigger?: number; // Increment this to trigger a reload
+  reloadTrigger?: number;
 }
 
 const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) => {
@@ -45,7 +44,6 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
         const entries = await getTimeEntriesForOrder(orderId);
         setTimeEntries(entries);
 
-        // Calculate total completed time
         let total = 0;
         entries.forEach(entry => {
           if (entry.status === "completed" && entry.duration) {

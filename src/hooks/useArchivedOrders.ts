@@ -1,4 +1,3 @@
-// src/hooks/useArchivedOrders.ts
 import { useState, useEffect, useCallback } from "react";
 import {
   collection,
@@ -44,7 +43,6 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
   const [filter, setFilter] = useState<ArchiveFilter | undefined>(initialFilter);
   const [itemLimit, setItemLimit] = useState(initialLimit);
 
-  // Fetch archived orders
   const fetchArchivedOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -52,13 +50,10 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
     try {
       let ordersQuery;
 
-      // Create a base query
       const baseQuery = collection(db, "archivedOrders");
 
-      // Add query constraints
       const queryConstraints: QueryConstraint[] = [orderBy("archivedAt", "desc"), limit(itemLimit)];
 
-      // Apply date range filter if present
       if (filter?.dateRange) {
         const { start, end } = filter.dateRange;
         queryConstraints.push(
@@ -67,7 +62,6 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
         );
       }
 
-      // Build and execute the query
       ordersQuery = query(baseQuery, ...queryConstraints);
 
       const querySnapshot = await getDocs(ordersQuery);
@@ -87,28 +81,24 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
       setError(
         `Failed to load archived orders: ${err instanceof Error ? err.message : String(err)}`
       );
-      setArchivedOrders([]); // Clear orders on error
+      setArchivedOrders([]);
     } finally {
       setLoading(false);
     }
   }, [filter, itemLimit]);
 
-  // Fetch orders when filter or limit changes
   useEffect(() => {
     fetchArchivedOrders();
   }, [fetchArchivedOrders]);
 
-  // Function to update filters
   const updateFilter = useCallback((newFilter: ArchiveFilter) => {
     setFilter(newFilter);
   }, []);
 
-  // Function to update limit
   const updateLimit = useCallback((newLimit: number) => {
     setItemLimit(newLimit);
   }, []);
 
-  // Helper function to format date from Timestamp
   const formatDate = useCallback((timestamp: Timestamp | undefined) => {
     if (!timestamp || !timestamp.toDate) return "N/A";
     const date = timestamp.toDate();

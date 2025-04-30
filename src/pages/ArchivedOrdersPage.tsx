@@ -1,4 +1,3 @@
-// src/pages/ArchivedOrdersPage.tsx
 import React, { useState } from "react";
 import {
   Box,
@@ -53,15 +52,13 @@ const ArchivedOrdersPage = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  // Use our custom hook for archived orders
   const { archivedOrders, loading, error, formatDate, refreshArchivedOrders } = useArchivedOrders(
     {},
     200
-  ); // Display up to 200 archived orders
+  );
 
   const navigate = useNavigate();
 
-  // Filter orders by search term (client-side filtering)
   const filteredOrders = archivedOrders.filter(order => {
     if (!searchTerm) return true;
 
@@ -76,7 +73,7 @@ const ArchivedOrdersPage = () => {
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
-    setPage(0); // Reset to first page when searching
+    setPage(0);
   };
 
   const handleRefresh = () => {
@@ -115,7 +112,7 @@ const ArchivedOrdersPage = () => {
       if (result.success) {
         setSuccessMessage(`Order ${orderToRestore} has been restored successfully`);
         setSnackbarOpen(true);
-        refreshArchivedOrders(); // Refresh the list
+        refreshArchivedOrders();
       } else {
         setSuccessMessage(`Failed to restore order: ${result.message}`);
         setSnackbarOpen(true);
@@ -141,7 +138,6 @@ const ArchivedOrdersPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header */}
         <Box sx={{ mb: 3 }}>
           <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
             <Link component={RouterLink} to="/" color="inherit">
@@ -165,7 +161,6 @@ const ArchivedOrdersPage = () => {
           </Box>
         </Box>
 
-        {/* Search and Filters */}
         <Paper sx={{ mb: 3, p: 2 }}>
           <Box
             sx={{
@@ -193,7 +188,6 @@ const ArchivedOrdersPage = () => {
           </Box>
         </Paper>
 
-        {/* Orders Table */}
         <Paper>
           {loading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
@@ -291,15 +285,13 @@ const ArchivedOrdersPage = () => {
           )}
         </Paper>
 
-        {/* Order Details Dialog */}
         <OrderDetailsDialog
           open={detailsDialogOpen}
           onClose={() => setDetailsDialogOpen(false)}
           orderId={selectedOrderId}
-          isArchived={true} // Add this prop to OrderDetailsDialog component
+          isArchived={true}
         />
 
-        {/* Restore Confirmation Dialog */}
         <Dialog open={confirmRestoreOpen} onClose={handleCancelRestore}>
           <DialogTitle>Confirm Restore</DialogTitle>
           <DialogContent>
@@ -323,7 +315,6 @@ const ArchivedOrdersPage = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Snackbar for notifications */}
         <Snackbar
           open={snackbarOpen}
           autoHideDuration={6000}

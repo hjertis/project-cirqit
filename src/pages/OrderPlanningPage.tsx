@@ -1,4 +1,3 @@
-// src/pages/OrderPlanningPage.tsx
 import { useState } from "react";
 import { Box, Breadcrumbs, Typography, Link, Paper, Tabs, Tab } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
@@ -16,7 +15,6 @@ const OrderPlanningPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" gutterBottom>
             Order Planning
@@ -32,7 +30,6 @@ const OrderPlanningPage = () => {
           </Breadcrumbs>
         </Box>
 
-        {/* Wrap tabs and content in a Paper component */}
         <Paper>
           <Tabs
             value={tabValue}

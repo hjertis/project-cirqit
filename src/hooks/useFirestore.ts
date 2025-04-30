@@ -1,23 +1,20 @@
 import { useState, useEffect } from "react";
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
   deleteDoc,
-  QueryConstraint
+  QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
-export function useCollection<T>(
-  collectionName: string,
-  constraints: QueryConstraint[] = []
-) {
+export function useCollection<T>(collectionName: string, constraints: QueryConstraint[] = []) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -28,7 +25,7 @@ export function useCollection<T>(
       try {
         const q = query(collection(db, collectionName), ...constraints);
         const querySnapshot = await getDocs(q);
-        const documents = querySnapshot.docs.map((doc) => ({
+        const documents = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         })) as T[];
@@ -59,7 +56,7 @@ export function useDocument<T>(collectionName: string, documentId: string) {
       try {
         const docRef = doc(db, collectionName, documentId);
         const docSnap = await getDoc(docRef);
-        
+
         if (docSnap.exists()) {
           setData({ id: docSnap.id, ...docSnap.data() } as T);
         } else {

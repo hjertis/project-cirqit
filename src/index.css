@@ -28,9 +28,6 @@ body {
   min-height: 100vh;
 }
 
-/* Remove vertical centering that was causing layout issues */
-/* The display: flex and place-items: center were causing the centering problem */
-
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
@@ -68,7 +65,6 @@ button:focus-visible {
   }
 }
 
-/* Add this to ensure app takes full height */
 #root {
   min-height: 100vh;
   display: flex;

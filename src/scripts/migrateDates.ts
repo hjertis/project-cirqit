@@ -4,10 +4,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 dayjs.extend(isoWeek);
 
-// Initialize Firebase (use your config)
-const firebaseConfig = {
-  /* ... */
-};
+const firebaseConfig = {};
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -18,7 +15,6 @@ async function migratePlannedWeekStartDates() {
   for (const orderDoc of snapshot.docs) {
     const data = orderDoc.data();
     if (data.plannedWeekStartDate) {
-      // Convert to Monday (isoWeek)
       const monday = dayjs(data.plannedWeekStartDate).startOf("isoWeek").format("YYYY-MM-DD");
       if (monday !== data.plannedWeekStartDate) {
         await updateDoc(doc(db, "orders", orderDoc.id), {

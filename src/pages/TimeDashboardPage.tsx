@@ -1,4 +1,3 @@
-// src/pages/TimeDashboardPage.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -7,7 +6,6 @@ import {
   Grid,
   Card,
   CardContent,
-  Divider,
   TextField,
   Button,
   Table,
@@ -26,7 +24,6 @@ import {
   InputAdornment,
 } from "@mui/material";
 import {
-  AccessTime as TimeIcon,
   CalendarToday as CalendarIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
@@ -95,20 +92,16 @@ const TimeDashboardPage = () => {
       try {
         setLoading(true);
 
-        // Get user's time entries
         const entries = await getTimeEntriesForUser(currentUser.uid, 100);
         setUserTimeEntries(entries);
 
-        // Get all active entries for admin view
         const activeEntries = await getAllActiveTimeEntries();
         setAllActiveEntries(activeEntries);
 
-        // Calculate total time for this week
         const startOfWeek = dayjs().startOf("week").toDate();
         const totalWeek = await calculateTotalTimeForUser(currentUser.uid, startOfWeek);
         setTotalTimeThisWeek(totalWeek);
 
-        // Calculate total time for this month
         const startOfMonth = dayjs().startOf("month").toDate();
         const totalMonth = await calculateTotalTimeForUser(currentUser.uid, startOfMonth);
         setTotalTimeThisMonth(totalMonth);
@@ -170,7 +163,6 @@ const TimeDashboardPage = () => {
     }
   };
 
-  // Filter time entries by search term
   const filteredTimeEntries = userTimeEntries.filter(entry => {
     if (!searchTerm) return true;
 
@@ -184,7 +176,6 @@ const TimeDashboardPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Typography variant="h4" component="h1">
             Time Dashboard
@@ -199,7 +190,6 @@ const TimeDashboardPage = () => {
           </Button>
         </Box>
 
-        {/* Summary Cards */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Card>
@@ -270,7 +260,6 @@ const TimeDashboardPage = () => {
           </Grid>
         </Grid>
 
-        {/* Tabs */}
         <Paper sx={{ mb: 3 }}>
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="time tracking tabs">
@@ -280,7 +269,6 @@ const TimeDashboardPage = () => {
             </Tabs>
           </Box>
 
-          {/* My Time Entries Tab */}
           <TabPanel value={tabValue} index={0}>
             <Box sx={{ mb: 2 }}>
               <Grid container spacing={2} alignItems="center">
@@ -448,7 +436,6 @@ const TimeDashboardPage = () => {
             )}
           </TabPanel>
 
-          {/* Active Sessions Tab */}
           <TabPanel value={tabValue} index={1}>
             <Box sx={{ mb: 2 }}>
               <Typography variant="h6">Active Time Sessions</Typography>
@@ -559,7 +546,6 @@ const TimeDashboardPage = () => {
             )}
           </TabPanel>
 
-          {/* Admin Tab - All Users */}
           {currentUser?.email?.includes("admin") && (
             <TabPanel value={tabValue} index={2}>
               <Box sx={{ mb: 2 }}>

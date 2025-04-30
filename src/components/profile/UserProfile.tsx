@@ -1,4 +1,3 @@
-// src/components/profile/UserProfile.tsx
 import { useState } from "react";
 import {
   Box,
@@ -13,7 +12,6 @@ import {
   CircularProgress,
   Stack,
 } from "@mui/material";
-import { PersonOutline as PersonIcon } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 
 const UserProfile = () => {
@@ -25,7 +23,6 @@ const UserProfile = () => {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  // Get user initials for avatar
   const getInitials = () => {
     if (!currentUser?.displayName) return "U";
 
@@ -71,7 +68,6 @@ const UserProfile = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      // Redirection will be handled by ProtectedRoute component
     } catch (err: any) {
       setError(`Failed to log out: ${err.message}`);
     }

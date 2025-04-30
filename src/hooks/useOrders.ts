@@ -1,4 +1,3 @@
-// src/hooks/useOrders.ts - with enhanced debugging
 import { useState, useEffect, useCallback } from "react";
 import {
   collection,
@@ -44,7 +43,6 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
   const [filter, setFilter] = useState<OrderFilter | undefined>(initialFilter);
   const [itemLimit, setItemLimit] = useState(initialLimit);
 
-  // Fetch orders function
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -53,9 +51,7 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
       let ordersQuery;
       let queryDescription = "";
 
-      // Create the appropriate query based on filter
       if (filter && filter.status && Array.isArray(filter.status) && filter.status.length > 0) {
-        // Has status filter with values
         queryDescription = `Filtering by status: ${filter.status.join(", ")}`;
 
         ordersQuery = query(
@@ -76,7 +72,6 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
         const data = doc.data();
         const status = data.status || "unknown";
 
-        // Count each status type for debugging
         statusCounts[status] = (statusCounts[status] || 0) + 1;
 
         fetchedOrders.push({
@@ -89,28 +84,24 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
     } catch (err) {
       console.error("Error fetching orders:", err);
       setError(`Failed to load orders: ${err instanceof Error ? err.message : String(err)}`);
-      setOrders([]); // Clear orders on error
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   }, [filter, itemLimit]);
 
-  // Fetch orders when filter or limit changes
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Function to update filters
   const updateFilter = useCallback((newFilter: OrderFilter) => {
     setFilter(newFilter);
   }, []);
 
-  // Function to update limit
   const updateLimit = useCallback((newLimit: number) => {
     setItemLimit(newLimit);
   }, []);
 
-  // Helper function to format date from Timestamp
   const formatDate = useCallback((timestamp: Timestamp | undefined) => {
     if (!timestamp || !timestamp.toDate) return "N/A";
     const date = timestamp.toDate();

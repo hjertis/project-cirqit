@@ -1,4 +1,3 @@
-// src/pages/auth/ForgotPassword.tsx
 import { useState } from "react";
 import {
   Box,
@@ -40,7 +39,6 @@ const ForgotPassword = () => {
       await resetPassword(email);
       setMessage("Password reset email sent! Check your inbox for further instructions.");
     } catch (err: any) {
-      // Handle specific Firebase Auth errors
       if (err.code === "auth/user-not-found") {
         setError("No account found with this email address");
       } else if (err.code === "auth/invalid-email") {

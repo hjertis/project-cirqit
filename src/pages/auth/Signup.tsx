@@ -1,4 +1,3 @@
-// src/pages/auth/Signup.tsx
 import { useState } from "react";
 import {
   Box,
@@ -47,7 +46,6 @@ const Signup = () => {
         [field]: event.target.value,
       });
 
-      // Clear error when field is modified
       if (errors[field]) {
         setErrors({
           ...errors,
@@ -55,7 +53,6 @@ const Signup = () => {
         });
       }
 
-      // Clear general signup error
       if (signupError) {
         setSignupError("");
       }
@@ -113,19 +110,13 @@ const Signup = () => {
     setSignupError("");
 
     try {
-      // Create user with Firebase Auth
       await signup(formData.email, formData.password, `${formData.firstName} ${formData.lastName}`);
 
-      // You could also store additional user data in Firestore here
-      // For example, company and phone data that isn't stored in the Firebase Auth user object
-
-      // Navigate to login page or dashboard
       navigate("/login", {
         replace: true,
         state: { message: "Account created successfully! Please sign in." },
       });
     } catch (err: any) {
-      // Handle specific Firebase Auth errors
       if (err.code === "auth/email-already-in-use") {
         setSignupError(
           "This email is already in use. Please use a different email or try logging in."

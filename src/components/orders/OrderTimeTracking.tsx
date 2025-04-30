@@ -1,4 +1,3 @@
-// src/components/orders/OrderTimeTracking.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -45,7 +44,6 @@ const OrderTimeTracking = ({ orderId, orderNumber, processes = [] }: OrderTimeTr
   }, [orderId, refreshTrigger]);
 
   const handleTimeEntryUpdated = () => {
-    // Trigger a refresh of the time entries list and total time
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -53,7 +51,6 @@ const OrderTimeTracking = ({ orderId, orderNumber, processes = [] }: OrderTimeTr
     <Box>
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
-          {/* Time Entry Widget */}
           <TimeEntryWidget
             orderId={orderId}
             orderNumber={orderNumber}
@@ -61,7 +58,6 @@ const OrderTimeTracking = ({ orderId, orderNumber, processes = [] }: OrderTimeTr
             onTimeEntryUpdated={handleTimeEntryUpdated}
           />
 
-          {/* Time Summary Card */}
           <Card sx={{ mb: 2 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
@@ -107,7 +103,6 @@ const OrderTimeTracking = ({ orderId, orderNumber, processes = [] }: OrderTimeTr
         </Grid>
 
         <Grid item xs={12} md={8}>
-          {/* Time Entries List */}
           <TimeEntriesList orderId={orderId} reloadTrigger={refreshTrigger} />
         </Grid>
       </Grid>

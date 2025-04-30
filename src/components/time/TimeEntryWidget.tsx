@@ -1,4 +1,3 @@
-// src/components/time/TimeEntryWidget.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -55,7 +54,6 @@ const TimeEntryWidget = ({
   const [activeEntry, setActiveEntry] = useState<any | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
 
-  // Check for active time entry when component mounts
   useEffect(() => {
     const fetchActiveEntry = async () => {
       if (!currentUser) return;
@@ -66,7 +64,6 @@ const TimeEntryWidget = ({
         setActiveEntry(entry);
 
         if (entry) {
-          // If there's an active entry, initialize the elapsed time
           const startTime = entry.startTime.toDate();
           const now = new Date();
           const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
@@ -85,7 +82,6 @@ const TimeEntryWidget = ({
     fetchActiveEntry();
   }, [currentUser, orderId]);
 
-  // Update the elapsed time every second for active entries
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
@@ -208,7 +204,6 @@ const TimeEntryWidget = ({
         </Alert>
       )}
 
-      {/* Active Time Display */}
       {activeEntry && (
         <Box
           sx={{

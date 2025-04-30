@@ -1,4 +1,3 @@
-// src/App.tsx
 import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { createTheme } from "@mui/material/styles";
@@ -8,10 +7,9 @@ import { AuthProvider } from "./context/AuthContext";
 import AppRoutes from "./routes";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import "dayjs/locale/sv"; // Import Swedish locale for dayjs
+import "dayjs/locale/sv";
 import dayjs from "dayjs";
 
-// Initialize React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -21,7 +19,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// Create a theme instance
 const theme = createTheme({
   palette: {
     primary: {
@@ -82,13 +79,12 @@ const theme = createTheme({
 });
 
 function App() {
-  dayjs.locale("sv"); // Set the locale to Swedish for dayjs
+  dayjs.locale("sv");
   return (
     <QueryClientProvider client={queryClient}>
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="sv">
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          {/* Wrap everything with AuthProvider */}
           <AuthProvider>
             <DashboardProvider>
               <BrowserRouter>

@@ -11,7 +11,7 @@ export interface Order {
   priority?: string;
   notes?: string;
   updated?: Timestamp;
-  // New fields for resource assignment
-  assignedResourceId?: string; // ID of the assigned resource
-  assignedResourceName?: string; // Name of the assigned resource (for display)
+
+  assignedResourceId?: string;
+  assignedResourceName?: string;
 }

@@ -1,4 +1,3 @@
-// src/pages/ImportOrdersPage.tsx
 import { Box, Breadcrumbs, Typography, Link, Paper } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import OrdersImporter from "../components/orders/OrdersImporter";
@@ -9,7 +8,6 @@ const ImportOrdersPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" gutterBottom>
             Import Orders
@@ -25,7 +23,6 @@ const ImportOrdersPage = () => {
           </Breadcrumbs>
         </Box>
 
-        {/* Instructions Panel */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             Instructions
@@ -83,7 +80,6 @@ const ImportOrdersPage = () => {
           </Box>
         </Paper>
 
-        {/* Import Component */}
         <OrdersImporter />
       </Box>
     </ContentWrapper>

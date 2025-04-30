@@ -2,13 +2,12 @@ import { Box, Typography, Breadcrumbs, Link } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
 import ContentWrapper from "../components/layout/ContentWrapper";
-import InProgressKanbanBoard from "../components/kanban/KanbanBoard"; // Adjust path if needed
+import InProgressKanbanBoard from "../components/kanban/KanbanBoard";
 
 const KanbanPage = () => {
   return (
     <ContentWrapper>
       <Box sx={{ width: "100%" }}>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" gutterBottom>
             In Progress Kanban Board
@@ -21,7 +20,6 @@ const KanbanPage = () => {
           </Breadcrumbs>
         </Box>
 
-        {/* Render the Kanban Board Component */}
         <InProgressKanbanBoard />
       </Box>
     </ContentWrapper>

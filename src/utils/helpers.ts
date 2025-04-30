@@ -1,6 +1,3 @@
-/**
- * Format seconds into a human-readable duration string (HH:MM:SS)
- */
 export const formatDuration = (seconds: number): string => {
   if (seconds <= 0) return "00:00:00";
 
@@ -11,9 +8,6 @@ export const formatDuration = (seconds: number): string => {
   return [hours, minutes, remainingSeconds].map(val => val.toString().padStart(2, "0")).join(":");
 };
 
-/**
- * Format seconds into a human-readable duration string (e.g., 2h 30m)
- */
 export const formatDurationHumanReadable = (seconds: number): string => {
   if (seconds < 60) return `${seconds}s`;
 
@@ -27,9 +21,6 @@ export const formatDurationHumanReadable = (seconds: number): string => {
   }
 };
 
-/**
- * Format a date as a string
- */
 export const formatDate = (date: Date): string => {
   return date.toLocaleDateString("en-US", {
     year: "numeric",
@@ -38,9 +29,6 @@ export const formatDate = (date: Date): string => {
   });
 };
 
-/**
- * Format a date and time as a string
- */
 export const formatDateTime = (date: Date): string => {
   return date.toLocaleString("en-US", {
     year: "numeric",

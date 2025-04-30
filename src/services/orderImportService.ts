@@ -13,7 +13,6 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 import { archiveOrder } from "./orderService";
 import { STANDARD_PROCESS_NAMES } from "../constants/constants.ts";
 
-// Initialize dayjs with custom parse format plugin
 dayjs.extend(customParseFormat);
 
 export interface OrderImportData {
@@ -28,33 +27,25 @@ export interface OrderImportData {
   State?: string;
 }
 
-// Add your wash keywords here
 const washKeywords = ["EVP", "TSP", "SKY", "ETI", "TS PRO"];
 
-/**
- * Import a single order into Firestore
- */
 export const importOrder = async (order: OrderImportData) => {
   const workOrderId = order.No;
   const docRef = doc(db, "orders", workOrderId);
   const docSnap = await getDoc(docRef);
 
-  // Parse dates
   const startDate = dayjs(order.StartingDateTime, "DD-MM-YYYY").toDate();
   const endDate = dayjs(order.EndingDateTime, "DD-MM-YYYY").toDate();
 
-  // Determine priority based on order state
   const getPriority = (state?: string) => {
     if (state === "URGENT") return "High";
     if (state === "HIGH") return "Medium-High";
     return "Medium";
   };
 
-  // Check if we need to archive this order
   const isFinishedOrder = order.Status === "Finished" || order.Status === "Done";
 
   if (!docSnap.exists()) {
-    // Create new order
     const workOrder = {
       orderNumber: order.No,
       id: order.No,
@@ -71,13 +62,10 @@ export const importOrder = async (order: OrderImportData) => {
       updated: Timestamp.fromDate(new Date()),
     };
 
-    // Save the work order
     await setDoc(docRef, workOrder);
 
-    // Generate processes for this work order, pass product name
     await generateProcesses(workOrderId, order.State || "REGULAR", startDate, order.Description);
 
-    // If the order is finished, archive it immediately
     if (isFinishedOrder) {
       await archiveOrder(workOrderId);
       return { created: true, updated: false, archived: true };
@@ -85,7 +73,6 @@ export const importOrder = async (order: OrderImportData) => {
 
     return { created: true, updated: false, archived: false };
   } else {
-    // Update existing order
     const updates: Record<string, any> = {};
     const currentData = docSnap.data();
     let statusChanged = false;
@@ -114,7 +101,6 @@ export const importOrder = async (order: OrderImportData) => {
       updates.updated = Timestamp.fromDate(new Date());
       await updateDoc(docRef, updates);
 
-      // If the status was changed to "Finished" or "Done", archive the order
       if (statusChanged && isFinishedOrder) {
         await archiveOrder(workOrderId);
         return { created: false, updated: true, archived: true };
@@ -127,9 +113,6 @@ export const importOrder = async (order: OrderImportData) => {
   }
 };
 
-/**
- * Import multiple orders in batch
- */
 export const importOrdersBatch = async (orders: OrderImportData[]) => {
   const results = {
     total: orders.length,
@@ -159,9 +142,6 @@ export const importOrdersBatch = async (orders: OrderImportData[]) => {
   return results;
 };
 
-/**
- * Generate process entries for a work order
- */
 const generateProcesses = async (
   workOrderId: string,
   state: string,
@@ -171,7 +151,6 @@ const generateProcesses = async (
   const batch = writeBatch(db);
   let processTypes = [...STANDARD_PROCESS_NAMES];
 
-  // Insert "Wash" after "HMT" if productName matches any wash keyword
   if (
     productName &&
     washKeywords.some(keyword => productName.toUpperCase().includes(keyword.toUpperCase()))
@@ -186,7 +165,6 @@ const generateProcesses = async (
     }
   }
 
-  // Base duration in days for each process
   const durations: Record<string, number> = {
     Setup: 1,
     SMT: state === "URGENT" ? 2 : 3,

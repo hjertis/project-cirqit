@@ -1,5 +1,4 @@
-// src/pages/admin/MigrateOrdersPage.tsx
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Box,
   Typography,
@@ -18,31 +17,34 @@ import {
   ListItemText,
   ListItemIcon,
   Breadcrumbs,
-  Link
-} from '@mui/material';
+  Link,
+} from "@mui/material";
 import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   MoveToInbox as MoveToInboxIcon,
   Storage as StorageIcon,
   ArrowForward as ArrowForwardIcon,
-  NavigateNext as NavigateNextIcon
-} from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
-import { migrateFinishedOrders, migrateRelatedProcesses } from '../../scripts/migrateFinishedOrders';
+  NavigateNext as NavigateNextIcon,
+} from "@mui/icons-material";
+import { Link as RouterLink } from "react-router-dom";
+import {
+  migrateFinishedOrders,
+  migrateRelatedProcesses,
+} from "../../scripts/migrateFinishedOrders";
 
 const steps = [
   {
-    label: 'Migrate Finished Orders',
+    label: "Migrate Finished Orders",
     description: 'Move all orders with "Finished" or "Done" status to the archive collection.',
   },
   {
-    label: 'Migrate Related Processes',
-    description: 'Move all processes related to archived orders to the archive.',
+    label: "Migrate Related Processes",
+    description: "Move all processes related to archived orders to the archive.",
   },
   {
-    label: 'Review and Verify',
-    description: 'Confirm that all data has been migrated correctly.',
+    label: "Review and Verify",
+    description: "Confirm that all data has been migrated correctly.",
   },
 ];
 
@@ -53,13 +55,13 @@ const MigrateOrdersPage = () => {
   const [migrationError, setMigrationError] = useState<string | null>(null);
   const [processesResults, setProcessesResults] = useState<any>(null);
   const [processesError, setProcessesError] = useState<string | null>(null);
-  
+
   const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    setActiveStep(prevActiveStep => prevActiveStep + 1);
   };
 
   const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    setActiveStep(prevActiveStep => prevActiveStep - 1);
   };
 
   const handleReset = () => {
@@ -69,42 +71,44 @@ const MigrateOrdersPage = () => {
     setProcessesResults(null);
     setProcessesError(null);
   };
-  
+
   const handleMigrateOrders = async () => {
     setIsProcessing(true);
     setMigrationError(null);
-    
+
     try {
       const results = await migrateFinishedOrders();
       setMigrationResults(results);
-      
+
       if (results.success || results.totalMigrated > 0) {
-        // Auto-advance to next step if successful or at least some orders were migrated
         handleNext();
       }
     } catch (error) {
-      console.error('Error during migration:', error);
-      setMigrationError(`Migration failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("Error during migration:", error);
+      setMigrationError(
+        `Migration failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       setIsProcessing(false);
     }
   };
-  
+
   const handleMigrateProcesses = async () => {
     setIsProcessing(true);
     setProcessesError(null);
-    
+
     try {
       const results = await migrateRelatedProcesses();
       setProcessesResults(results);
-      
+
       if (results.success) {
-        // Auto-advance to next step if successful
         handleNext();
       }
     } catch (error) {
-      console.error('Error during process migration:', error);
-      setProcessesError(`Process migration failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("Error during process migration:", error);
+      setProcessesError(
+        `Process migration failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -123,26 +127,26 @@ const MigrateOrdersPage = () => {
           </Link>
           <Typography color="text.primary">Migrate Orders</Typography>
         </Breadcrumbs>
-        
+
         <Typography variant="h4" component="h1" sx={{ mt: 2 }}>
           Migrate Finished Orders to Archive
         </Typography>
       </Box>
-      
+
       <Paper sx={{ p: 3 }}>
         <Alert severity="info" sx={{ mb: 3 }}>
           <AlertTitle>Important Information</AlertTitle>
           <Typography variant="body2" paragraph>
-            This utility will move all orders with "Finished" or "Done" status to a separate
-            archive collection. This helps maintain performance by keeping your active orders
-            collection lean.
+            This utility will move all orders with "Finished" or "Done" status to a separate archive
+            collection. This helps maintain performance by keeping your active orders collection
+            lean.
           </Typography>
           <Typography variant="body2">
-            The process is performed in batches and is resumable if interrupted. Orders that
-            have already been migrated will be skipped.
+            The process is performed in batches and is resumable if interrupted. Orders that have
+            already been migrated will be skipped.
           </Typography>
         </Alert>
-        
+
         <Stepper activeStep={activeStep} orientation="vertical">
           {steps.map((step, index) => (
             <Step key={step.label}>
@@ -156,26 +160,28 @@ const MigrateOrdersPage = () => {
                         <Box sx={{ mb: 2 }}>
                           <Alert severity={migrationResults.success ? "success" : "warning"}>
                             <AlertTitle>
-                              {migrationResults.success ? "Migration Successful" : "Migration Completed with Issues"}
+                              {migrationResults.success
+                                ? "Migration Successful"
+                                : "Migration Completed with Issues"}
                             </AlertTitle>
                             <Typography variant="body2">{migrationResults.message}</Typography>
                           </Alert>
-                          
+
                           <List dense>
                             <ListItem>
                               <ListItemIcon>
                                 <StorageIcon color="primary" />
                               </ListItemIcon>
-                              <ListItemText 
-                                primary={`Total orders processed: ${migrationResults.totalProcessed}`} 
+                              <ListItemText
+                                primary={`Total orders processed: ${migrationResults.totalProcessed}`}
                               />
                             </ListItem>
                             <ListItem>
                               <ListItemIcon>
                                 <MoveToInboxIcon color="primary" />
                               </ListItemIcon>
-                              <ListItemText 
-                                primary={`Orders migrated to archive: ${migrationResults.totalMigrated}`} 
+                              <ListItemText
+                                primary={`Orders migrated to archive: ${migrationResults.totalMigrated}`}
                               />
                             </ListItem>
                             {migrationResults.totalErrors > 0 && (
@@ -183,7 +189,7 @@ const MigrateOrdersPage = () => {
                                 <ListItemIcon>
                                   <ErrorIcon color="error" />
                                 </ListItemIcon>
-                                <ListItemText 
+                                <ListItemText
                                   primary={`Errors encountered: ${migrationResults.totalErrors}`}
                                   secondary="Check console logs for details"
                                 />
@@ -197,14 +203,16 @@ const MigrateOrdersPage = () => {
                           {migrationError}
                         </Alert>
                       ) : null}
-                      
+
                       <div>
                         <Button
                           variant="contained"
                           onClick={handleMigrateOrders}
                           sx={{ mt: 1, mr: 1 }}
                           disabled={isProcessing}
-                          startIcon={isProcessing ? <CircularProgress size={20} /> : <ArrowForwardIcon />}
+                          startIcon={
+                            isProcessing ? <CircularProgress size={20} /> : <ArrowForwardIcon />
+                          }
                         >
                           {isProcessing ? "Migrating..." : "Migrate Orders"}
                         </Button>
@@ -218,34 +226,36 @@ const MigrateOrdersPage = () => {
                       </div>
                     </>
                   )}
-                  
+
                   {index === 1 && (
                     <>
                       {processesResults ? (
                         <Box sx={{ mb: 2 }}>
                           <Alert severity={processesResults.success ? "success" : "warning"}>
                             <AlertTitle>
-                              {processesResults.success ? "Process Migration Successful" : "Process Migration Completed with Issues"}
+                              {processesResults.success
+                                ? "Process Migration Successful"
+                                : "Process Migration Completed with Issues"}
                             </AlertTitle>
                             <Typography variant="body2">{processesResults.message}</Typography>
                           </Alert>
-                          
+
                           {processesResults.totalProcessed > 0 && (
                             <List dense>
                               <ListItem>
                                 <ListItemIcon>
                                   <StorageIcon color="primary" />
                                 </ListItemIcon>
-                                <ListItemText 
-                                  primary={`Total processes processed: ${processesResults.totalProcessed}`} 
+                                <ListItemText
+                                  primary={`Total processes processed: ${processesResults.totalProcessed}`}
                                 />
                               </ListItem>
                               <ListItem>
                                 <ListItemIcon>
                                   <MoveToInboxIcon color="primary" />
                                 </ListItemIcon>
-                                <ListItemText 
-                                  primary={`Processes migrated to archive: ${processesResults.totalMigrated}`} 
+                                <ListItemText
+                                  primary={`Processes migrated to archive: ${processesResults.totalMigrated}`}
                                 />
                               </ListItem>
                               {processesResults.totalErrors > 0 && (
@@ -253,7 +263,7 @@ const MigrateOrdersPage = () => {
                                   <ListItemIcon>
                                     <ErrorIcon color="error" />
                                   </ListItemIcon>
-                                  <ListItemText 
+                                  <ListItemText
                                     primary={`Errors encountered: ${processesResults.totalErrors}`}
                                     secondary="Check console logs for details"
                                   />
@@ -268,42 +278,40 @@ const MigrateOrdersPage = () => {
                           {processesError}
                         </Alert>
                       ) : null}
-                      
+
                       <div>
                         <Button
                           variant="contained"
                           onClick={handleMigrateProcesses}
                           sx={{ mt: 1, mr: 1 }}
                           disabled={isProcessing}
-                          startIcon={isProcessing ? <CircularProgress size={20} /> : <ArrowForwardIcon />}
+                          startIcon={
+                            isProcessing ? <CircularProgress size={20} /> : <ArrowForwardIcon />
+                          }
                         >
                           {isProcessing ? "Migrating Processes..." : "Migrate Processes"}
                         </Button>
-                        <Button
-                          disabled={isProcessing}
-                          onClick={handleBack}
-                          sx={{ mt: 1, mr: 1 }}
-                        >
+                        <Button disabled={isProcessing} onClick={handleBack} sx={{ mt: 1, mr: 1 }}>
                           Back
                         </Button>
                       </div>
                     </>
                   )}
-                  
+
                   {index === 2 && (
                     <>
                       <Alert severity="success" sx={{ mb: 2 }}>
                         <AlertTitle>Migration Complete</AlertTitle>
                         <Typography variant="body2" paragraph>
-                          The migration process has completed successfully. Finished orders
-                          have been moved to the archive collection, and active orders remain
-                          in the main collection.
+                          The migration process has completed successfully. Finished orders have
+                          been moved to the archive collection, and active orders remain in the main
+                          collection.
                         </Typography>
                         <Typography variant="body2">
                           You can now view your archived orders in the Archived Orders page.
                         </Typography>
                       </Alert>
-                      
+
                       <Box sx={{ mt: 3, mb: 1 }}>
                         <Button
                           component={RouterLink}
@@ -313,10 +321,7 @@ const MigrateOrdersPage = () => {
                         >
                           View Archived Orders
                         </Button>
-                        <Button
-                          onClick={handleReset}
-                          variant="outlined"
-                        >
+                        <Button onClick={handleReset} variant="outlined">
                           Reset Migration Tool
                         </Button>
                       </Box>

@@ -1,4 +1,3 @@
-// src/pages/PrintOrderPage.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Box, Typography, Paper, Button, CircularProgress, Alert } from "@mui/material";
@@ -17,7 +16,6 @@ const PrintOrderPage = () => {
   const [processes, setProcesses] = useState<any[]>([]);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
 
-  // Fetch order and process data
   useEffect(() => {
     const fetchOrderData = async () => {
       if (!id) {
@@ -27,7 +25,6 @@ const PrintOrderPage = () => {
       }
 
       try {
-        // Fetch order data
         const orderDoc = await getDoc(doc(db, "orders", id));
 
         if (!orderDoc.exists()) {
@@ -39,7 +36,6 @@ const PrintOrderPage = () => {
         const orderData = { id: orderDoc.id, ...orderDoc.data() };
         setOrder(orderData);
 
-        // Fetch processes for this order
         const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
         const processesSnapshot = await getDocs(processesQuery);
         const processesData: any[] = [];
@@ -51,12 +47,10 @@ const PrintOrderPage = () => {
           });
         });
 
-        // Sort processes by sequence
         processesData.sort((a, b) => a.sequence - b.sequence);
         setProcesses(processesData);
         setError(null);
 
-        // Automatically open print dialog when data is loaded
         setTimeout(() => {
           setPrintDialogOpen(true);
         }, 500);
@@ -128,7 +122,6 @@ const PrintOrderPage = () => {
         </Box>
       </Paper>
 
-      {/* Printable Work Order Dialog */}
       {order && (
         <PrintableWorkOrder
           open={printDialogOpen}

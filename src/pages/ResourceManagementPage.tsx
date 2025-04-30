@@ -1,4 +1,3 @@
-// src/pages/ResourceManagementPage.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -35,7 +34,6 @@ import {
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
   Block as BlockIcon,
   CheckCircle as CheckCircleIcon,
   Refresh as RefreshIcon,
@@ -57,7 +55,6 @@ import {
   reactivateResource,
 } from "../services/resourceService";
 
-// Tab panel interface
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -80,7 +77,6 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-// Resource type colors
 const typeColors: Record<string, string> = {
   person: "#3f51b5",
   machine: "#f50057",
@@ -88,7 +84,6 @@ const typeColors: Record<string, string> = {
   area: "#4caf50",
 };
 
-// Get icon for resource type
 const getTypeIcon = (type: string) => {
   switch (type) {
     case "person":
@@ -121,7 +116,7 @@ const ResourceManagementPage = () => {
     type: "person",
     department: "",
     email: "",
-    capacity: 8, // Default 8 hours per day
+    capacity: 8,
     color: "#3f51b5",
     active: true,
   });
@@ -129,21 +124,18 @@ const ResourceManagementPage = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Fetch resources on component mount
   useEffect(() => {
     fetchResources();
   }, []);
 
-  // Filter resources when tab changes or search term changes
   useEffect(() => {
     filterResources();
   }, [tabValue, searchTerm, resources]);
 
-  // Fetch resources from the server
   const fetchResources = async () => {
     setLoading(true);
     try {
-      const allResources = await getResources(false); // Get all resources, including inactive
+      const allResources = await getResources(false);
       setResources(allResources);
       setError(null);
     } catch (err) {
@@ -154,12 +146,9 @@ const ResourceManagementPage = () => {
     }
   };
 
-  // Filter resources based on tab and search term
   const filterResources = () => {
-    // Start with all resources
     let filtered = [...resources];
 
-    // Filter by tab (resource type or status)
     if (tabValue === 1) {
       filtered = filtered.filter(resource => resource.type === "person");
     } else if (tabValue === 2) {
@@ -169,11 +158,9 @@ const ResourceManagementPage = () => {
     } else if (tabValue === 4) {
       filtered = filtered.filter(resource => !resource.active);
     } else {
-      // All resources (active only for the first tab)
       filtered = filtered.filter(resource => resource.active);
     }
 
-    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -185,38 +172,31 @@ const ResourceManagementPage = () => {
     }
 
     setFilteredResources(filtered);
-    setPage(0); // Reset to first page when filtering
+    setPage(0);
   };
 
-  // Handle tab change
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  // Handle page change
   const handleChangePage = (_: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  // Handle search input change
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
 
-  // Handle opening the resource form dialog
   const handleOpenFormDialog = (resource: Resource | null = null, viewOnly = false) => {
     if (resource) {
-      // Edit existing resource
       setEditingResource(resource);
       setFormData({ ...resource });
     } else {
-      // Create new resource
       setEditingResource(null);
       setFormData({
         name: "",
@@ -233,12 +213,10 @@ const ResourceManagementPage = () => {
     setIsFormDialogOpen(true);
   };
 
-  // Handle closing the resource form dialog
   const handleCloseFormDialog = () => {
     setIsFormDialogOpen(false);
   };
 
-  // Handle form field changes
   const handleFormChange =
     (field: keyof Resource) =>
     (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
@@ -248,7 +226,6 @@ const ResourceManagementPage = () => {
         [field]: value,
       }));
 
-      // Clear error for the field
       if (formErrors[field]) {
         setFormErrors(prev => ({
           ...prev,
@@ -257,7 +234,6 @@ const ResourceManagementPage = () => {
       }
     };
 
-  // Validate form data
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -285,7 +261,6 @@ const ResourceManagementPage = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle resource form submission
   const handleSubmitForm = async () => {
     if (!validateForm()) {
       return;
@@ -294,16 +269,13 @@ const ResourceManagementPage = () => {
     setActionLoading(true);
     try {
       if (editingResource) {
-        // Update existing resource
         await updateResource(editingResource.id, formData);
         setSuccessMessage(`Resource "${formData.name}" updated successfully`);
       } else {
-        // Create new resource
         await createResource(formData as Omit<Resource, "id" | "createdAt" | "updatedAt">);
         setSuccessMessage(`Resource "${formData.name}" created successfully`);
       }
 
-      // Close the dialog and refresh the list
       setIsFormDialogOpen(false);
       fetchResources();
     } catch (err) {
@@ -314,7 +286,6 @@ const ResourceManagementPage = () => {
     }
   };
 
-  // Handle deactivating a resource
   const handleDeactivateResource = async (resource: Resource) => {
     if (window.confirm(`Are you sure you want to deactivate "${resource.name}"?`)) {
       setActionLoading(true);
@@ -333,7 +304,6 @@ const ResourceManagementPage = () => {
     }
   };
 
-  // Handle reactivating a resource
   const handleReactivateResource = async (resource: Resource) => {
     setActionLoading(true);
     try {
@@ -350,7 +320,6 @@ const ResourceManagementPage = () => {
     }
   };
 
-  // Close success message
   const handleCloseSuccessMessage = () => {
     setSuccessMessage(null);
   };
@@ -358,7 +327,6 @@ const ResourceManagementPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
             <Link component={RouterLink} to="/" color="inherit">
@@ -394,21 +362,18 @@ const ResourceManagementPage = () => {
           </Box>
         </Box>
 
-        {/* Success message */}
         {successMessage && (
           <Alert severity="success" onClose={handleCloseSuccessMessage} sx={{ mb: 2 }}>
             {successMessage}
           </Alert>
         )}
 
-        {/* Error message */}
         {error && (
           <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
 
-        {/* Search and filters */}
         <Paper sx={{ mb: 3, p: 2 }}>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={4}>
@@ -426,7 +391,6 @@ const ResourceManagementPage = () => {
           </Grid>
         </Paper>
 
-        {/* Resource tabs and table */}
         <Paper>
           <Tabs
             value={tabValue}
@@ -443,7 +407,6 @@ const ResourceManagementPage = () => {
             <Tab label="Inactive" />
           </Tabs>
 
-          {/* Resource tables by tab */}
           <TabPanel value={tabValue} index={0}>
             {renderResourceTable()}
           </TabPanel>
@@ -461,7 +424,6 @@ const ResourceManagementPage = () => {
           </TabPanel>
         </Paper>
 
-        {/* Resource Form Dialog */}
         <Dialog open={isFormDialogOpen} onClose={handleCloseFormDialog} maxWidth="sm" fullWidth>
           <DialogTitle>
             {isViewMode
@@ -589,7 +551,6 @@ const ResourceManagementPage = () => {
     </ContentWrapper>
   );
 
-  // Helper function to render resource table
   function renderResourceTable() {
     if (loading) {
       return (

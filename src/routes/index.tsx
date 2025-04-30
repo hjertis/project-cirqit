@@ -1,4 +1,3 @@
-// src/routes/index.tsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import Dashboard from "../pages/Dashboard";
@@ -18,29 +17,22 @@ import TimeDashboardPage from "../pages/TimeDashboardPage";
 import ResourceCalendarPage from "../pages/ResourceCalendarPage";
 import ResourceManagementPage from "../pages/ResourceManagementPage";
 import FaultParetoChart from "../components/dashboard/FaultParetoChart";
-import ResourceBoardPage from "../pages/ResourceBoardPage"; // <-- Import the new page
+import ResourceBoardPage from "../pages/ResourceBoardPage";
 import ProductionDashboardPage from "../pages/ProductionDashboardPage";
 import PrintOrderPage from "../pages/PrintOrderPage";
 import DailySchedulerPage from "../pages/DailySchedulerPage";
 import MigratePlannedWeekStartDateButton from "../pages/admin/MigrateDates";
 import KanbanPage from "../pages/KanbanPage";
-import StandardizeOrderProcessesPage from "../pages/admin/StandardizeOrderProcessesPage.tsx";
 import StandardizeProcessesCollectionPage from "../pages/admin/StandardizeProcessesCollectionPage.tsx";
 
-/**
- * Main application routes configuration
- * This centralizes all routing logic for the application
- */
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/unauthorized" element={<div>Unauthorized Access</div>} />
 
-      {/* Protected routes - wrapped in our main layout */}
       <Route
         element={
           <ProtectedRoute>
@@ -48,9 +40,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        {/* Dashboard */}
         <Route path="/" element={<Dashboard />} />
-        {/* Orders module */}
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/create" element={<CreateOrderPage />} />
         <Route path="/orders/import" element={<ImportOrdersPage />} />
@@ -58,27 +48,19 @@ const AppRoutes = () => {
         <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
         <Route path="/orders/resource-board" element={<ResourceBoardPage />} />
         <Route path="/orders/resource-scheduler" element={<DailySchedulerPage />} />
-        {/* <-- Add this route */}
         <Route path="/orders/:id/print" element={<PrintOrderPage />} />
-        {/* New calendar route */}
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
-        {/* Products module */}
         <Route path="/products" element={<div>Products Page</div>} />
         <Route path="/products/create" element={<div>Create Product Page</div>} />
         <Route path="/products/:id" element={<div>Product Details Page</div>} />
-        {/* Employees module */}
         <Route path="/employees" element={<div>Employees Page</div>} />
-        {/* Reports module */}
         <Route path="/reports" element={<div>Reports Page</div>} />
         <Route path="/reports/fault-analysis" element={<FaultParetoChart />} />
         <Route path="/reports/production-dashboard" element={<ProductionDashboardPage />} />
         <Route path="/time" element={<TimeDashboardPage />} />
-        {/* Resource Management */}
         <Route path="/resources" element={<ResourceManagementPage />} />
-        {/* Kanban Board */}
         <Route path="/kanban" element={<KanbanPage />} />
-        {/* Admin section */}
         <Route
           path="/admin/migrate-orders"
           element={
@@ -92,13 +74,9 @@ const AppRoutes = () => {
           path="/admin/standardize-process-collection"
           element={<StandardizeProcessesCollectionPage />}
         />
-        {/* Settings */}
         <Route path="/settings" element={<div>Settings Page</div>} />
-        {/* User Profile */}
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
-
-      {/* Redirect unknown paths to dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

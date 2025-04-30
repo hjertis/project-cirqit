@@ -1,6 +1,4 @@
-/* src/styles/CompactPrintStyles.css - Updated with better print layout */
 @media print {
-  /* General print settings */
   @page {
     size: A4;
     margin: 20mm;
@@ -18,7 +16,6 @@
     min-height: auto !important;
   }
 
-  /* Hide everything on the page initially */
   body * {
     visibility: hidden !important;
   }
@@ -27,7 +24,6 @@
     background: none !important;
   }
 
-  /* Hide non-printable elements */
   .no-print,
   button,
   .MuiButtonBase-root,
@@ -49,27 +45,23 @@
     display: none !important;
   }
 
-  /* Make only the print container and its children visible */
-  /* Target the container INSIDE DialogContent */
   .print-container,
   .print-container * {
     visibility: visible !important;
   }
 
-  /* Position the print container at the top-left of the page */
   .print-container {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100% !important; /* Use full printable width */
+    width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important; /* Reset padding, rely on @page margin */
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: white !important; /* Explicitly set print container background */
+    background: white !important;
   }
 
-  /* Ensure boxes fit within page */
   .MuiPaper-root {
     box-shadow: none !important;
     border: 1px solid #000 !important;
@@ -78,7 +70,6 @@
     page-break-inside: avoid !important;
   }
 
-  /* Adjust table for printing */
   table {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -95,7 +86,6 @@
     text-align: left !important;
   }
 
-  /* Details grid - NOT USED AS IT MAKES GRIDS COLLAPSE HORIZONTALLY */
   .details-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -141,14 +131,12 @@
     font-size: 9pt !important;
   }
 
-  /* Make process rows more compact */
   .process-row {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     height: auto !important;
   }
 
-  /* Ensure progress section is condensed */
   .progress-section {
     display: flex !important;
     flex-direction: row !important;
@@ -163,7 +151,6 @@
     transform: scale(0.7) !important;
   }
 
-  /* Reduce spacing */
   .MuiGrid-root {
     margin-top: 2px !important;
     margin-bottom: 2px !important;
@@ -178,7 +165,6 @@
     padding: 4px !important;
   }
 
-  /* Reduce vertical spacing between sections */
   h6,
   .MuiTypography-subtitle2 {
     margin-top: 8px !important;
@@ -196,14 +182,12 @@
     font-size: 8pt !important;
   }
 
-  /* Fix Divider appearance */
   .MuiDivider-root {
     border-color: #000 !important;
     margin: 4px 0 !important;
     border-bottom-width: 1px !important;
   }
 
-  /* Make signature areas smaller but visible */
   .signature-box {
     height: 40px !important;
     border: 1px dashed #000 !important;
@@ -211,18 +195,15 @@
     page-break-inside: avoid !important;
   }
 
-  /* Signature label */
   .signature-label {
     font-size: 9pt !important;
     margin-top: 4px !important;
   }
 
-  /* Quality Verification Section */
   .quality-verification-section {
     padding-left: 13px !important;
   }
 
-  /* Notes section */
   .notes-section {
     min-height: 60px !important;
     border: 1px solid #000 !important;
@@ -231,20 +212,17 @@
     page-break-inside: avoid !important;
   }
 
-  /* Specific styles for process table */
   .process-table th,
   .process-table td {
     font-size: 8.5pt !important;
     padding: 3px !important;
   }
 
-  /* Scale down checkboxes */
   .MuiCheckbox-root {
     transform: scale(0.7) !important;
     padding: 2px !important;
   }
 
-  /* Force headers to be printed */
   thead {
     display: table-header-group !important;
   }
@@ -257,38 +235,33 @@
   .MuiAppBar-root,
   .MuiDrawer-root {
     display: none !important;
-    visibility: hidden !important; /* Reinforce hiding */
+    visibility: hidden !important;
   }
 
-  /* Reset backgrounds just in case */
   #root,
   main,
   main > .MuiContainer-root {
     background: none !important;
   }
 
-  /* Style the actual content for print */
   .MuiPaper-root {
     box-shadow: none !important;
     border: 1px solid #000 !important;
     padding: 4px !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    background: white !important; /* Ensure paper background is white */
+    background: white !important;
   }
 
   table {
-    /* ... keep existing table styles ... */
-    background: white !important; /* Ensure table background is white */
+    background: white !important;
   }
 
   th,
   td {
-    /* ... keep existing cell styles ... */
-    background: white !important; /* Ensure cell background is white */
+    background: white !important;
   }
 
-  /* Ensure white background */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

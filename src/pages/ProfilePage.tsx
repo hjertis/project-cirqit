@@ -1,4 +1,3 @@
-// src/pages/ProfilePage.tsx
 import { Box, Typography, Breadcrumbs, Link } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
@@ -9,7 +8,6 @@ const ProfilePage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
             <Link component={RouterLink} to="/" color="inherit">
@@ -23,7 +21,6 @@ const ProfilePage = () => {
           </Typography>
         </Box>
 
-        {/* Profile Component */}
         <UserProfile />
       </Box>
     </ContentWrapper>

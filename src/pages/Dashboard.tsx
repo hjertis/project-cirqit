@@ -1,4 +1,3 @@
-// src/pages/Dashboard.tsx
 import {
   Grid,
   Typography,
@@ -70,7 +69,6 @@ const Dashboard = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Dashboard Header */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Typography variant="h4" component="h1">
             Dashboard
@@ -93,7 +91,6 @@ const Dashboard = () => {
           </Box>
         </Box>
 
-        {/* KPI Cards */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
@@ -129,7 +126,6 @@ const Dashboard = () => {
           </Grid>
         </Grid>
 
-        {/* Charts Section */}
         <Paper sx={{ mb: 3 }}>
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="dashboard tabs">
@@ -145,7 +141,6 @@ const Dashboard = () => {
           </TabPanel>
         </Paper>
 
-        {/* Recent Orders Table */}
         <Paper sx={{ p: 2 }}>
           <Box
             sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}
@@ -179,7 +174,6 @@ const Dashboard = () => {
           />
         </Paper>
 
-        {/* Additional Dashboard Components */}
         <Grid container spacing={3} sx={{ mt: 3 }}>
           <Grid item xs={12} md={6}>
             <NotificationsPanel />

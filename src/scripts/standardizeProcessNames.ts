@@ -1,10 +1,9 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, writeBatch, doc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, writeBatch, doc } from "firebase/firestore";
 import { STANDARD_PROCESS_NAMES } from "../constants/constants";
 
-// --- Firebase config ---
 const firebaseConfig = {
   apiKey: process.env.VITE_FIREBASE_API_KEY,
   authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -19,7 +18,6 @@ const db = getFirestore(app);
 
 const BATCH_SIZE = 400;
 
-// Helper: Try to match a process name to a standard name (case-insensitive, ignores WO- prefix, trims)
 function matchStandardProcessName(name: string): string | null {
   if (!name) return null;
   const cleaned = name
@@ -28,7 +26,7 @@ function matchStandardProcessName(name: string): string | null {
     .toLowerCase();
   for (const std of STANDARD_PROCESS_NAMES) {
     if (cleaned === std.toLowerCase()) return std;
-    // Optionally: fuzzy match, e.g. "repair rework" => "Repair/Rework"
+
     if (cleaned.replace(/[^\w]/g, "") === std.toLowerCase().replace(/[^\w]/g, "")) return std;
   }
   return null;

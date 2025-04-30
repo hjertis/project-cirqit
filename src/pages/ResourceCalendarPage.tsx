@@ -1,4 +1,3 @@
-// src/pages/ResourceCalendarPage.tsx
 import { Box, Typography, Breadcrumbs, Link, Paper } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
@@ -9,7 +8,6 @@ const ResourceCalendarPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h4" gutterBottom>
             Resource Calendar
@@ -25,7 +23,6 @@ const ResourceCalendarPage = () => {
           </Breadcrumbs>
         </Box>
 
-        {/* Resource Calendar View */}
         <ResourceCalendarView defaultView="week" />
       </Box>
     </ContentWrapper>

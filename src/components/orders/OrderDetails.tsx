@@ -760,7 +760,6 @@ const OrderDetails = () => {
         </TabPanel>
       </Paper>
 
-      {/* Resource Assignment Dialog */}
       <Dialog
         open={assignResourceOpen}
         onClose={() => setAssignResourceOpen(false)}
@@ -832,7 +831,6 @@ const OrderDetails = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Status Update Dialog */}
       <Dialog
         open={updateStatusOpen}
         onClose={() => setUpdateStatusOpen(false)}
@@ -916,7 +914,6 @@ const OrderDetails = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Success Snackbar */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}

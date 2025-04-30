@@ -1,4 +1,3 @@
-// src/pages/Orders.tsx
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -49,7 +48,7 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
-import EditOrderDialog from "../components/orders/EditOrderDialog"; // Import the EditOrderDialog
+import EditOrderDialog from "../components/orders/EditOrderDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
 import { doc, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -116,22 +115,20 @@ const OrdersPage = () => {
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [orderBy, setOrderBy] = useState<string>("start");
 
-  // Get the initial filter based on the tab
   const getFilterForTab = (tabIndex: number): OrderFilter => {
     let filter: OrderFilter;
 
     switch (tabIndex) {
-      case 1: // In Progress tab
+      case 1:
         filter = { status: ["In Progress"] };
         break;
-      case 2: // Completed tab
+      case 2:
         filter = { status: ["Done", "Finished"] };
         break;
-      case 3: // Delayed tab
+      case 3:
         filter = { status: ["Delayed"] };
         break;
-      default: // All Orders tab (index 0) - filter out Finished/Done orders
-        // For All Orders, we only want active orders (not Finished/Done)
+      default:
         filter = {
           status: ["Open", "Released", "In Progress", "Delayed", "Firm Planned"],
         };
@@ -140,21 +137,16 @@ const OrdersPage = () => {
     return filter;
   };
 
-  // Use our orders hook with the initial filter
   const { orders, loading, error, updateFilter, formatDate, refreshOrders } = useOrders({}, 1000);
 
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Update filter when tab changes
   useEffect(() => {
-    // Get the filter for this tab
     const newFilter = getFilterForTab(tabValue);
 
-    // Apply the filter
     updateFilter(newFilter);
 
-    // Update active filters UI
     if (tabValue === 0) {
       setActiveFilters([]);
     } else {
@@ -168,7 +160,6 @@ const OrdersPage = () => {
     }
   }, [tabValue, updateFilter]);
 
-  // Filter orders by search term (client-side filtering)
   const filteredOrders = orders.filter(order => {
     if (!searchTerm) return true;
 
@@ -191,12 +182,12 @@ const OrdersPage = () => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    setPage(0); // Reset to first page when changing tabs
+    setPage(0);
   };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
-    setPage(0); // Reset to first page when searching
+    setPage(0);
   };
 
   const handleNewOrder = () => {
@@ -210,7 +201,6 @@ const OrdersPage = () => {
   const handleExport = () => {
     setIsExporting(true);
 
-    // Simulate export process
     setTimeout(() => {
       setIsExporting(false);
       alert("Orders exported successfully!");
@@ -243,10 +233,8 @@ const OrdersPage = () => {
   const handleEditComplete = () => {
     setEditDialogOpen(false);
 
-    // Refresh the orders list
     refreshOrders();
 
-    // Show success message
     setSuccessMessage("Order updated successfully");
     setSnackbarOpen(true);
   };
@@ -258,11 +246,9 @@ const OrdersPage = () => {
 
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
-    // Don't reset selectedOrder here
   };
 
   const handleDeleteClick = () => {
-    // Store the selected order before closing the menu
     setOrderToDelete(selectedOrder);
     handleMenuClose();
     setConfirmDeleteOpen(true);
@@ -277,7 +263,6 @@ const OrdersPage = () => {
     try {
       setIsDeleting(true);
 
-      // 1. Delete all processes associated with this order
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderToDelete)
@@ -285,30 +270,24 @@ const OrdersPage = () => {
 
       const processesSnapshot = await getDocs(processesQuery);
 
-      // Use a batch for efficient deletion of multiple documents
       const batch = writeBatch(db);
 
       processesSnapshot.forEach(doc => {
         batch.delete(doc.ref);
       });
 
-      // 2. Delete the order document itself
       const orderRef = doc(db, "orders", orderToDelete);
       batch.delete(orderRef);
 
-      // Commit all the delete operations
       await batch.commit();
 
-      // Show success message
       setSuccessMessage(`Order ${orderToDelete} has been deleted successfully`);
       setSnackbarOpen(true);
 
-      // Close the dialog
       setConfirmDeleteOpen(false);
-      setOrderToDelete(null); // Clear the order to delete
-      setSelectedOrder(null); // Also clear the selectedOrder
+      setOrderToDelete(null);
+      setSelectedOrder(null);
 
-      // Refresh the orders list
       await refreshOrders();
     } catch (err) {
       console.error("Error in delete process:", err);
@@ -323,11 +302,10 @@ const OrdersPage = () => {
 
   const handleCancelDelete = () => {
     setConfirmDeleteOpen(false);
-    setOrderToDelete(null); // Clear the order to delete
+    setOrderToDelete(null);
   };
 
   const handleRemoveFilter = (filterToRemove: string) => {
-    // If removing the tab filter, go back to All Orders tab
     if (filterToRemove.startsWith("Status:")) {
       setTabValue(0);
     } else {
@@ -336,49 +314,41 @@ const OrdersPage = () => {
   };
 
   useEffect(() => {
-    // Check if we navigated here from a redirect with state
     if (location.state && location.state.openOrderDetails) {
       setSelectedOrderId(location.state.orderId);
       setDetailsDialogOpen(true);
 
-      // Clear the state to prevent dialog reopening on refresh
       window.history.replaceState({}, document.title);
     }
   }, [location]);
 
   const sortByTimestamp = (a: any, b: any, orderBy: string) => {
-    // Handle case where timestamp might be undefined
     if (!a[orderBy] || !b[orderBy]) {
       if (!a[orderBy]) return 1;
       if (!b[orderBy]) return -1;
       return 0;
     }
 
-    // Handle Firestore Timestamp objects
     if (a[orderBy] instanceof Timestamp && b[orderBy] instanceof Timestamp) {
       const aDate = a[orderBy].toDate().getTime();
       const bDate = b[orderBy].toDate().getTime();
       return aDate - bDate;
     }
 
-    // Default fallback for non-timestamp fields
     if (a[orderBy] < b[orderBy]) return -1;
     if (a[orderBy] > b[orderBy]) return 1;
     return 0;
   };
 
-  // Add this function to handle sorting requests
   const handleRequestSort = (property: string) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
     setOrderBy(property);
   };
 
-  // Modify your orders array with sorting before slicing for pagination
   const sortedOrders = React.useMemo(() => {
     if (!filteredOrders.length) return [];
 
-    // Create a copy to avoid mutating the original array
     return [...filteredOrders].sort((a, b) => {
       const sortResult = sortByTimestamp(a, b, orderBy);
       return order === "asc" ? sortResult : -sortResult;
@@ -388,7 +358,6 @@ const OrdersPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Typography variant="h4" component="h1">
             Orders
@@ -453,7 +422,6 @@ const OrdersPage = () => {
 
         {isExporting && <LinearProgress sx={{ mb: 2 }} />}
 
-        {/* Filters and Search */}
         <Paper sx={{ mb: 3, p: 2 }}>
           <Box
             sx={{
@@ -495,7 +463,6 @@ const OrdersPage = () => {
           </Box>
         </Paper>
 
-        {/* Orders Tabs and Table */}
         <Paper>
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="orders tabs">
@@ -523,10 +490,8 @@ const OrdersPage = () => {
           </TabPanel>
         </Paper>
 
-        {/* Import Dialog */}
         <ImportOrdersDialog open={importDialogOpen} onClose={closeImportDialog} />
 
-        {/* Context Menu */}
         <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
           <MenuItem
             onClick={() => {
@@ -553,7 +518,6 @@ const OrdersPage = () => {
           </MenuItem>
         </Menu>
 
-        {/* Confirm Delete Dialog */}
         <Dialog open={confirmDeleteOpen} onClose={handleCancelDelete}>
           <DialogTitle>Confirm Delete</DialogTitle>
           <DialogContent>
@@ -576,14 +540,12 @@ const OrdersPage = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Order Details Dialog */}
         <OrderDetailsDialog
           open={detailsDialogOpen}
           onClose={() => setDetailsDialogOpen(false)}
           orderId={selectedOrderId}
         />
 
-        {/* Edit Order Dialog */}
         <EditOrderDialog
           open={editDialogOpen}
           onClose={() => setEditDialogOpen(false)}
@@ -591,7 +553,6 @@ const OrdersPage = () => {
           onOrderUpdated={handleEditComplete}
         />
 
-        {/* Snackbar for notifications */}
         <Snackbar
           open={snackbarOpen}
           autoHideDuration={6000}
@@ -602,7 +563,6 @@ const OrdersPage = () => {
     </ContentWrapper>
   );
 
-  // Function to render the orders table
   function renderOrdersTable() {
     if (loading) {
       return (

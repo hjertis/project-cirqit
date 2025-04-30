@@ -1,4 +1,3 @@
-// src/components/orders/OrderWorkflowTimeline.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -13,9 +12,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent, // Import SelectChangeEvent
-  TextField, // Import TextField
-  InputAdornment, // Import InputAdornment
+  SelectChangeEvent,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -24,7 +23,7 @@ import {
   Schedule as ScheduleIcon,
   Flag as FlagIcon,
   ArrowDropDown as ArrowDropDownIcon,
-  Search as SearchIcon, // Import SearchIcon
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import {
@@ -42,12 +41,10 @@ import {
 import { db } from "../../config/firebase";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-import OrderDetailsDialog from "./OrderDetailsDialog"; // Import the dialog component
+import OrderDetailsDialog from "./OrderDetailsDialog";
 
-// Extend dayjs
 dayjs.extend(isBetween);
 
-// Define interfaces
 interface Order {
   id: string;
   orderNumber: string;
@@ -79,7 +76,6 @@ interface OrderWithProcesses {
   processes: Process[];
 }
 
-// Define the workflow stages
 interface WorkflowStage {
   id: string;
   name: string;
@@ -87,40 +83,37 @@ interface WorkflowStage {
   processTypes: string[];
 }
 
-// Define workflow stages
 const workflowStages: WorkflowStage[] = [
   {
     id: "testing",
     name: "Testing",
-    color: "#e74c3c", // Red
+    color: "#e74c3c",
     processTypes: ["Setup", "Testing"],
   },
   {
     id: "preparation",
     name: "Preparation",
-    color: "#3498db", // Blue
+    color: "#3498db",
     processTypes: ["Preparation", "Setup"],
   },
   {
     id: "processing",
     name: "Processing",
-    color: "#f1c40f", // Yellow
+    color: "#f1c40f",
     processTypes: ["Assembly", "Production"],
   },
   {
     id: "finalize",
     name: "Finalize",
-    color: "#9b59b6", // Purple
+    color: "#9b59b6",
     processTypes: ["Quality Check", "Packaging", "Shipping"],
   },
 ];
 
-// Get stage for a process type
 const getStageForProcessType = (processType: string): WorkflowStage | undefined => {
   return workflowStages.find(stage => stage.processTypes.includes(processType));
 };
 
-// Determine stage progress
 const determineStageProgress = (processes: Process[], stageProcessTypes: string[]): number => {
   const stageProcesses = processes.filter(p => stageProcessTypes.includes(p.type));
 
@@ -130,7 +123,6 @@ const determineStageProgress = (processes: Process[], stageProcessTypes: string[
   return Math.round(totalProgress / stageProcesses.length);
 };
 
-// Determine if a stage is active
 const isStageActive = (processes: Process[], stageProcessTypes: string[]): boolean => {
   return processes.some(
     p =>
@@ -138,7 +130,6 @@ const isStageActive = (processes: Process[], stageProcessTypes: string[]): boole
   );
 };
 
-// Determine if a stage is completed
 const isStageCompleted = (processes: Process[], stageProcessTypes: string[]): boolean => {
   const stageProcesses = processes.filter(p => stageProcessTypes.includes(p.type));
 
@@ -149,12 +140,10 @@ const isStageCompleted = (processes: Process[], stageProcessTypes: string[]): bo
   );
 };
 
-// Format date
 const formatDate = (date: Date): string => {
   return dayjs(date).format("DD/MM/YYYY");
 };
 
-// Get priority color
 const getPriorityColor = (priority: string = "Medium"): string => {
   switch (priority) {
     case "Critical":
@@ -172,24 +161,23 @@ const getPriorityColor = (priority: string = "Medium"): string => {
   }
 };
 
-// Get status color
 const getStatusColor = (status: string): string => {
   switch (status) {
     case "Open":
     case "Released":
     case "Pending":
-      return "#3f51b5"; // primary
+      return "#3f51b5";
     case "In Progress":
-      return "#19857b"; // secondary
+      return "#19857b";
     case "Done":
     case "Finished":
     case "Completed":
-      return "#4caf50"; // success
+      return "#4caf50";
     case "Delayed":
     case "Not Started":
-      return "#f44336"; // error
+      return "#f44336";
     default:
-      return "#9e9e9e"; // default
+      return "#9e9e9e";
   }
 };
 
@@ -200,43 +188,36 @@ const OrderWorkflowTimeline: React.FC = () => {
   const [filteredOrders, setFilteredOrders] = useState<OrderWithProcesses[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("In Progress");
   const [filterPriority, setFilterPriority] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState<string>(""); // State for the search term
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [allFetchedOrders, setAllFetchedOrders] = useState<OrderWithProcesses[]>([]); // Store all fetched orders before client-side filtering
-  const [dialogOpen, setDialogOpen] = useState(false); // State for dialog visibility
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null); // State for the order ID in the dialog
+  const [allFetchedOrders, setAllFetchedOrders] = useState<OrderWithProcesses[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  // Fetch orders and their processes
   useEffect(() => {
     const fetchOrdersAndProcesses = async () => {
       setLoading(true);
-      setError(null); // Reset error on new fetch
+      setError(null);
       try {
-        // Start with base query constraints (where clauses)
         const queryConstraints: (
           | QueryConstraint
           | QueryOrderByConstraint
           | QueryLimitConstraint
-        )[] = []; // Initialize as an array that accepts all constraint types
+        )[] = [];
 
-        // Add status filter if selected
         if (filterStatus) {
-          queryConstraints.push(where("status", "==", filterStatus)); // Use push
+          queryConstraints.push(where("status", "==", filterStatus));
         }
 
-        // Add priority filter if selected
         if (filterPriority) {
-          queryConstraints.push(where("priority", "==", filterPriority)); // Use push
+          queryConstraints.push(where("priority", "==", filterPriority));
         }
 
-        // Add sorting and limiting constraints *after* where clauses
         queryConstraints.push(orderBy("end", "asc"));
         queryConstraints.push(limit(20));
 
-        // Create the final query
         const ordersQuery = query(collection(db, "orders"), ...queryConstraints);
 
-        // Fetch orders
         const ordersSnapshot = await getDocs(ordersQuery);
         const ordersData: Order[] = [];
 
@@ -247,7 +228,6 @@ const OrderWorkflowTimeline: React.FC = () => {
           } as Order);
         });
 
-        // Fetch processes for these orders
         const orderProcesses: Record<string, Process[]> = {};
 
         for (const order of ordersData) {
@@ -266,31 +246,26 @@ const OrderWorkflowTimeline: React.FC = () => {
             } as Process);
           });
 
-          // Sort processes by sequence
           processes.sort((a, b) => a.sequence - b.sequence);
           orderProcesses[order.id] = processes;
         }
 
-        // Combine orders with their processes
         const ordersWithProcessesData = ordersData.map(order => ({
           order,
           processes: orderProcesses[order.id] || [],
         }));
 
-        // Store all fetched orders
         setAllFetchedOrders(ordersWithProcessesData);
-        // We will filter in the next useEffect based on searchTerm
 
-        // Initialize expanded state (can stay here or move to the filtering useEffect)
         const newExpanded: Record<string, boolean> = {};
         ordersData.forEach(order => {
-          newExpanded[order.id] = false; // Default to collapsed
+          newExpanded[order.id] = false;
         });
         setExpanded(newExpanded);
       } catch (err) {
         console.error("Error fetching orders and processes:", err);
         setError(`Failed to load orders: ${err instanceof Error ? err.message : String(err)}`);
-        setAllFetchedOrders([]); // Clear data on error
+        setAllFetchedOrders([]);
         setFilteredOrders([]);
       } finally {
         setLoading(false);
@@ -298,12 +273,11 @@ const OrderWorkflowTimeline: React.FC = () => {
     };
 
     fetchOrdersAndProcesses();
-  }, [filterStatus, filterPriority]); // Add filterPriority to dependency array
+  }, [filterStatus, filterPriority]);
 
-  // useEffect for client-side filtering based on searchTerm
   useEffect(() => {
     if (!searchTerm) {
-      setFilteredOrders(allFetchedOrders); // If search is empty, show all fetched orders
+      setFilteredOrders(allFetchedOrders);
     } else {
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const filtered = allFetchedOrders.filter(
@@ -313,24 +287,20 @@ const OrderWorkflowTimeline: React.FC = () => {
       );
       setFilteredOrders(filtered);
     }
-  }, [searchTerm, allFetchedOrders]); // Re-run filter when search term or fetched data changes
+  }, [searchTerm, allFetchedOrders]);
 
-  // Handle filter change for Status
   const handleStatusFilterChange = (event: SelectChangeEvent<string>) => {
     setFilterStatus(event.target.value as string);
   };
 
-  // Handle filter change for Priority
   const handlePriorityFilterChange = (event: SelectChangeEvent<string>) => {
     setFilterPriority(event.target.value as string);
   };
 
-  // Handle search term change
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
 
-  // Toggle expanded state for an order
   const toggleExpanded = (orderId: string) => {
     setExpanded(prev => ({
       ...prev,
@@ -338,30 +308,26 @@ const OrderWorkflowTimeline: React.FC = () => {
     }));
   };
 
-  // Handle opening the view dialog
   const handleViewOrder = (orderId: string) => {
     setSelectedOrderId(orderId);
     setDialogOpen(true);
   };
 
-  // Handle closing the view dialog
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setSelectedOrderId(null);
   };
 
-  // Handle edit order
   const handleEditOrder = (orderId: string) => {
     navigate(`/orders/${orderId}/edit`);
   };
 
   return (
     <Box>
-      {/* Filter controls */}
       <Box
         sx={{
           display: "flex",
-          flexWrap: "wrap", // Allow wrapping on smaller screens
+          flexWrap: "wrap",
           justifyContent: "space-between",
           alignItems: "center",
           mb: 3,
@@ -370,18 +336,16 @@ const OrderWorkflowTimeline: React.FC = () => {
       >
         <Typography variant="h6" sx={{ mr: "auto" }}>
           {" "}
-          {/* Push filters to the right */}
           Order Workflow Timeline
         </Typography>
 
-        {/* Search Input */}
         <TextField
           label="Search Part No / Desc"
           variant="outlined"
           size="small"
           value={searchTerm}
           onChange={handleSearchChange}
-          sx={{ minWidth: 200 }} // Adjust width as needed
+          sx={{ minWidth: 200 }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -391,7 +355,6 @@ const OrderWorkflowTimeline: React.FC = () => {
           }}
         />
 
-        {/* Status Filter */}
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <InputLabel id="status-filter-label">Status</InputLabel>
           <Select
@@ -406,11 +369,9 @@ const OrderWorkflowTimeline: React.FC = () => {
             <MenuItem value="In Progress">In Progress</MenuItem>
             <MenuItem value="Delayed">Delayed</MenuItem>
             <MenuItem value="Finished">Finished</MenuItem>
-            {/* Add other relevant statuses */}
           </Select>
         </FormControl>
 
-        {/* Priority Filter */}
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <InputLabel id="priority-filter-label">Priority</InputLabel>
           <Select
@@ -430,7 +391,6 @@ const OrderWorkflowTimeline: React.FC = () => {
         </FormControl>
       </Box>
 
-      {/* Conditional rendering for loading, error, or content */}
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
           <CircularProgress />
@@ -445,7 +405,6 @@ const OrderWorkflowTimeline: React.FC = () => {
         </Box>
       ) : (
         <>
-          {/* Workflow stage header */}
           <Box sx={{ display: "flex", mb: 2 }}>
             <Box sx={{ width: "300px", flexShrink: 0 }}>
               <Typography variant="subtitle2" color="text.secondary">
@@ -471,7 +430,6 @@ const OrderWorkflowTimeline: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Orders with workflow stages */}
           <Box sx={{ mb: 3 }}>
             {filteredOrders.map(({ order, processes }) => (
               <Paper
@@ -484,9 +442,7 @@ const OrderWorkflowTimeline: React.FC = () => {
                 }}
                 elevation={2}
               >
-                {/* Order summary row */}
                 <Box sx={{ display: "flex", alignItems: "stretch" }}>
-                  {/* Order details */}
                   <Box
                     sx={{
                       width: "300px",
@@ -523,14 +479,12 @@ const OrderWorkflowTimeline: React.FC = () => {
                       />
                     </Box>
 
-                    {/* Add Part Number here */}
                     <Typography
                       variant="body2"
                       noWrap
                       title={order.partNo}
                       sx={{ mb: 1, color: "text.secondary" }}
                     >
-                      {/* Added Part Number */}
                       Part: {order.partNo}
                     </Typography>
 
@@ -587,19 +541,16 @@ const OrderWorkflowTimeline: React.FC = () => {
                     </Box>
                   </Box>
 
-                  {/* Workflow stages progress */}
                   <Box sx={{ display: "flex", flexGrow: 1 }}>
                     {workflowStages.map(stage => {
                       const progress = determineStageProgress(processes, stage.processTypes);
                       const isActive = isStageActive(processes, stage.processTypes);
                       const isComplete = isStageCompleted(processes, stage.processTypes);
 
-                      // Find processes for this stage
                       const stageProcesses = processes.filter(p =>
                         stage.processTypes.includes(p.type)
                       );
 
-                      // Find resource assigned to this stage
                       const resourcesForStage = stageProcesses
                         .map(p => p.assignedResource)
                         .filter(r => r !== null) as string[];
@@ -647,7 +598,6 @@ const OrderWorkflowTimeline: React.FC = () => {
                             </Box>
                           ) : (
                             <>
-                              {/* Progress bar */}
                               <Box
                                 sx={{
                                   height: 4,
@@ -701,7 +651,6 @@ const OrderWorkflowTimeline: React.FC = () => {
                   </Box>
                 </Box>
 
-                {/* Expanded process details */}
                 {expanded[order.id] && (
                   <Box
                     sx={{
@@ -798,7 +747,6 @@ const OrderWorkflowTimeline: React.FC = () => {
         </>
       )}
 
-      {/* Order Details Dialog */}
       {selectedOrderId && (
         <OrderDetailsDialog
           orderId={selectedOrderId}

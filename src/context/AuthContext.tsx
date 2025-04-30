@@ -1,4 +1,3 @@
-// src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import {
   User,
@@ -40,7 +39,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sign up with email and password
   const signup = async (
     email: string,
     password: string,
@@ -48,7 +46,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ): Promise<UserCredential> => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Set the display name
     if (userCredential.user) {
       await updateProfile(userCredential.user, { displayName });
     }
@@ -56,36 +53,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return userCredential;
   };
 
-  // Login with email and password
   const login = (email: string, password: string): Promise<UserCredential> => {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  // Logout
   const logout = (): Promise<void> => {
     return signOut(auth);
   };
 
-  // Reset password
   const resetPassword = (email: string): Promise<void> => {
     return sendPasswordResetEmail(auth, email);
   };
 
-  // Update user profile
   const updateUserProfile = async (displayName: string): Promise<void> => {
     if (auth.currentUser) {
       await updateProfile(auth.currentUser, { displayName });
     }
   };
 
-  // Subscribe to auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, user => {
       setCurrentUser(user);
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
     return unsubscribe;
   }, []);
 

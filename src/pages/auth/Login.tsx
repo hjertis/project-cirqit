@@ -1,4 +1,3 @@
-// src/pages/auth/Login.tsx
 import { useState } from "react";
 import {
   Box,
@@ -30,7 +29,6 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get the redirect path from location state or default to homepage
   const from = (location.state as any)?.from?.pathname || "/";
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -47,17 +45,14 @@ const Login = () => {
     try {
       await login(email, password);
 
-      // If rememberMe is checked, persist auth state (this is optional)
       if (rememberMe) {
         localStorage.setItem("rememberMe", "true");
       } else {
         localStorage.removeItem("rememberMe");
       }
 
-      // Navigate to the page user tried to access or home page
       navigate(from, { replace: true });
     } catch (err: any) {
-      // Handle specific Firebase Auth errors
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
         setError("Invalid email or password");
       } else if (err.code === "auth/too-many-requests") {

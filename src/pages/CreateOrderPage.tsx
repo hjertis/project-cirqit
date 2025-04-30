@@ -1,4 +1,3 @@
-// src/pages/CreateOrderPage.tsx
 import { Box, Breadcrumbs, Typography, Link } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { NavigateNext as NavigateNextIcon } from "@mui/icons-material";
@@ -9,7 +8,6 @@ const CreateOrderPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
             <Link component={RouterLink} to="/" color="inherit">
@@ -22,7 +20,6 @@ const CreateOrderPage = () => {
           </Breadcrumbs>
         </Box>
 
-        {/* Create Order Form */}
         <CreateOrder />
       </Box>
     </ContentWrapper>

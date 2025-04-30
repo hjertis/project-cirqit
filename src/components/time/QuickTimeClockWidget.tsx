@@ -1,4 +1,3 @@
-// src/components/time/QuickTimeClockWidget.tsx
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -38,7 +37,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { formatDuration } from "../../utils/helpers";
 
-// This component will be used in the TopBar for quick time tracking access
 const QuickTimeClockWidget = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -52,7 +50,6 @@ const QuickTimeClockWidget = () => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
 
-  // Check for active time entries on component mount
   useEffect(() => {
     const checkActiveEntries = async () => {
       if (!currentUser) return;
@@ -62,14 +59,12 @@ const QuickTimeClockWidget = () => {
         setHasActive(active);
 
         if (active) {
-          // If there are active entries, get the details of the first one
           const entry = await getActiveTimeEntry(currentUser.uid, "");
           if (entry) {
             setActiveEntry(entry);
             setOrderNumber(entry.orderNumber);
             setNotes(entry.notes || "");
 
-            // Calculate elapsed time
             const startTime = entry.startTime.toDate();
             const now = new Date();
             const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
@@ -84,13 +79,11 @@ const QuickTimeClockWidget = () => {
 
     checkActiveEntries();
 
-    // Poll for active time entries every 30 seconds
     const interval = setInterval(checkActiveEntries, 30000);
 
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Update the elapsed time every second when timer is running
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
@@ -124,10 +117,9 @@ const QuickTimeClockWidget = () => {
       setLoading(true);
       setError(null);
 
-      // Start a new time entry
       const entry = await startTimeEntry(
         currentUser.uid,
-        orderNumber, // Using orderNumber as orderId for simplicity
+        orderNumber,
         orderNumber,
         undefined,
         notes
@@ -210,7 +202,6 @@ const QuickTimeClockWidget = () => {
     handleCloseDialog();
   };
 
-  // Show different time tracking badge based on state
   const renderTimeBadge = () => {
     if (hasActive) {
       return (

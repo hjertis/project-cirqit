@@ -1,4 +1,3 @@
-// src/pages/OrderDetailsPage.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Box, Breadcrumbs, Typography, Link, CircularProgress } from "@mui/material";
@@ -13,8 +12,6 @@ const OrderDetailsPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // This component exists just for the URL structure and SEO
-    // The actual content is handled by the dialog in fullPage mode
     setLoading(false);
   }, [id]);
 
@@ -33,7 +30,6 @@ const OrderDetailsPage = () => {
   return (
     <ContentWrapper>
       <Box>
-        {/* Page Header with Breadcrumbs */}
         <Box sx={{ mb: 3 }}>
           <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
             <Link component={RouterLink} to="/" color="inherit">
@@ -46,7 +42,6 @@ const OrderDetailsPage = () => {
           </Breadcrumbs>
         </Box>
 
-        {/* Full page dialog */}
         <OrderDetailsDialog
           open={true}
           onClose={handleClose}

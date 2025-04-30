@@ -1,6 +1,3 @@
-// src/types/export-libraries.d.ts
-
-// Type declarations for export libraries
 declare module "jspdf" {
   export class jsPDF {
     constructor(orientation?: string, unit?: string, format?: string);
@@ -24,7 +21,6 @@ declare module "html2canvas" {
   export default html2canvas;
 }
 
-// Extend XLSX declaration for our needs
 declare module "xlsx" {
   export const utils: {
     book_new(): any;

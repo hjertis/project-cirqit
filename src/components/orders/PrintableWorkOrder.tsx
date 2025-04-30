@@ -1,6 +1,3 @@
-// src/components/orders/PrintableWorkOrder.tsx
-import { useState } from "react";
-import { Dialog } from "@mui/material";
 import { Timestamp } from "firebase/firestore";
 import OptimizedPrintableWorkOrder from "./OptimizedPrintableWorkOrder";
 
@@ -19,11 +16,10 @@ interface Process {
 interface PrintableWorkOrderProps {
   open: boolean;
   onClose: () => void;
-  order: any; // Order details
+  order: any;
   processes: Process[];
 }
 
-// This is now just a wrapper around the optimized component
 const PrintableWorkOrder = ({ open, onClose, order, processes }: PrintableWorkOrderProps) => {
   return (
     <OptimizedPrintableWorkOrder
