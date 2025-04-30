@@ -127,7 +127,6 @@ const CompactProcessesTable = ({
               </TableCell>
               <TableCell sx={{ p: 0.5 }}>
                 <Box className="progress-section" sx={{ width: "100%" }}>
-                  {/* Progress checkboxes in a row */}
                   <Box
                     sx={{
                       display: "flex",

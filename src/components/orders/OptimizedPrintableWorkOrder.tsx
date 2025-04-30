@@ -127,7 +127,6 @@ const OptimizedPrintableWorkOrder = ({
 
       <DialogContent dividers sx={{ p: 1 }} className="print-content">
         <Box className="print-container" sx={{ maxWidth: "210mm", margin: "0 auto" }}>
-          {/* Work Order Header */}
           <Box
             sx={{
               display: "flex",
