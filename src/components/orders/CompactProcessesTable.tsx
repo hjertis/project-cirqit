@@ -1,4 +1,3 @@
-// src/components/orders/CompactProcessesTable.tsx
 import {
   Table,
   TableBody,
@@ -32,7 +31,6 @@ interface CompactProcessesTableProps {
   isPrintMode?: boolean;
 }
 
-// Format date function
 const formatDate = (timestamp: Timestamp): string => {
   if (!timestamp || !timestamp.toDate) return "N/A";
   const date = timestamp.toDate();

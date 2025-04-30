@@ -4,18 +4,36 @@ import { db } from "../../config/firebase";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 import { Button, Alert, Typography, CircularProgress } from "@mui/material";
 
-// Helper: Try to match a process name to a standard name
-function matchStandardProcessName(name: string): string | null {
-  if (!name) return null;
+// Legacy to standard mapping
+const LEGACY_TO_STANDARD: Record<string, string> = {
+  setup: "Setup",
+  production: "SMT",
+  "quality check": "Inspection",
+  packaging: "Delivery",
+  // Add more mappings as needed
+};
+
+// Helper: Match a process name to a standard name
+function matchStandardProcessName(name: string): string {
+  if (!name) return STANDARD_PROCESS_NAMES[0];
   const cleaned = name
     .replace(/^WO-\d+\s*/i, "")
     .trim()
     .toLowerCase();
+
+  // 1. Check explicit legacy mapping
+  if (LEGACY_TO_STANDARD[cleaned]) {
+    return LEGACY_TO_STANDARD[cleaned];
+  }
+
+  // 2. Try direct match to standard names
   for (const std of STANDARD_PROCESS_NAMES) {
     if (cleaned === std.toLowerCase()) return std;
     if (cleaned.replace(/[^\w]/g, "") === std.toLowerCase().replace(/[^\w]/g, "")) return std;
   }
-  return null;
+
+  // 3. Fallback to first standard name
+  return STANDARD_PROCESS_NAMES[0];
 }
 
 const StandardizeOrderProcessesPage: React.FC = () => {
@@ -41,10 +59,11 @@ const StandardizeOrderProcessesPage: React.FC = () => {
 
         if (Array.isArray(orderData.processes)) {
           const newProcesses = orderData.processes.map((proc: any) => {
-            const matched = matchStandardProcessName(proc.name);
-            if (matched && proc.name !== matched) {
+            const newName = matchStandardProcessName(proc.name);
+            // Update both name and type
+            if (proc.name !== newName || proc.type !== newName) {
               updated = true;
-              return { ...proc, name: matched };
+              return { ...proc, name: newName, type: newName };
             }
             return proc;
           });

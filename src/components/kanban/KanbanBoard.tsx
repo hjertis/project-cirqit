@@ -11,21 +11,17 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
-import { FirebaseOrder } from "../../hooks/useOrders"; // Adjust path if needed
+import { FirebaseOrder } from "../../hooks/useOrders";
 import OrderDetailsDialog from "../orders/OrderDetailsDialog";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
-// Define the columns for the Kanban board
 const KANBAN_COLUMNS = STANDARD_PROCESS_NAMES;
 
-// Interface for orders shown on the board (add necessary fields)
 interface KanbanOrder extends FirebaseOrder {
   id: string;
-  currentProcessName: string; // Assumes orders have this field
-  // Add other fields needed for the card display (e.g., orderNumber, description)
+  currentProcessName: string;
 }
 
-// Type for the board data structure
 type BoardData = {
   [key: string]: KanbanOrder[];
 };
@@ -52,7 +48,6 @@ const InProgressKanbanBoard: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Query for orders with status "In Progress"
     const q = query(collection(db, "orders"), where("status", "==", "In Progress"));
 
     const unsubscribe = onSnapshot(
@@ -60,25 +55,19 @@ const InProgressKanbanBoard: React.FC = () => {
       snapshot => {
         const inProgressOrders: KanbanOrder[] = [];
         snapshot.forEach(doc => {
-          // --- IMPORTANT ---
-          // You need to determine the 'currentProcessName' for each order.
-          // This might involve looking at the order's sub-collection of processes
-          // or a specific field on the order document itself.
-          // For this example, we assume a field 'currentProcessName' exists.
           const orderData = doc.data() as FirebaseOrder;
-          // --- Replace this logic with your actual process determination ---
-          const currentProcess = orderData.currentProcessName || KANBAN_COLUMNS[0]; // Default or determine logic
+
+          const currentProcess = orderData.currentProcessName || KANBAN_COLUMNS[0];
 
           if (KANBAN_COLUMNS.includes(currentProcess)) {
             inProgressOrders.push({
               ...orderData,
               id: doc.id,
               currentProcessName: currentProcess,
-            } as KanbanOrder); // Cast might need adjustment
+            } as KanbanOrder);
           }
         });
 
-        // Group orders by their current process
         const groupedData: BoardData = KANBAN_COLUMNS.reduce((acc, col) => {
           acc[col] = [];
           return acc;
@@ -88,7 +77,6 @@ const InProgressKanbanBoard: React.FC = () => {
           if (groupedData[order.currentProcessName]) {
             groupedData[order.currentProcessName].push(order);
           }
-          // Optionally handle orders whose process isn't a column
         });
 
         setBoardData(groupedData);
@@ -101,18 +89,16 @@ const InProgressKanbanBoard: React.FC = () => {
       }
     );
 
-    return () => unsubscribe(); // Cleanup listener on unmount
+    return () => unsubscribe();
   }, []);
 
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
-    // Dropped outside the list
     if (!destination) {
       return;
     }
 
-    // Dropped in the same place
     if (source.droppableId === destination.droppableId && source.index === destination.index) {
       return;
     }
@@ -120,18 +106,15 @@ const InProgressKanbanBoard: React.FC = () => {
     const startColumnName = source.droppableId;
     const endColumnName = destination.droppableId;
 
-    // --- Optimistic UI Update ---
     const startColumn = Array.from(boardData[startColumnName]);
     const [movedOrder] = startColumn.splice(source.index, 1);
     const endColumn = Array.from(boardData[endColumnName]);
 
-    // If moving within the same column
     if (startColumnName === endColumnName) {
       endColumn.splice(destination.index, 0, movedOrder);
       const newBoardData = { ...boardData, [startColumnName]: endColumn };
       setBoardData(newBoardData);
     } else {
-      // Moving to a different column
       endColumn.splice(destination.index, 0, { ...movedOrder, currentProcessName: endColumnName });
       const newBoardData = {
         ...boardData,
@@ -141,23 +124,17 @@ const InProgressKanbanBoard: React.FC = () => {
       setBoardData(newBoardData);
     }
 
-    // --- Update Firestore ---
     try {
       const orderRef = doc(db, "orders", draggableId);
-      // --- IMPORTANT ---
-      // Update the order's status/process field in Firestore.
-      // This might involve updating the main order document's 'currentProcessName'
-      // or updating the status of specific sub-processes.
+
       await updateDoc(orderRef, {
-        currentProcessName: endColumnName, // Update the process field
-        // You might also need to update process start/end dates or status
+        currentProcessName: endColumnName,
+
         updated: Timestamp.now(),
       });
-      // Note: If the optimistic update is wrong, Firestore listener will correct it.
     } catch (err) {
       console.error("Failed to update order process:", err);
       setError("Failed to move order. Please refresh.");
-      // TODO: Revert optimistic update if needed, though Firestore sync might handle it.
     }
   };
 
@@ -188,8 +165,8 @@ const InProgressKanbanBoard: React.FC = () => {
                       : theme.palette.grey[100],
                     display: "flex",
                     flexDirection: "column",
-                    height: "fit-content", // Adjust height as needed
-                    maxHeight: "80vh", // Example max height
+                    height: "fit-content",
+                    maxHeight: "80vh",
                   }}
                 >
                   <Typography variant="h6" sx={{ p: 1, mb: 1 }}>
@@ -211,8 +188,8 @@ const InProgressKanbanBoard: React.FC = () => {
                               backgroundColor: "background.paper",
                               opacity: snapshotDraggable.isDragging ? 0.8 : 1,
                               cursor: "pointer",
-                              borderLeft: `4px solid ${theme.palette.primary.main}`, // <-- Add this line for blue border
-                              "&:hover": { boxShadow: 3 }, // Optional: Add hover effect if desired
+                              borderLeft: `4px solid ${theme.palette.primary.main}`,
+                              "&:hover": { boxShadow: 3 },
                             }}
                             onClick={() => handleOpenDetailsDialog(order.id)}
                           >
@@ -223,9 +200,8 @@ const InProgressKanbanBoard: React.FC = () => {
                               {order.partNo}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              {order.description} {/* Or other relevant info */}
+                              {order.description}
                             </Typography>
-                            {/* Add more order details as needed */}
                           </Paper>
                         )}
                       </Draggable>

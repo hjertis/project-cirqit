@@ -1,4 +1,3 @@
-// src/components/layout/Sidebar.tsx
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
@@ -26,13 +25,12 @@ import {
   ExpandMore,
   PeopleAlt as PeopleAltIcon,
   ErrorOutline as FaultIcon,
-  CalendarViewWeek as CalendarViewWeekIcon, // <-- Import an appropriate icon
-  CalendarToday as CalendarTodayIcon, // Example icon
-  ViewKanban as ViewKanbanIcon, // Example icon
+  CalendarViewWeek as CalendarViewWeekIcon,
+  CalendarToday as CalendarTodayIcon,
+  ViewKanban as ViewKanbanIcon,
 } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 
-// Drawer width
 const drawerWidth = 240;
 
 interface SidebarProps {
@@ -67,7 +65,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     {
       text: "Orders",
       icon: <OrdersIcon />,
-      path: "/orders", // Base path for the section
+      path: "/orders",
       children: [
         { text: "All Orders", icon: <OrdersIcon />, path: "/orders" },
         { text: "Create Order", icon: <OrdersIcon />, path: "/orders/create" },
@@ -95,15 +93,15 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     {
       text: "Reports",
       icon: <ReportsIcon />,
-      path: "/reports", // Base path for reports section
+      path: "/reports",
       children: [
-        { text: "Overview", icon: <ReportsIcon />, path: "/reports" }, // Link to the main reports page
-        { text: "Fault Analysis", icon: <FaultIcon />, path: "/reports/fault-analysis" }, // Link to the new chart
+        { text: "Overview", icon: <ReportsIcon />, path: "/reports" },
+        { text: "Fault Analysis", icon: <FaultIcon />, path: "/reports/fault-analysis" },
         {
           text: "Production Dashboard",
           icon: <ReportsIcon />,
           path: "/reports/production-dashboard",
-        }, // Link to the production dashboard
+        },
       ],
     },
     {
@@ -113,7 +111,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     },
     {
       text: "Resources",
-      icon: <PeopleAltIcon />, // or another appropriate icon
+      icon: <PeopleAltIcon />,
       path: "/resources",
     },
   ];
@@ -125,9 +123,8 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     }
   };
 
-  // Function to determine if a submenu should be open based on current path
   useEffect(() => {
-    const currentTopLevelPath = location.pathname.split("/")[1]; // e.g., "orders"
+    const currentTopLevelPath = location.pathname.split("/")[1];
     const parentItem = navItems.find(
       item =>
         item.path === `/${currentTopLevelPath}` || location.pathname.startsWith(item.path + "/")
@@ -136,10 +133,8 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     if (parentItem && parentItem.children) {
       setOpenSubmenu(parentItem.text);
     } else {
-      // Optional: Close other submenus if not in a submenu section
-      // setOpenSubmenu(null);
     }
-  }, [location.pathname, navItems]); // Re-run when path changes
+  }, [location.pathname, navItems]);
 
   const drawer = (
     <div>
@@ -153,7 +148,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                 <ListItem disablePadding>
                   <ListItemButton
                     onClick={() => handleSubmenuToggle(item.text)}
-                    selected={location.pathname.startsWith(item.path)} // Highlight parent if any child is active
+                    selected={location.pathname.startsWith(item.path)}
                     sx={{
                       backgroundColor: location.pathname.startsWith(item.path)
                         ? theme.palette.action.selected
@@ -174,13 +169,13 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                       <ListItemButton
                         key={child.text}
                         onClick={() => handleNavClick(child.path)}
-                        selected={location.pathname === child.path} // Exact match for child selection
+                        selected={location.pathname === child.path}
                         sx={{
-                          pl: 4, // Indent child items
+                          pl: 4,
                           backgroundColor:
                             location.pathname === child.path
                               ? theme.palette.primary.lighter
-                              : "transparent", // Highlight selected child
+                              : "transparent",
                           color:
                             location.pathname === child.path
                               ? theme.palette.primary.main
@@ -190,7 +185,6 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                             backgroundColor: theme.palette.action.hover,
                           },
                           "& .MuiListItemIcon-root": {
-                            // Ensure icon color matches
                             color:
                               location.pathname === child.path
                                 ? theme.palette.primary.main
@@ -203,7 +197,6 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                           primary={child.text}
                           sx={{
                             "& .MuiTypography-root": {
-                              // Target the typography inside ListItemText
                               fontWeight: location.pathname === child.path ? "bold" : "normal",
                             },
                           }}
@@ -217,12 +210,12 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
               <ListItem disablePadding>
                 <ListItemButton
                   onClick={() => handleNavClick(item.path)}
-                  selected={location.pathname === item.path} // Exact match for top-level selection
+                  selected={location.pathname === item.path}
                   sx={{
                     backgroundColor:
                       location.pathname === item.path
                         ? theme.palette.primary.lighter
-                        : "transparent", // Highlight selected top-level
+                        : "transparent",
                     color: location.pathname === item.path ? theme.palette.primary.main : "inherit",
                     fontWeight: location.pathname === item.path ? "bold" : "normal",
                     "&:hover": {
@@ -257,7 +250,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
             selected={location.pathname === "/settings"}
             sx={{
               backgroundColor:
-                location.pathname === "/settings" ? theme.palette.primary.lighter : "transparent", // Highlight settings
+                location.pathname === "/settings" ? theme.palette.primary.lighter : "transparent",
               color: location.pathname === "/settings" ? theme.palette.primary.main : "inherit",
               fontWeight: location.pathname === "/settings" ? "bold" : "normal",
               "&:hover": {
@@ -287,14 +280,13 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
 
   return (
     <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
-      {/* The implementation can be swapped with js to avoid SEO duplication of links. */}
       {isMobile ? (
         <Drawer
           variant="temporary"
           open={open}
           onClose={toggleDrawer}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}
           sx={{
             display: { xs: "block", md: "none" },

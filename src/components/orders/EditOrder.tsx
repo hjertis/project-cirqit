@@ -1,4 +1,3 @@
-// src/components/orders/EditOrder.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -42,7 +41,6 @@ import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
-// Define the form data interface
 interface OrderFormData {
   orderNumber: string;
   description: string;
@@ -58,17 +56,15 @@ interface OrderFormData {
   assignedResourceId?: string;
 }
 
-// Define process template interface
 interface ProcessTemplate {
-  id?: string; // Existing processes will have an ID
+  id?: string;
   type: string;
   name: string;
-  duration: number; // in days
+  duration: number;
   sequence: number;
-  status?: string; // Existing processes will have a status
+  status?: string;
 }
 
-// Interface for Firebase Process
 interface FirebaseProcess {
   id: string;
   workOrderId: string;
@@ -83,34 +79,28 @@ interface FirebaseProcess {
   createdAt: Timestamp;
 }
 
-// Format date as YYYY-MM-DD for input fields
 const formatDateForInput = (date: Date): string => {
   return date.toISOString().split("T")[0];
 };
 
-// Format Timestamp as YYYY-MM-DD for input fields
 const formatTimestampForInput = (timestamp: Timestamp): string => {
   return formatDateForInput(timestamp.toDate());
 };
 
-// Parse date string from input field
 const parseInputDate = (dateString: string): Date => {
   return new Date(dateString);
 };
 
-// Calculate new date by adding days
 const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 };
 
-// Calculate duration in days between two dates
 const calculateDuration = (startDate: Date, endDate: Date): number => {
   return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-// Initial form state - will be populated with order data
 const initialFormData: OrderFormData = {
   orderNumber: "",
   description: "",
@@ -118,23 +108,19 @@ const initialFormData: OrderFormData = {
   quantity: 1,
   status: "Open",
   startDate: formatDateForInput(new Date()),
-  endDate: formatDateForInput(addDays(new Date(), 14)), // 2 weeks from now
+  endDate: formatDateForInput(addDays(new Date(), 14)),
   customer: "",
   priority: "Medium",
   notes: "",
   processes: [],
 };
 
-// Predefined process templates
 const processTypes = STANDARD_PROCESS_NAMES;
 
-// Available statuses
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
 
-// Priority options
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
 
-// Process status options
 const processStatusOptions = ["Not Started", "Pending", "In Progress", "Completed", "Delayed"];
 
 const EditOrder = () => {
@@ -151,7 +137,6 @@ const EditOrder = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loadingResources, setLoadingResources] = useState<boolean>(false);
 
-  // Fetch order and processes data
   useEffect(() => {
     const fetchOrderData = async () => {
       if (!id) {
@@ -161,7 +146,6 @@ const EditOrder = () => {
       }
 
       try {
-        // Fetch order data
         const orderDoc = await getDoc(doc(db, "orders", id));
 
         if (!orderDoc.exists()) {
@@ -172,7 +156,6 @@ const EditOrder = () => {
 
         const orderData = orderDoc.data();
 
-        // Fetch processes for this order
         const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
 
         const processesSnapshot = await getDocs(processesQuery);
@@ -185,11 +168,9 @@ const EditOrder = () => {
           } as FirebaseProcess);
         });
 
-        // Sort processes by sequence
         processesData.sort((a, b) => a.sequence - b.sequence);
         setOriginalProcesses(processesData);
 
-        // Convert processes to form data format
         const processTemplates: ProcessTemplate[] = processesData.map(process => ({
           id: process.id,
           type: process.type,
@@ -199,7 +180,6 @@ const EditOrder = () => {
           status: process.status,
         }));
 
-        // Set form data
         setFormData({
           orderNumber: orderData.orderNumber || id,
           description: orderData.description || "",
@@ -212,7 +192,7 @@ const EditOrder = () => {
           priority: orderData.priority || "Medium",
           notes: orderData.notes || "",
           processes: processTemplates,
-          // Include assignedResourceId if it exists
+
           assignedResourceId: orderData.assignedResourceId || "",
         });
 
@@ -225,27 +205,22 @@ const EditOrder = () => {
       }
     };
 
-    // Add function to fetch resources
     const fetchResources = async () => {
       setLoadingResources(true);
       try {
-        // Only fetch active resources
         const activeResources = await getResources(true);
         setResources(activeResources);
       } catch (err) {
         console.error("Error fetching resources:", err);
-        // We don't set an error state here to avoid blocking the main form
       } finally {
         setLoadingResources(false);
       }
     };
 
-    // Call both fetch functions
     fetchOrderData();
     fetchResources();
   }, [id]);
 
-  // Handle form field changes
   const handleChange =
     (field: keyof OrderFormData) =>
     (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
@@ -255,7 +230,6 @@ const EditOrder = () => {
         [field]: value,
       });
 
-      // Clear validation error when field is edited
       if (validationErrors[field]) {
         setValidationErrors({
           ...validationErrors,
@@ -264,7 +238,6 @@ const EditOrder = () => {
       }
     };
 
-  // Add a new process
   const handleAddProcess = () => {
     const newSequence =
       formData.processes.length > 0 ? Math.max(...formData.processes.map(p => p.sequence)) + 1 : 1;
@@ -284,7 +257,6 @@ const EditOrder = () => {
     });
   };
 
-  // Update a process
   const handleProcessChange = (index: number, field: keyof ProcessTemplate, value: any) => {
     const updatedProcesses = [...formData.processes];
     updatedProcesses[index] = {
@@ -298,11 +270,9 @@ const EditOrder = () => {
     });
   };
 
-  // Remove a process
   const handleRemoveProcess = (index: number) => {
     const updatedProcesses = formData.processes.filter((_, i) => i !== index);
 
-    // Resequence the processes
     const resequencedProcesses = updatedProcesses.map((process, i) => ({
       ...process,
       sequence: i + 1,
@@ -314,7 +284,6 @@ const EditOrder = () => {
     });
   };
 
-  // Validate the form
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -357,11 +326,9 @@ const EditOrder = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Validate the form
     if (!validateForm()) {
       setError("Please fix the validation errors before submitting.");
       return;
@@ -374,14 +341,12 @@ const EditOrder = () => {
       const startDate = parseInputDate(formData.startDate);
       const endDate = parseInputDate(formData.endDate);
 
-      // Get the resource name if a resource is assigned
       let assignedResourceName = "";
       if (formData.assignedResourceId) {
         const assignedResource = resources.find(r => r.id === formData.assignedResourceId);
         assignedResourceName = assignedResource ? assignedResource.name : "";
       }
 
-      // Update the order object
       const orderData = {
         orderNumber: formData.orderNumber,
         description: formData.description,
@@ -394,44 +359,35 @@ const EditOrder = () => {
         priority: formData.priority,
         notes: formData.notes,
         updated: Timestamp.fromDate(new Date()),
-        // Include assigned resource data
+
         assignedResourceId: formData.assignedResourceId || null,
         assignedResourceName: assignedResourceName || null,
       };
 
-      // Update order in Firestore
       await updateDoc(doc(db, "orders", id!), orderData);
 
-      // Handle process updates - first identify existing, updated, and new processes
       const existingProcessIds = originalProcesses.map(p => p.id);
       const currentProcessIds = formData.processes.filter(p => p.id).map(p => p.id) as string[];
 
-      // Find processes to delete (in original but not in current)
       const processesToDelete = existingProcessIds.filter(id => !currentProcessIds.includes(id));
 
-      // Delete processes that were removed
       for (const processId of processesToDelete) {
         await deleteDoc(doc(db, "processes", processId));
       }
 
-      // Update or create processes
       for (const process of formData.processes) {
-        // Calculate process dates based on parent order dates and sequence
         const processStartDate = new Date(startDate);
         const processEndDate = new Date(processStartDate);
 
-        // Find previous processes to determine start date
         const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
         if (previousProcesses.length > 0) {
           const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
           processStartDate.setDate(startDate.getDate() + totalPreviousDuration);
         }
 
-        // Calculate end date based on process duration
         processEndDate.setDate(processStartDate.getDate() + process.duration);
 
         if (process.id) {
-          // Update existing process
           const processRef = doc(db, "processes", process.id);
           await updateDoc(processRef, {
             workOrderId: formData.orderNumber,
@@ -444,7 +400,6 @@ const EditOrder = () => {
             updated: Timestamp.fromDate(new Date()),
           });
         } else {
-          // Create new process
           const processRef = doc(collection(db, "processes"));
           await setDoc(processRef, {
             workOrderId: formData.orderNumber,
@@ -464,9 +419,8 @@ const EditOrder = () => {
 
       setSuccess(true);
 
-      // Navigate back to the orders list after a short delay
       setTimeout(() => {
-        navigate(`/orders`); // Changed from `/orders/${id}`
+        navigate(`/orders`);
       }, 1500);
     } catch (err) {
       console.error("Error updating order:", err);
@@ -476,9 +430,8 @@ const EditOrder = () => {
     }
   };
 
-  // Handle cancel
   const handleCancel = () => {
-    navigate(`/orders`); // Changed from `/orders/${id}`
+    navigate(`/orders`);
   };
 
   if (loading) {
@@ -502,7 +455,6 @@ const EditOrder = () => {
 
   return (
     <Box>
-      {/* Header */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <IconButton onClick={handleCancel} sx={{ mr: 1 }}>
@@ -525,11 +477,9 @@ const EditOrder = () => {
         </Box>
       </Box>
 
-      {/* Form */}
       <Paper sx={{ p: 3 }}>
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            {/* Basic Information */}
             <Grid item xs={12}>
               <Typography variant="h6">Basic Information</Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
@@ -543,7 +493,7 @@ const EditOrder = () => {
                 onChange={handleChange("orderNumber")}
                 helperText={validationErrors.orderNumber}
                 error={!!validationErrors.orderNumber}
-                disabled // Prevent changing the order number once created
+                disabled
               />
             </Grid>
 
@@ -650,7 +600,6 @@ const EditOrder = () => {
               </FormControl>
             </Grid>
 
-            {/* Schedule */}
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Typography variant="h6">Schedule</Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
@@ -686,7 +635,6 @@ const EditOrder = () => {
               />
             </Grid>
 
-            {/* Processes */}
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="h6">Production Processes</Typography>
@@ -791,7 +739,6 @@ const EditOrder = () => {
               </Grid>
             ))}
 
-            {/* Notes */}
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Typography variant="h6">Additional Notes</Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
@@ -809,7 +756,6 @@ const EditOrder = () => {
               />
             </Grid>
 
-            {/* Error messaging */}
             {error && (
               <Grid item xs={12}>
                 <Alert severity="error">{error}</Alert>
@@ -819,7 +765,6 @@ const EditOrder = () => {
         </form>
       </Paper>
 
-      {/* Success message */}
       <Snackbar
         open={success}
         autoHideDuration={5000}

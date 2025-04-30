@@ -1,4 +1,3 @@
-// src/components/orders/EditOrderDialog.tsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -46,7 +45,6 @@ import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
-// Define interfaces
 interface OrderFormData {
   orderNumber: string;
   description: string;
@@ -85,7 +83,6 @@ interface FirebaseProcess {
   createdAt: Timestamp;
 }
 
-// Dialog props
 interface EditOrderDialogProps {
   open: boolean;
   onClose: () => void;
@@ -93,14 +90,12 @@ interface EditOrderDialogProps {
   onOrderUpdated?: () => void;
 }
 
-// Constants
 const processTypes = STANDARD_PROCESS_NAMES;
 
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
 const processStatusOptions = ["Not Started", "Pending", "In Progress", "Completed", "Delayed"];
 
-// Helper functions
 const formatDateForInput = (date: Date): string => {
   return date.toISOString().split("T")[0];
 };
@@ -123,7 +118,6 @@ const calculateDuration = (startDate: Date, endDate: Date): number => {
   return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-// Initial form state
 const initialFormData: OrderFormData = {
   orderNumber: "",
   description: "",
@@ -153,12 +147,10 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
   const [resources, setResources] = useState<Resource[]>([]);
   const [loadingResources, setLoadingResources] = useState<boolean>(false);
 
-  // Fetch order data when dialog opens
   useEffect(() => {
     if (open && orderId) {
       fetchOrderData();
     } else {
-      // Reset form when dialog is closed
       setFormData(initialFormData);
       setOriginalProcesses([]);
       setError(null);
@@ -166,7 +158,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     }
   }, [open, orderId]);
 
-  // Fetch order and process data
   const fetchOrderData = async () => {
     if (!orderId) {
       setError("Order ID is missing");
@@ -176,7 +167,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
 
     setLoading(true);
     try {
-      // Fetch order data
       const orderDoc = await getDoc(doc(db, "orders", orderId));
 
       if (!orderDoc.exists()) {
@@ -187,7 +177,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
 
       const orderData = orderDoc.data();
 
-      // Fetch processes for this order
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderId)
@@ -202,11 +191,9 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         } as FirebaseProcess);
       });
 
-      // Sort processes by sequence
       processesData.sort((a, b) => a.sequence - b.sequence);
       setOriginalProcesses(processesData);
 
-      // Convert processes to form data format
       const processTemplates: ProcessTemplate[] = processesData.map(process => ({
         id: process.id,
         type: process.type,
@@ -216,7 +203,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         status: process.status,
       }));
 
-      // Set form data
       setFormData({
         orderNumber: orderData.orderNumber || orderId,
         description: orderData.description || "",
@@ -232,7 +218,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         assignedResourceId: orderData.assignedResourceId || "",
       });
 
-      // Fetch resources if not already loaded
       if (resources.length === 0) {
         fetchResources();
       }
@@ -246,7 +231,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     }
   };
 
-  // Fetch resources
   const fetchResources = async () => {
     setLoadingResources(true);
     try {
@@ -259,7 +243,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     }
   };
 
-  // Handle form field changes
   const handleChange =
     (field: keyof OrderFormData) =>
     (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
@@ -269,7 +252,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         [field]: value,
       });
 
-      // Clear validation error
       if (validationErrors[field]) {
         setValidationErrors({
           ...validationErrors,
@@ -278,7 +260,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
       }
     };
 
-  // Add a new process
   const handleAddProcess = () => {
     const newSequence =
       formData.processes.length > 0 ? Math.max(...formData.processes.map(p => p.sequence)) + 1 : 1;
@@ -298,7 +279,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     });
   };
 
-  // Update a process
   const handleProcessChange = (index: number, field: keyof ProcessTemplate, value: any) => {
     const updatedProcesses = [...formData.processes];
     updatedProcesses[index] = {
@@ -312,11 +292,9 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     });
   };
 
-  // Remove a process
   const handleRemoveProcess = (index: number) => {
     const updatedProcesses = formData.processes.filter((_, i) => i !== index);
 
-    // Resequence the processes
     const resequencedProcesses = updatedProcesses.map((process, i) => ({
       ...process,
       sequence: i + 1,
@@ -328,7 +306,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     });
   };
 
-  // Validate the form
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -367,7 +344,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     return Object.keys(errors).length === 0;
   };
 
-  // Save the order
   const handleSave = async () => {
     if (!validateForm() || !orderId) {
       return;
@@ -380,14 +356,12 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
       const startDate = parseInputDate(formData.startDate);
       const endDate = parseInputDate(formData.endDate);
 
-      // Get resource name if assigned
       let assignedResourceName = "";
       if (formData.assignedResourceId) {
         const assignedResource = resources.find(r => r.id === formData.assignedResourceId);
         assignedResourceName = assignedResource ? assignedResource.name : "";
       }
 
-      // Update the order
       const orderData = {
         orderNumber: formData.orderNumber,
         description: formData.description,
@@ -404,37 +378,29 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         assignedResourceName: assignedResourceName || null,
       };
 
-      // Update order in Firestore
       await updateDoc(doc(db, "orders", orderId), orderData);
 
-      // Handle process updates
       const existingProcessIds = originalProcesses.map(p => p.id);
       const currentProcessIds = formData.processes.filter(p => p.id).map(p => p.id) as string[];
 
-      // Delete removed processes
       const processesToDelete = existingProcessIds.filter(id => !currentProcessIds.includes(id));
       for (const processId of processesToDelete) {
         await deleteDoc(doc(db, "processes", processId));
       }
 
-      // Update or create processes
       for (const process of formData.processes) {
-        // Calculate process dates
         const processStartDate = new Date(startDate);
         const processEndDate = new Date(processStartDate);
 
-        // Find previous processes to determine start date
         const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
         if (previousProcesses.length > 0) {
           const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
           processStartDate.setDate(startDate.getDate() + totalPreviousDuration);
         }
 
-        // Calculate end date based on process duration
         processEndDate.setDate(processStartDate.getDate() + process.duration);
 
         if (process.id) {
-          // Update existing process
           const processRef = doc(db, "processes", process.id);
           await updateDoc(processRef, {
             workOrderId: formData.orderNumber,
@@ -447,7 +413,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
             updated: Timestamp.fromDate(new Date()),
           });
         } else {
-          // Create new process
           const processRef = doc(collection(db, "processes"));
           await setDoc(processRef, {
             workOrderId: formData.orderNumber,
@@ -467,7 +432,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
 
       setSuccess(true);
 
-      // Call the success callback after a short delay
       setTimeout(() => {
         if (onOrderUpdated) {
           onOrderUpdated();
@@ -521,7 +485,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         ) : (
           <Box sx={{ p: 2 }}>
             <Grid container spacing={3}>
-              {/* Basic Information */}
               <Grid item xs={12}>
                 <Typography variant="h6">Basic Information</Typography>
                 <Divider sx={{ mt: 1, mb: 2 }} />
@@ -642,7 +605,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                 </FormControl>
               </Grid>
 
-              {/* Schedule */}
               <Grid item xs={12} sx={{ mt: 2 }}>
                 <Typography variant="h6">Schedule</Typography>
                 <Divider sx={{ mt: 1, mb: 2 }} />
@@ -678,7 +640,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                 />
               </Grid>
 
-              {/* Processes */}
               <Grid item xs={12} sx={{ mt: 2 }}>
                 <Box
                   sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
@@ -728,8 +689,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                       </Grid>
 
                       <Grid item xs={12} md={6}>
-                        {" "}
-                        {/* Adjusted grid size */}
                         <FormControl fullWidth>
                           <InputLabel>Process Name</InputLabel>
                           <Select
@@ -780,7 +739,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                 </Grid>
               ))}
 
-              {/* Notes */}
               <Grid item xs={12} sx={{ mt: 2 }}>
                 <Typography variant="h6">Additional Notes</Typography>
                 <Divider sx={{ mt: 1, mb: 2 }} />
@@ -798,7 +756,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                 />
               </Grid>
 
-              {/* Error messaging */}
               {error && (
                 <Grid item xs={12}>
                   <Alert severity="error">{error}</Alert>

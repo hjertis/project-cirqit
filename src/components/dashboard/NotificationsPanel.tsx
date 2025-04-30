@@ -1,4 +1,3 @@
-// src/components/dashboard/NotificationsPanel.tsx
 import { useState } from "react";
 import {
   List,

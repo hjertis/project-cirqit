@@ -93,7 +93,6 @@ const DailyScheduler: React.FC = () => {
       const date = start.add(i, "day");
       const dayOfWeek = date.day();
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        // 0 = Sunday, 6 = Saturday
         dates.push(date.toDate());
       }
     }
@@ -216,7 +215,6 @@ const DailyScheduler: React.FC = () => {
     }
   };
 
-  // Navigation Handlers
   const handlePrev = () => {
     setCurrentDate(dayjs(currentDate).subtract(1, viewType).toDate());
   };
@@ -231,7 +229,6 @@ const DailyScheduler: React.FC = () => {
     );
   };
 
-  // --- Dialog Logic ---
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [orderToMove, setOrderToMove] = useState<SchedulerOrder | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<Date | null>(null);
@@ -249,9 +246,7 @@ const DailyScheduler: React.FC = () => {
     setOrderToMove(null);
   };
 
-  // --- Render Logic ---
   if (loading) {
-    // ... (loading spinner) ...
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
         <CircularProgress />
@@ -259,7 +254,6 @@ const DailyScheduler: React.FC = () => {
     );
   }
   if (error) {
-    // ... (error alert) ...
     return (
       <Box sx={{ p: 2 }}>
         <Alert severity="error">{error}</Alert>
@@ -271,8 +265,6 @@ const DailyScheduler: React.FC = () => {
     <React.Fragment>
       <DragDropContext onDragEnd={handleDragEnd}>
         <Box sx={{ p: 2 }}>
-          {/* Header with Navigation */}
-          {/* ... (keep the header Box as provided before) ... */}
           <Box
             sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}
           >
@@ -305,7 +297,6 @@ const DailyScheduler: React.FC = () => {
               </Tooltip>
             </Box>
           </Box>
-          {/* Main Grid */}
           <Paper sx={{ overflowX: "auto", border: `1px solid ${theme.palette.divider}` }}>
             <Box
               sx={{
@@ -313,7 +304,6 @@ const DailyScheduler: React.FC = () => {
                 gridTemplateColumns: `${RESOURCE_HEADER_WIDTH}px repeat(${calendarDates.length}, 1fr)`,
               }}
             >
-              {/* Header Row */}
               <Box
                 sx={{
                   height: 50,
@@ -352,10 +342,8 @@ const DailyScheduler: React.FC = () => {
                 </Box>
               ))}
 
-              {/* Resource Rows */}
               {resources.map(resource => (
                 <React.Fragment key={resource.id}>
-                  {/* Resource Name Cell */}
                   <Box
                     sx={{
                       borderBottom: `1px solid ${theme.palette.divider}`,
@@ -370,7 +358,6 @@ const DailyScheduler: React.FC = () => {
                       {resource.name}
                     </Typography>
                   </Box>
-                  {/* Calendar Cells */}
                   {calendarDates.map(date => {
                     const dateString = dayjs(date).format("YYYY-MM-DD");
                     const droppableId = `${resource.id}|${dateString}`;
@@ -422,8 +409,8 @@ const DailyScheduler: React.FC = () => {
                                       opacity: snapshotDraggable.isDragging ? 0.8 : 1,
                                       cursor: "grab",
                                       overflow: "hidden",
-                                      borderLeft: `4px solid ${theme.palette.primary.main}`, // <-- Add this line for blue border
-                                      "&:hover": { boxShadow: 3 }, // Optional: Add hover effect if desired
+                                      borderLeft: `4px solid ${theme.palette.primary.main}`,
+                                      "&:hover": { boxShadow: 3 },
                                     }}
                                     title={`${order.orderNumber}: ${order.description}`}
                                   >
@@ -484,14 +471,13 @@ const DailyScheduler: React.FC = () => {
           <Button
             onClick={async () => {
               if (!orderToMove || !selectedWeek) return;
-              // Calculate new start and end dates (start of selected week, 8:00)
+
               const newStartDate = dayjs(selectedWeek).hour(8).minute(0).second(0).toDate();
               const newEndDate = calculateEndDate(newStartDate, orderToMove.estimatedHours || 8);
               const newPlannedWeekStartDate = dayjs(newStartDate)
                 .startOf("isoWeek")
                 .format("YYYY-MM-DD");
 
-              // Update Firestore and local state
               await updateDoc(doc(db, "orders", orderToMove.id), {
                 start: Timestamp.fromDate(newStartDate),
                 end: Timestamp.fromDate(newEndDate),
@@ -520,6 +506,6 @@ const DailyScheduler: React.FC = () => {
       </Dialog>
     </React.Fragment>
   );
-}; // <-- This is the single, correct closing brace for the component
+};
 
 export default DailyScheduler;

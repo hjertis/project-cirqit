@@ -1,4 +1,3 @@
-// src/components/dashboard/RecentOrdersTable.tsx
 import { useState, useMemo } from "react";
 import {
   Table,
@@ -57,7 +56,6 @@ export default function RecentOrdersTable({
   const { orders, loading, error, formatDate } = useOrders();
   const navigate = useNavigate();
 
-  // Sorting state
   const [order, setOrder] = useState<"asc" | "desc">(defaultSortDirection);
   const [orderBy, setOrderBy] = useState<string>(defaultSortField);
 
@@ -72,10 +70,8 @@ export default function RecentOrdersTable({
 
   const handleViewOrder = (orderId: string) => {
     if (onViewOrder) {
-      // Use callback if provided
       onViewOrder(orderId);
     } else {
-      // Fall back to navigation if no callback
       navigate(`/orders/${orderId}`);
     }
   };
@@ -84,40 +80,33 @@ export default function RecentOrdersTable({
     navigate(`/orders/${orderId}/edit`);
   };
 
-  // Handle sort request
   const handleRequestSort = (property: string) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
     setOrderBy(property);
   };
 
-  // Helper function to sort by timestamp fields
   const sortByTimestamp = (a: any, b: any, orderBy: string) => {
-    // Handle case where timestamp might be undefined
     if (!a[orderBy] || !b[orderBy]) {
       if (!a[orderBy]) return 1;
       if (!b[orderBy]) return -1;
       return 0;
     }
 
-    // Handle Firestore Timestamp objects
     if (a[orderBy] instanceof Timestamp && b[orderBy] instanceof Timestamp) {
       const aDate = a[orderBy].toDate().getTime();
       const bDate = b[orderBy].toDate().getTime();
       return aDate - bDate;
     }
 
-    // Default fallback for non-timestamp fields
     if (a[orderBy] < b[orderBy]) return -1;
     if (a[orderBy] > b[orderBy]) return 1;
     return 0;
   };
 
-  // Sort orders
   const sortedOrders = useMemo(() => {
     if (!orders.length) return [];
 
-    // Create a copy to avoid mutating the original array
     return [...orders].sort((a, b) => {
       const sortResult = sortByTimestamp(a, b, orderBy);
       return order === "asc" ? sortResult : -sortResult;

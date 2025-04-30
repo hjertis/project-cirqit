@@ -1,4 +1,3 @@
-// src/components/orders/CreateOrder.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -32,7 +31,6 @@ import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
-// Define the form data interface
 interface OrderFormData {
   orderNumber: string;
   description: string;
@@ -48,32 +46,27 @@ interface OrderFormData {
   assignedResourceId?: string;
 }
 
-// Define process template interface
 interface ProcessTemplate {
   type: string;
   name: string;
-  duration: number; // in days
+  duration: number;
   sequence: number;
 }
 
-// Format date as YYYY-MM-DD for input fields
 const formatDateForInput = (date: Date): string => {
   return date.toISOString().split("T")[0];
 };
 
-// Parse date string from input field
 const parseInputDate = (dateString: string): Date => {
   return new Date(dateString);
 };
 
-// Calculate new date by adding days
 const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 };
 
-// Initial form state
 const initialFormData: OrderFormData = {
   orderNumber: "",
   description: "",
@@ -81,30 +74,25 @@ const initialFormData: OrderFormData = {
   quantity: 1,
   status: "Open",
   startDate: formatDateForInput(new Date()),
-  endDate: formatDateForInput(addDays(new Date(), 14)), // 2 weeks from now
+  endDate: formatDateForInput(addDays(new Date(), 14)),
   customer: "",
   priority: "Medium",
   notes: "",
   processes: [],
 };
 
-// Predefined process templates
 const processTypes = STANDARD_PROCESS_NAMES;
 
-// Available statuses
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
 
-// Priority options
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
 
-// Default process templates - Use standard names for 'name'
 const defaultProcessTemplates: ProcessTemplate[] = [
-  { type: "Setup", name: "Setup", duration: 1, sequence: 1 }, // Use standard name
-  { type: "SMT", name: "SMT", duration: 3, sequence: 2 }, // Use standard name
-  { type: "Inspection", name: "Inspection", duration: 2, sequence: 3 }, // Use standard name
-  { type: "Repair/Rework", name: "Repair/Rework", duration: 1, sequence: 4 }, // Use standard name
-  { type: "HMT", name: "HMT", duration: 1, sequence: 5 }, // Use standard name
-  // Add others like Wash, Cut, Test, Delivery if needed as defaults
+  { type: "Setup", name: "Setup", duration: 1, sequence: 1 },
+  { type: "SMT", name: "SMT", duration: 3, sequence: 2 },
+  { type: "Inspection", name: "Inspection", duration: 2, sequence: 3 },
+  { type: "Repair/Rework", name: "Repair/Rework", duration: 1, sequence: 4 },
+  { type: "HMT", name: "HMT", duration: 1, sequence: 5 },
 ];
 
 const CreateOrder = () => {
@@ -126,12 +114,10 @@ const CreateOrder = () => {
     const fetchResources = async () => {
       setLoadingResources(true);
       try {
-        // Only fetch active resources
         const activeResources = await getResources(true);
         setResources(activeResources);
       } catch (err) {
         console.error("Error fetching resources:", err);
-        // Optionally show an error message
       } finally {
         setLoadingResources(false);
       }
@@ -140,7 +126,6 @@ const CreateOrder = () => {
     fetchResources();
   }, []);
 
-  // Handle form field changes
   const handleChange =
     (field: keyof OrderFormData) =>
     (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
@@ -150,7 +135,6 @@ const CreateOrder = () => {
         [field]: value,
       });
 
-      // Clear validation error when field is edited
       if (validationErrors[field]) {
         setValidationErrors({
           ...validationErrors,
@@ -159,7 +143,6 @@ const CreateOrder = () => {
       }
     };
 
-  // Add a new process
   const handleAddProcess = () => {
     const newSequence =
       formData.processes.length > 0 ? Math.max(...formData.processes.map(p => p.sequence)) + 1 : 1;
@@ -178,7 +161,6 @@ const CreateOrder = () => {
     });
   };
 
-  // Update a process
   const handleProcessChange = (index: number, field: keyof ProcessTemplate, value: any) => {
     const updatedProcesses = [...formData.processes];
     updatedProcesses[index] = {
@@ -192,11 +174,9 @@ const CreateOrder = () => {
     });
   };
 
-  // Remove a process
   const handleRemoveProcess = (index: number) => {
     const updatedProcesses = formData.processes.filter((_, i) => i !== index);
 
-    // Resequence the processes
     const resequencedProcesses = updatedProcesses.map((process, i) => ({
       ...process,
       sequence: i + 1,
@@ -208,7 +188,6 @@ const CreateOrder = () => {
     });
   };
 
-  // Auto-generate order number if blank
   const generateOrderNumber = () => {
     if (formData.orderNumber) return;
 
@@ -224,7 +203,6 @@ const CreateOrder = () => {
     });
   };
 
-  // Validate the form
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -267,16 +245,13 @@ const CreateOrder = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Generate order number if not provided
     if (!formData.orderNumber) {
       generateOrderNumber();
     }
 
-    // Validate the form
     if (!validateForm()) {
       setError("Please fix the validation errors before submitting.");
       return;
@@ -289,7 +264,6 @@ const CreateOrder = () => {
       const startDate = parseInputDate(formData.startDate);
       const endDate = parseInputDate(formData.endDate);
 
-      // Create the order object
       const orderData = {
         orderNumber: formData.orderNumber,
         description: formData.description,
@@ -305,32 +279,27 @@ const CreateOrder = () => {
         assignedResourceId: formData.assignedResourceId || null,
       };
 
-      const orderNumber = formData.orderNumber || `ORD-${Date.now()}`; // Example auto-generation
+      const orderNumber = formData.orderNumber || `ORD-${Date.now()}`;
 
-      // Create the order document
       const orderRef = doc(db, "orders", orderNumber);
       await setDoc(orderRef, {
         ...orderData,
-        orderNumber: orderNumber, // Ensure the final orderNumber is saved
+        orderNumber: orderNumber,
         createdAt: Timestamp.fromDate(new Date()),
       });
 
-      // Create processes for the order
       for (const process of formData.processes) {
         const processRef = doc(collection(db, "processes"));
 
-        // Calculate process dates
         const processStartDate = new Date(startDate);
         const processEndDate = new Date(processStartDate);
 
-        // Find previous processes and adjust start date
         const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
         if (previousProcesses.length > 0) {
           const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
           processStartDate.setDate(startDate.getDate() + totalPreviousDuration);
         }
 
-        // Set end date based on duration
         processEndDate.setDate(processStartDate.getDate() + process.duration);
 
         await setDoc(processRef, {
@@ -350,9 +319,8 @@ const CreateOrder = () => {
 
       setSuccess(true);
 
-      // Navigate back to orders list after a delay
       setTimeout(() => {
-        navigate(`/orders`); // Changed from `/orders/${orderNumber}`
+        navigate(`/orders`);
       }, 1500);
     } catch (err) {
       console.error("Error creating order:", err);
@@ -362,14 +330,12 @@ const CreateOrder = () => {
     }
   };
 
-  // Handle cancel
   const handleCancel = () => {
     navigate("/orders");
   };
 
   return (
     <Box>
-      {/* Header */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <IconButton onClick={handleCancel} sx={{ mr: 1 }}>
@@ -392,11 +358,9 @@ const CreateOrder = () => {
         </Box>
       </Box>
 
-      {/* Form */}
       <Paper sx={{ p: 3 }}>
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            {/* Basic Information */}
             <Grid item xs={12}>
               <Typography variant="h6">Basic Information</Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
@@ -524,7 +488,6 @@ const CreateOrder = () => {
               </FormControl>
             </Grid>
 
-            {/* Schedule */}
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Typography variant="h6">Schedule</Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
@@ -560,7 +523,6 @@ const CreateOrder = () => {
               />
             </Grid>
 
-            {/* Processes */}
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="h6">Production Processes</Typography>
@@ -606,19 +568,15 @@ const CreateOrder = () => {
                       <FormControl fullWidth>
                         <InputLabel>Process Name</InputLabel>
                         <Select
-                          value={process.name} // Bind to process.name
-                          onChange={e => handleProcessChange(index, "name", e.target.value)} // Update process.name
+                          value={process.name}
+                          onChange={e => handleProcessChange(index, "name", e.target.value)}
                           label="Process Name"
                         >
-                          {STANDARD_PROCESS_NAMES.map(
-                            (
-                              name // Use standard names for options
-                            ) => (
-                              <MenuItem key={name} value={name}>
-                                {name}
-                              </MenuItem>
-                            )
-                          )}
+                          {STANDARD_PROCESS_NAMES.map(name => (
+                            <MenuItem key={name} value={name}>
+                              {name}
+                            </MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     </Grid>
@@ -640,7 +598,6 @@ const CreateOrder = () => {
               </Grid>
             ))}
 
-            {/* Notes */}
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Typography variant="h6">Additional Notes</Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
@@ -658,7 +615,6 @@ const CreateOrder = () => {
               />
             </Grid>
 
-            {/* Error messaging */}
             {error && (
               <Grid item xs={12}>
                 <Alert severity="error">{error}</Alert>
@@ -668,7 +624,6 @@ const CreateOrder = () => {
         </form>
       </Paper>
 
-      {/* Success message */}
       <Snackbar
         open={success}
         autoHideDuration={5000}

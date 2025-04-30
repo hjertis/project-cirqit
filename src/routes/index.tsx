@@ -25,6 +25,7 @@ import DailySchedulerPage from "../pages/DailySchedulerPage";
 import MigratePlannedWeekStartDateButton from "../pages/admin/MigrateDates";
 import KanbanPage from "../pages/KanbanPage";
 import StandardizeOrderProcessesPage from "../pages/admin/StandardizeOrderProcessesPage.tsx";
+import StandardizeProcessesCollectionPage from "../pages/admin/StandardizeProcessesCollectionPage.tsx";
 
 /**
  * Main application routes configuration
@@ -88,8 +89,8 @@ const AppRoutes = () => {
         />
         <Route path="/admin/migrate-dates" element={<MigratePlannedWeekStartDateButton />} />
         <Route
-          path="/admin/standardize-order-processes"
-          element={<StandardizeOrderProcessesPage />}
+          path="/admin/standardize-process-collection"
+          element={<StandardizeProcessesCollectionPage />}
         />
         {/* Settings */}
         <Route path="/settings" element={<div>Settings Page</div>} />

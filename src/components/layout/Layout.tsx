@@ -1,4 +1,3 @@
-// src/components/layout/Layout.tsx
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Box, Toolbar, Container } from "@mui/material";
@@ -26,7 +25,7 @@ const Layout = () => {
           overflow: "auto",
         }}
       >
-        <Toolbar /> {/* This adds space below the app bar */}
+        <Toolbar />
         <Container
           maxWidth={false}
           sx={{

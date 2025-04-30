@@ -1,4 +1,3 @@
-// src/components/orders/ImportOrdersDialog.tsx
 import { useState, useRef } from "react";
 import {
   Dialog,
@@ -32,7 +31,6 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
   const [results, setResults] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Progress bar animation
   useState(() => {
     const interval = setInterval(() => {
       if (loading) {
@@ -48,7 +46,6 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
     return () => clearInterval(interval);
   });
 
-  // Reset progress when loading stops
   useState(() => {
     if (!loading) {
       setProgress(100);
@@ -99,7 +96,6 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
         );
       }
 
-      // Close dialog after successful import
       setTimeout(() => {
         onClose();
         setFile(null);
@@ -124,7 +120,6 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
     }
   };
 
-  // Count finished orders in the CSV
   const getFinishedOrdersCount = () => {
     return results.filter(row => row.Status === "Finished" || row.Status === "Done").length;
   };

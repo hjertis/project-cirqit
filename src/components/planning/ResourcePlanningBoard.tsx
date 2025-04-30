@@ -1,4 +1,3 @@
-// src/components/planning/ResourcePlanningBoard.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
@@ -19,10 +18,10 @@ import {
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import dayjs from "dayjs";
 import weekOfYear from "dayjs/plugin/weekOfYear";
-import isoWeek from "dayjs/plugin/isoWeek"; // Needed for week calculations
-import isBetween from "dayjs/plugin/isBetween"; // Needed for date checks later if implemented
-import { getResources, Resource } from "../../services/resourceService"; // Use your actual service
-import OrderDetailsDialog from "../orders/OrderDetailsDialog"; // Import the dialog
+import isoWeek from "dayjs/plugin/isoWeek";
+import isBetween from "dayjs/plugin/isBetween";
+import { getResources, Resource } from "../../services/resourceService";
+import OrderDetailsDialog from "../orders/OrderDetailsDialog";
 import {
   collection,
   query,
@@ -40,36 +39,30 @@ dayjs.extend(weekOfYear);
 dayjs.extend(isoWeek);
 dayjs.extend(isBetween);
 
-// --- Define Types ---
-
-// Interface for the planning-specific order data we need
 interface PlanningOrder {
   id: string;
   orderNumber: string;
   description: string;
-  estimatedHours: number; // Crucial for load calculation
+  estimatedHours: number;
   assignedResourceId: string | null;
-  plannedWeekStartDate: string; // Store week start date as YYYY-MM-DD string
+  plannedWeekStartDate: string;
   priority?: string;
-  // Add other fields needed for display or tooltips if necessary
+
   partNo?: string;
   status?: string;
 }
 
-// Extend the Resource type to include calculated weekly load
 interface ResourceWithLoad extends Resource {
-  weeklyLoad: { [weekStartDate: string]: number }; // Key: YYYY-MM-DD, Value: total hours
+  weeklyLoad: { [weekStartDate: string]: number };
 }
 
-// --- Constants ---
-const WEEKS_TO_SHOW = 6; // Number of weeks to display
-const HOURS_PER_DAY = 7.4; // Standard 8-hour workday
-const HOURS_PER_WEEK = 37; // Standard 40-hour workweek
+const WEEKS_TO_SHOW = 6;
+const HOURS_PER_DAY = 7.4;
+const HOURS_PER_WEEK = 37;
 const RESOURCE_HEADER_WIDTH = "220px";
 const WEEK_CELL_WIDTH = "250px";
-const DEFAULT_ESTIMATED_HOURS = HOURS_PER_DAY; // Default to one workday if not specified
+const DEFAULT_ESTIMATED_HOURS = HOURS_PER_DAY;
 
-// --- Helper Functions ---
 const getPriorityColor = (priority: string = "Medium"): string => {
   switch (priority?.toLowerCase()) {
     case "critical":
@@ -83,7 +76,7 @@ const getPriorityColor = (priority: string = "Medium"): string => {
     case "low":
       return "#2ecc71";
     default:
-      return "#95a5a6"; // Default grey for unknown/undefined
+      return "#95a5a6";
   }
 };
 
@@ -95,20 +88,16 @@ const getPriorityColor = (priority: string = "Medium"): string => {
  */
 const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<PlanningOrder[]> => {
   try {
-    // Query orders within the date range
     const ordersRef = collection(db, "orders");
 
-    // Create Firebase timestamp objects for query
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
 
-    // Query orders that have start or end dates within our range
-    // We need both conditions to catch orders that span across our range
     const q = query(
       ordersRef,
-      where("status", "in", ["Open", "Released", "In Progress", "Delayed", "Firm Planned"]), // Only active orders
+      where("status", "in", ["Open", "Released", "In Progress", "Delayed", "Firm Planned"]),
       orderBy("start", "asc"),
-      limit(200) // Reasonable limit for performance
+      limit(200)
     );
 
     const querySnapshot = await getDocs(q);
@@ -117,7 +106,6 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
     querySnapshot.forEach(doc => {
       const orderData = doc.data();
 
-      // Skip orders that are entirely outside our date range
       if (
         (orderData.end && orderData.end.toDate() < startDate) ||
         (orderData.start && orderData.start.toDate() > endDate)
@@ -125,45 +113,32 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
         return;
       }
 
-      // Convert the order's start date to the start of its week for planning
       const orderStartDate = orderData.start ? orderData.start.toDate() : new Date();
       const weekStartDate = dayjs(orderStartDate).startOf("isoWeek").format("YYYY-MM-DD");
 
-      // Calculate estimated hours from order metadata
-      // You might need to adjust this logic based on your actual data model
-      let estimatedHours = DEFAULT_ESTIMATED_HOURS; // Default to one workday
+      let estimatedHours = DEFAULT_ESTIMATED_HOURS;
 
-      // If order has a custom estimatedHours field, use that
       if (orderData.estimatedHours) {
         estimatedHours = orderData.estimatedHours;
-      }
-      // If we have start and end dates, calculate duration in workdays * 8 hours
-      else if (orderData.start && orderData.end) {
-        // Calculate working days between dates (excluding weekends)
+      } else if (orderData.start && orderData.end) {
         const startDate = orderData.start.toDate();
         const endDate = orderData.end.toDate();
         let workDays = 0;
         let currentDate = new Date(startDate);
 
         while (currentDate <= endDate) {
-          // Only count Monday - Friday (0 = Sunday, 6 = Saturday)
           const dayOfWeek = currentDate.getDay();
           if (dayOfWeek !== 0 && dayOfWeek !== 6) {
             workDays++;
           }
-          // Move to next day
+
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
-        // Calculate hours based on 8-hour workdays, minimum 1 day
         estimatedHours = Math.max(workDays, 1) * HOURS_PER_DAY;
-        // Round to whole numbers for cleaner display
+
         estimatedHours = Math.round(estimatedHours);
-      }
-      // Or if order has a quantity field, we could use that to estimate hours
-      else if (orderData.quantity) {
-        // Simple calculation - adjust as needed for your business logic
-        // Each item takes 2 hours, minimum of 1 hour
+      } else if (orderData.quantity) {
         estimatedHours = Math.max(orderData.quantity, 1) * 2;
       }
 
@@ -185,12 +160,12 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
     return planningOrders;
   } catch (error) {
     console.error("Error fetching planning data:", error);
-    throw error; // Re-throw to let the caller handle it
+    throw error;
   }
 };
 
 const ResourcePlanningBoard: React.FC = () => {
-  const theme = useTheme(); // Access theme for colors
+  const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
   const [resources, setResources] = useState<ResourceWithLoad[]>([]);
   const [orders, setOrders] = useState<PlanningOrder[]>([]);
@@ -199,7 +174,6 @@ const ResourcePlanningBoard: React.FC = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  // Calculate the start dates of the weeks to display
   const visibleWeeks = useMemo(
     () =>
       Array.from({ length: WEEKS_TO_SHOW }).map((_, i) =>
@@ -208,41 +182,34 @@ const ResourcePlanningBoard: React.FC = () => {
     [currentWeekStart]
   );
 
-  // --- Data Fetching ---
-
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch Resources
-      const fetchedResources = await getResources(true); // Get only active resources
+      const fetchedResources = await getResources(true);
 
-      // 2. Fetch Orders for the visible weeks + buffer
       const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("isoWeek").toDate();
       const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("isoWeek").toDate();
-      const fetchedOrders = await fetchPlanningData(startDate, endDate); // Fetch orders from Firebase
+      const fetchedOrders = await fetchPlanningData(startDate, endDate);
 
-      // Filter orders to only include those within the visible weeks
       const filteredOrders = fetchedOrders.filter(order => {
         const orderDate = dayjs(order.plannedWeekStartDate);
-        return orderDate.isBetween(dayjs(startDate), dayjs(endDate), null, "[]"); // Inclusive of start and end
+        return orderDate.isBetween(dayjs(startDate), dayjs(endDate), null, "[]");
       });
 
-      // Set the filtered orders to state
       setOrders(filteredOrders);
 
-      // 3. Calculate Load and add to resources
       const resourcesWithLoad = fetchedResources.map(res => {
         const weeklyLoad: { [weekStartDate: string]: number } = {};
         visibleWeeks.forEach(weekDate => {
           const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
-          // Calculate load based on orders assigned to this resource AND this week
+
           const load = fetchedOrders
             .filter(o => o.assignedResourceId === res.id && o.plannedWeekStartDate === weekStartStr)
-            .reduce((sum, o) => sum + (o.estimatedHours || 0), 0); // Use estimatedHours
+            .reduce((sum, o) => sum + (o.estimatedHours || 0), 0);
           weeklyLoad[weekStartStr] = load;
         });
-        return { ...res, weeklyLoad }; // Add the calculated load object to the resource
+        return { ...res, weeklyLoad };
       });
 
       setResources(resourcesWithLoad);
@@ -258,10 +225,8 @@ const ResourcePlanningBoard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWeekStart]); // Re-fetch data when the displayed week changes
+  }, [currentWeekStart]);
 
-  // --- Event Handlers ---
   const handlePrevWeek = () => {
     setCurrentWeekStart(dayjs(currentWeekStart).subtract(1, "week").toDate());
   };
@@ -279,9 +244,8 @@ const ResourcePlanningBoard: React.FC = () => {
     setCurrentWeekStart(dayjs().startOf("isoWeek").toDate());
   };
 
-  // --- Render Helpers ---
   const getLoadColor = (load: number, capacity: number): string => {
-    if (capacity <= 0) return theme.palette.text.disabled; // No capacity defined
+    if (capacity <= 0) return theme.palette.text.disabled;
     const percentage = (load / capacity) * 100;
     if (percentage > 100) return "#b71c1c";
     if (percentage > 85) return "#b26a00";
@@ -293,16 +257,15 @@ const ResourcePlanningBoard: React.FC = () => {
     const percentage = (load / capacity) * 100;
     if (percentage > 100) return "#ffebee";
     if (percentage > 85) return "#fff3e0";
-    return "transparent"; // Use 'transparent' or a subtle success color if needed
+    return "transparent";
   };
 
   const getOrderBackgroundColor = (status?: string, isDragging?: boolean): string => {
     if (isDragging) return theme.palette.action.selected;
-    if (status === "Firm Planned") return "#e3f2fd"; // Light blue (Material UI blue[50])
+    if (status === "Firm Planned") return "#e3f2fd";
     return "background.paper";
   };
 
-  // --- Main Render ---
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
@@ -317,7 +280,6 @@ const ResourcePlanningBoard: React.FC = () => {
 
   return (
     <Paper sx={{ p: 2, overflow: "hidden", width: "100%" }}>
-      {/* Header with Navigation */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h6">Resource Planning Board</Typography>
         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -344,7 +306,6 @@ const ResourcePlanningBoard: React.FC = () => {
             </Tooltip>
           </IconButton>
         </Box>
-        {/* Add Filter/Zoom controls here if needed */}
       </Box>
 
       <DragDropContext
@@ -366,7 +327,7 @@ const ResourcePlanningBoard: React.FC = () => {
               plannedWeekStartDate: newPlannedWeekStartDate,
             });
             console.log("Firestore updated!");
-            // Refetch orders after update
+
             fetchData();
           } catch (err) {
             setError("Failed to update order in Firestore.");
@@ -380,7 +341,6 @@ const ResourcePlanningBoard: React.FC = () => {
               minWidth: `calc(${RESOURCE_HEADER_WIDTH} + ${WEEKS_TO_SHOW} * ${WEEK_CELL_WIDTH})`,
             }}
           >
-            {/* Header Row */}
             <Box
               sx={{
                 width: RESOURCE_HEADER_WIDTH,
@@ -416,13 +376,11 @@ const ResourcePlanningBoard: React.FC = () => {
               </Box>
             ))}
           </Box>
-          {/* Resource Rows */}
           {resources.map(resource => (
             <Box
               key={resource.id}
               sx={{ display: "flex", borderBottom: 1, borderColor: "divider", minHeight: "100px" }}
             >
-              {/* Resource Name Cell */}
               <Box
                 sx={{
                   width: RESOURCE_HEADER_WIDTH,
@@ -461,7 +419,6 @@ const ResourcePlanningBoard: React.FC = () => {
                   {resource.name}
                 </Typography>
               </Box>
-              {/* Weekly Cells */}
               {visibleWeeks.map(weekDate => {
                 const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
                 const weeklyCapacity = resource.capacity ? resource.capacity * 5 : HOURS_PER_WEEK;
@@ -497,7 +454,6 @@ const ResourcePlanningBoard: React.FC = () => {
                           minHeight: "100px",
                         }}
                       >
-                        {/* Load Indicator */}
                         <Box
                           sx={{
                             display: "flex",
@@ -516,7 +472,6 @@ const ResourcePlanningBoard: React.FC = () => {
                             {Math.round(currentLoad)}h / {weeklyCapacity}h ({loadPercentage}%)
                           </Typography>
                         </Box>
-                        {/* Order Cards */}
                         {cellOrders.length > 0 ? (
                           cellOrders.map((order, index) => (
                             <Draggable draggableId={String(order.id)} index={index} key={order.id}>
@@ -593,7 +548,6 @@ const ResourcePlanningBoard: React.FC = () => {
               })}
             </Box>
           ))}
-          {/* Unassigned Orders Section */}
           <Box
             sx={{
               display: "flex",
@@ -719,7 +673,6 @@ const ResourcePlanningBoard: React.FC = () => {
         </Box>
       </DragDropContext>
 
-      {/* Order Details Dialog */}
       <OrderDetailsDialog
         open={detailsDialogOpen}
         onClose={() => setDetailsDialogOpen(false)}

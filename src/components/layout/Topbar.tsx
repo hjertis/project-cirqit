@@ -1,4 +1,3 @@
-// src/components/layout/Topbar.tsx
 import { useState } from "react";
 import {
   AppBar,
@@ -60,7 +59,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   color: "inherit",
   "& .MuiInputBase-input": {
     padding: theme.spacing(1, 1, 1, 0),
-    // vertical padding + font size from searchIcon
+
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
     transition: theme.transitions.create("width"),
     width: "100%",
@@ -102,14 +101,12 @@ const TopBar = ({ open, toggleDrawer }: TopBarProps) => {
   const handleLogout = async () => {
     try {
       await logout();
-      // No need to navigate - protected route will redirect to login
     } catch (error) {
       console.error("Logout error:", error);
     }
     handleMenuClose();
   };
 
-  // Get user initials for avatar
   const getUserInitials = (): string => {
     if (!currentUser?.displayName) {
       return currentUser?.email?.charAt(0).toUpperCase() || "U";

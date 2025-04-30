@@ -1,4 +1,3 @@
-// Updated OptimizedPrintableWorkOrder component with print fixes
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -39,7 +38,7 @@ interface Process {
 interface OptimizedPrintableWorkOrderProps {
   open: boolean;
   onClose: () => void;
-  order: any; // Order details
+  order: any;
   processes: Process[];
   printMode?: boolean;
 }
@@ -49,22 +48,21 @@ const getStatusColor = (status: string): string => {
     case "Open":
     case "Released":
     case "Pending":
-      return "#3f51b5"; // primary
+      return "#3f51b5";
     case "In Progress":
-      return "#19857b"; // secondary
+      return "#19857b";
     case "Done":
     case "Finished":
     case "Completed":
-      return "#4caf50"; // success
+      return "#4caf50";
     case "Delayed":
     case "Not Started":
-      return "#f44336"; // error
+      return "#f44336";
     default:
-      return "#9e9e9e"; // default
+      return "#9e9e9e";
   }
 };
 
-// Format date function
 const formatDate = (timestamp: Timestamp | undefined) => {
   if (!timestamp || !timestamp.toDate) return "N/A";
   const date = timestamp.toDate();
@@ -84,7 +82,6 @@ const OptimizedPrintableWorkOrder = ({
 }: OptimizedPrintableWorkOrderProps) => {
   const [processProgress, setProcessProgress] = useState<Record<string, number>>({});
 
-  // Initialize processProgress state based on processes
   useEffect(() => {
     const initialProgress: Record<string, number> = {};
     processes.forEach(process => {
@@ -166,7 +163,6 @@ const OptimizedPrintableWorkOrder = ({
 
           <Divider sx={{ mb: 1 }} />
 
-          {/* Order Details - More compact grid layout */}
           <Box sx={{ px: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
               Order Details
@@ -286,7 +282,6 @@ const OptimizedPrintableWorkOrder = ({
               </Grid>
             </Grid>
 
-            {/* Process Tracking */}
             <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
               Process Tracking
             </Typography>
@@ -297,7 +292,6 @@ const OptimizedPrintableWorkOrder = ({
               isPrintMode={printMode}
             />
 
-            {/* Quality Verification */}
             <Box className="quality-verification-section">
               <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 2, mb: 0.5 }}>
                 Quality Verification
@@ -307,7 +301,6 @@ const OptimizedPrintableWorkOrder = ({
               </Box>
             </Box>
 
-            {/* Notes Section */}
             <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 2, mb: 0.5 }}>
               Additional Notes
             </Typography>

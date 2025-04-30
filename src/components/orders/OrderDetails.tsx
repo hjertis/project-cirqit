@@ -1,4 +1,3 @@
-// src/components/orders/OrderDetails.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -109,7 +108,6 @@ interface Process {
   progress: number;
 }
 
-// Available resources for assignment
 const availableResources = [
   "John Doe",
   "Jane Smith",
@@ -119,7 +117,6 @@ const availableResources = [
   "Emma Davis",
 ];
 
-// Status options for processes
 const processStatusOptions = ["Not Started", "Pending", "In Progress", "Completed", "Delayed"];
 
 const getStatusColor = (status: string) => {
@@ -151,23 +148,19 @@ const OrderDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
 
-  // State for resource assignment modal
   const [assignResourceOpen, setAssignResourceOpen] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState<Process | null>(null);
   const [selectedResource, setSelectedResource] = useState<string>("");
   const [assignLoading, setAssignLoading] = useState(false);
 
-  // State for status update modal
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [statusNotes, setStatusNotes] = useState<string>("");
   const [updateLoading, setUpdateLoading] = useState(false);
 
-  // State for success message
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  // State for archiving
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveResult, setArchiveResult] = useState<string | null>(null);
 
@@ -177,7 +170,6 @@ const OrderDetails = () => {
 
       setLoading(true);
       try {
-        // Fetch order details
         const orderDoc = await getDoc(doc(db, "orders", id));
 
         if (!orderDoc.exists()) {
@@ -188,7 +180,6 @@ const OrderDetails = () => {
 
         setOrder({ id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder);
 
-        // Fetch order processes
         const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
 
         const processesSnapshot = await getDocs(processesQuery);
@@ -201,7 +192,6 @@ const OrderDetails = () => {
           } as Process);
         });
 
-        // Sort processes by sequence
         processesData.sort((a, b) => a.sequence - b.sequence);
         setProcesses(processesData);
 
@@ -255,32 +245,27 @@ const OrderDetails = () => {
     window.print();
   };
 
-  // Handle opening the resource assignment modal
   const handleAssignResourceClick = () => {
     setAssignResourceOpen(true);
   };
 
-  // Handle resource selection in the modal
   const handleResourceSelect = (processId: string, resource: string) => {
     setSelectedProcess(processes.find(p => p.id === processId) || null);
     setSelectedResource(resource);
   };
 
-  // Handle saving the resource assignment
   const handleSaveAssignment = async () => {
     if (!selectedProcess || !selectedResource) return;
 
     setAssignLoading(true);
 
     try {
-      // Update the process document in Firestore
       const processRef = doc(db, "processes", selectedProcess.id);
       await updateDoc(processRef, {
         assignedResource: selectedResource,
         updated: Timestamp.fromDate(new Date()),
       });
 
-      // Update the local state
       setProcesses(
         processes.map(process =>
           process.id === selectedProcess.id
@@ -289,11 +274,9 @@ const OrderDetails = () => {
         )
       );
 
-      // Show success message
       setSuccessMessage(`Resource ${selectedResource} assigned to process ${selectedProcess.name}`);
       setSnackbarOpen(true);
 
-      // Close the modal
       setAssignResourceOpen(false);
       setSelectedProcess(null);
       setSelectedResource("");
@@ -305,25 +288,21 @@ const OrderDetails = () => {
     }
   };
 
-  // Handle opening the status update modal
   const handleUpdateStatusClick = () => {
     setUpdateStatusOpen(true);
   };
 
-  // Handle status selection in the modal
   const handleStatusSelect = (processId: string, status: string) => {
     setSelectedProcess(processes.find(p => p.id === processId) || null);
     setSelectedStatus(status);
   };
 
-  // Handle saving the status update
   const handleSaveStatus = async () => {
     if (!selectedProcess || !selectedStatus) return;
 
     setUpdateLoading(true);
 
     try {
-      // Update the process document in Firestore
       const processRef = doc(db, "processes", selectedProcess.id);
 
       const updates: Record<string, any> = {
@@ -331,12 +310,9 @@ const OrderDetails = () => {
         updated: Timestamp.fromDate(new Date()),
       };
 
-      // If moving to completed, set progress to 100%
       if (selectedStatus === "Completed") {
         updates.progress = 100;
-      }
-      // If moving to In Progress from an earlier state, set progress to a default value
-      else if (
+      } else if (
         selectedStatus === "In Progress" &&
         (selectedProcess.status === "Not Started" || selectedProcess.status === "Pending")
       ) {
@@ -345,7 +321,6 @@ const OrderDetails = () => {
 
       await updateDoc(processRef, updates);
 
-      // Update the local state
       setProcesses(
         processes.map(process =>
           process.id === selectedProcess.id
@@ -358,11 +333,9 @@ const OrderDetails = () => {
         )
       );
 
-      // Show success message
       setSuccessMessage(`Status updated to ${selectedStatus} for process ${selectedProcess.name}`);
       setSnackbarOpen(true);
 
-      // Close the modal
       setUpdateStatusOpen(false);
       setSelectedProcess(null);
       setSelectedStatus("");
@@ -375,7 +348,6 @@ const OrderDetails = () => {
     }
   };
 
-  // Handle closing the snackbar
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
   };
@@ -402,7 +374,6 @@ const OrderDetails = () => {
   const handleArchiveOrder = async () => {
     if (!order) return;
 
-    // Show a confirmation dialog
     const confirm = window.confirm(
       `Are you sure you want to archive order ${order.orderNumber}? This will move it to the archive collection.`
     );
@@ -417,7 +388,7 @@ const OrderDetails = () => {
 
       if (result.success) {
         setArchiveResult(`Successfully archived: ${result.message}`);
-        // Redirect to the orders list after a short delay
+
         setTimeout(() => {
           navigate("/orders");
         }, 2000);
@@ -436,7 +407,6 @@ const OrderDetails = () => {
   const handleRestoreOrder = async () => {
     if (!order) return;
 
-    // Show a confirmation dialog
     const confirm = window.confirm(
       `Are you sure you want to restore order ${order.orderNumber} from the archive? This will move it back to active orders.`
     );
@@ -451,7 +421,7 @@ const OrderDetails = () => {
 
       if (result.success) {
         setArchiveResult(`Successfully restored: ${result.message}`);
-        // Redirect to the orders list after a short delay
+
         setTimeout(() => {
           navigate("/orders");
         }, 2000);
@@ -469,7 +439,6 @@ const OrderDetails = () => {
 
   return (
     <Box>
-      {/* Header with actions */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -495,7 +464,6 @@ const OrderDetails = () => {
         </Box>
       </Paper>
 
-      {/* Order summary cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={6}>
           <Card>
@@ -639,7 +607,6 @@ const OrderDetails = () => {
         </Grid>
       </Grid>
 
-      {/* Tabs for order details, processes, etc. */}
       <Paper>
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="order details tabs">
@@ -817,7 +784,7 @@ const OrderDetails = () => {
                 const processId = e.target.value as string;
                 const process = processes.find(p => p.id === processId);
                 setSelectedProcess(process || null);
-                // Pre-select current resource if any
+
                 if (process && process.assignedResource) {
                   setSelectedResource(process.assignedResource);
                 } else {
@@ -889,7 +856,7 @@ const OrderDetails = () => {
                 const processId = e.target.value as string;
                 const process = processes.find(p => p.id === processId);
                 setSelectedProcess(process || null);
-                // Pre-select current status
+
                 if (process) {
                   setSelectedStatus(process.status);
                 } else {

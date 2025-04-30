@@ -1,42 +1,41 @@
-// src/components/dashboard/ResourceUtilizationChart.tsx
-import { Box } from '@mui/material';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+import { Box } from "@mui/material";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
-  TooltipProps
-} from 'recharts';
-import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+  TooltipProps,
+} from "recharts";
+import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
-// Sample data
 const data = [
-  { name: 'John D.', utilization: 85 },
-  { name: 'Sarah M.', utilization: 65 },
-  { name: 'Mike T.', utilization: 90 },
-  { name: 'Emma R.', utilization: 40 },
-  { name: 'Alex S.', utilization: 75 },
+  { name: "John D.", utilization: 85 },
+  { name: "Sarah M.", utilization: 65 },
+  { name: "Mike T.", utilization: 90 },
+  { name: "Emma R.", utilization: 40 },
+  { name: "Alex S.", utilization: 75 },
 ];
 
-// Custom tooltip
 const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
   if (active && payload && payload.length) {
     return (
       <Box
         sx={{
-          backgroundColor: 'background.paper',
+          backgroundColor: "background.paper",
           p: 1,
           border: 1,
-          borderColor: 'divider',
+          borderColor: "divider",
           borderRadius: 1,
           boxShadow: 1,
         }}
       >
-        <p><strong>{label}</strong></p>
+        <p>
+          <strong>{label}</strong>
+        </p>
         <p>{`Utilization: ${payload[0].value}%`}</p>
       </Box>
     );
@@ -46,7 +45,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameT
 
 export default function ResourceUtilizationChart() {
   return (
-    <Box sx={{ width: '100%', height: 300 }}>
+    <Box sx={{ width: "100%", height: 300 }}>
       <ResponsiveContainer>
         <BarChart
           data={data}

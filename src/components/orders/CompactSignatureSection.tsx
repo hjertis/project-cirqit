@@ -1,4 +1,3 @@
-// Updated src/components/orders/CompactSignatureSection.tsx
 import { Grid, Typography, Paper, Box } from "@mui/material";
 
 interface CompactSignatureSectionProps {

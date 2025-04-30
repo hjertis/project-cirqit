@@ -1,4 +1,3 @@
-// src/components/planning/ResourceCalendarView.tsx
 import { useState, useEffect, useMemo } from "react";
 import {
   Box,
@@ -44,11 +43,9 @@ import isBetween from "dayjs/plugin/isBetween";
 import weekOfYear from "dayjs/plugin/weekOfYear";
 import OrderDetailsDialog from "../orders/OrderDetailsDialog";
 
-// Extend dayjs
 dayjs.extend(isBetween);
 dayjs.extend(weekOfYear);
 
-// Use the Resource type from the resource service
 type Resource = ResourceType;
 
 interface Order {
@@ -59,7 +56,7 @@ interface Order {
   start: Timestamp;
   end: Timestamp;
   priority?: string;
-  assignedResourceId?: string; // ID of the assigned resource
+  assignedResourceId?: string;
 }
 
 interface CalendarViewProps {
@@ -67,21 +64,20 @@ interface CalendarViewProps {
   defaultDate?: Date;
 }
 
-// Helper functions
 const getStatusColor = (status: string): string => {
   switch (status) {
     case "Open":
     case "Released":
-      return "#3f51b5"; // primary
+      return "#3f51b5";
     case "In Progress":
-      return "#19857b"; // secondary
+      return "#19857b";
     case "Done":
     case "Finished":
-      return "#4caf50"; // success
+      return "#4caf50";
     case "Delayed":
-      return "#f44336"; // error
+      return "#f44336";
     default:
-      return "#9e9e9e"; // default
+      return "#9e9e9e";
   }
 };
 
@@ -115,29 +111,23 @@ const ResourceCalendarView = ({
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
 
-  // View configuration
-  const [cellHeight, setCellHeight] = useState(100); // Height of a calendar cell in pixels
-  const [cellWidth, setCellWidth] = useState(223); // Width of a calendar cell in pixels
+  const [cellHeight, setCellHeight] = useState(100);
+  const [cellWidth, setCellWidth] = useState(223);
   const [resourceFilter, setResourceFilter] = useState<string | null>(null);
 
-  // Compute calendar dates based on view and current date
   const calendarDates = useMemo(() => {
     const dates: Date[] = [];
 
     if (viewType === "week") {
-      // Get the start of the week (Sunday)
       const startOfWeek = dayjs(currentDate).startOf("week");
 
-      // Create an array of dates for the week
       for (let i = 0; i < 7; i++) {
         dates.push(startOfWeek.add(i, "day").toDate());
       }
     } else if (viewType === "month") {
-      // Get the start of the month
       const startOfMonth = dayjs(currentDate).startOf("month");
       const daysInMonth = startOfMonth.daysInMonth();
 
-      // Create an array of dates for the month
       for (let i = 0; i < daysInMonth; i++) {
         dates.push(startOfMonth.add(i, "day").toDate());
       }
@@ -146,20 +136,16 @@ const ResourceCalendarView = ({
     return dates;
   }, [currentDate, viewType]);
 
-  // Fetch resources and orders
   useEffect(() => {
     const fetchResourcesAndOrders = async () => {
       setLoading(true);
       try {
-        // Fetch resources from your database
-        const fetchedResources = await getResources(true); // true to get only active resources
+        const fetchedResources = await getResources(true);
         setResources(fetchedResources);
 
-        // Determine date range for orders
         const startDate = dayjs(calendarDates[0]).startOf("day");
         const endDate = dayjs(calendarDates[calendarDates.length - 1]).endOf("day");
 
-        // Fetch orders within the date range
         const ordersQuery = query(
           collection(db, "orders"),
           where("status", "in", ["Open", "Released", "In Progress", "Delayed"]),
@@ -171,11 +157,10 @@ const ResourceCalendarView = ({
 
         querySnapshot.forEach(doc => {
           const data = doc.data();
-          // Filter orders that overlap with the calendar view
+
           const orderStart = dayjs(data.start.toDate());
           const orderEnd = dayjs(data.end.toDate());
 
-          // Check if the order overlaps with our calendar range
           if (
             (orderStart.isBefore(endDate) && orderEnd.isAfter(startDate)) ||
             orderStart.isSame(startDate) ||
@@ -207,7 +192,6 @@ const ResourceCalendarView = ({
     fetchResourcesAndOrders();
   }, [calendarDates]);
 
-  // Handle view type change
   const handleViewTypeChange = (
     event: React.MouseEvent<HTMLElement>,
     newViewType: "week" | "month" | null
@@ -217,12 +201,10 @@ const ResourceCalendarView = ({
     }
   };
 
-  // Go to today
   const handleGoToToday = () => {
     setCurrentDate(new Date());
   };
 
-  // Go to previous week/month
   const handlePrevious = () => {
     if (viewType === "week") {
       setCurrentDate(dayjs(currentDate).subtract(1, "week").toDate());
@@ -231,7 +213,6 @@ const ResourceCalendarView = ({
     }
   };
 
-  // Go to next week/month
   const handleNext = () => {
     if (viewType === "week") {
       setCurrentDate(dayjs(currentDate).add(1, "week").toDate());
@@ -240,45 +221,37 @@ const ResourceCalendarView = ({
     }
   };
 
-  // Handle zoom in (increase cell size)
   const handleZoomIn = () => {
     setCellHeight(prev => Math.min(prev + 20, 200));
     setCellWidth(prev => Math.min(prev + 30, 300));
   };
 
-  // Handle zoom out (decrease cell size)
   const handleZoomOut = () => {
     setCellHeight(prev => Math.max(prev - 20, 60));
     setCellWidth(prev => Math.max(prev - 30, 90));
   };
 
-  // Handle opening order details
   const handleViewOrder = (orderId: string) => {
     setSelectedOrderId(orderId);
     setDetailsDialogOpen(true);
   };
 
-  // Format date for display
   const formatDate = (date: Date): string => {
     return dayjs(date).format("ddd, MMM D");
   };
 
-  // Check if a date is today
   const isToday = (date: Date): boolean => {
     return dayjs(date).isSame(dayjs(), "day");
   };
 
-  // Check if a date is a weekend
   const isWeekend = (date: Date): boolean => {
     const day = dayjs(date).day();
-    return day === 0 || day === 6; // Sunday or Saturday
+    return day === 0 || day === 6;
   };
 
-  // Handle drag end for order reassignment
   const handleDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
 
-    // If dropped outside a droppable area or same position
     if (
       !destination ||
       (destination.droppableId === source.droppableId && destination.index === source.index)
@@ -289,15 +262,12 @@ const ResourceCalendarView = ({
     const orderToUpdate = orders.find(order => order.id === draggableId);
     if (!orderToUpdate) return;
 
-    // Parse the destination droppable ID to get resourceId and date
     const [resourceId, dateString] = destination.droppableId.split("_");
     const targetDate = new Date(dateString);
 
     try {
-      // Prepare update data
       const orderRef = doc(db, "orders", orderToUpdate.id);
 
-      // Calculate new start and end dates based on the drop target
       const originalDuration = dayjs(orderToUpdate.end.toDate()).diff(
         dayjs(orderToUpdate.start.toDate()),
         "day"
@@ -305,7 +275,6 @@ const ResourceCalendarView = ({
       const newStartDate = dayjs(targetDate);
       const newEndDate = newStartDate.add(originalDuration, "day");
 
-      // Update in Firestore
       await updateDoc(orderRef, {
         assignedResourceId: resourceId,
         start: Timestamp.fromDate(newStartDate.toDate()),
@@ -313,7 +282,6 @@ const ResourceCalendarView = ({
         updated: Timestamp.fromDate(new Date()),
       });
 
-      // Update local state
       setOrders(prev =>
         prev.map(order =>
           order.id === orderToUpdate.id
@@ -329,7 +297,6 @@ const ResourceCalendarView = ({
 
       setUpdateSuccess(`Order ${orderToUpdate.orderNumber} successfully reassigned`);
 
-      // Clear success message after 3 seconds
       setTimeout(() => {
         setUpdateSuccess(null);
       }, 3000);
@@ -347,10 +314,8 @@ const ResourceCalendarView = ({
     );
   }
 
-  // Create a simplified calendar view without drag and drop for now
   return (
     <Box>
-      {/* Calendar Controls */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item>
@@ -428,12 +393,9 @@ const ResourceCalendarView = ({
         </Alert>
       )}
 
-      {/* Simplified Calendar Grid */}
       <Paper sx={{ overflowX: "auto" }}>
         <Box sx={{ display: "flex", minWidth: cellWidth * calendarDates.length + 200 }}>
-          {/* Resource Column */}
           <Box sx={{ width: 200, flexShrink: 0 }}>
-            {/* Header cell */}
             <Box
               sx={{
                 height: 60,
@@ -452,7 +414,6 @@ const ResourceCalendarView = ({
               </Typography>
             </Box>
 
-            {/* Resource rows */}
             {resources.map(resource => (
               <Box
                 key={resource.id}
@@ -480,9 +441,7 @@ const ResourceCalendarView = ({
             ))}
           </Box>
 
-          {/* Calendar Cells */}
           <Box sx={{ flexGrow: 1 }}>
-            {/* Date headers */}
             <Box sx={{ display: "flex", height: 60 }}>
               {calendarDates.map((date, index) => (
                 <Box
@@ -522,7 +481,6 @@ const ResourceCalendarView = ({
               ))}
             </Box>
 
-            {/* Resource rows with cells */}
             {resources.map(resource => (
               <Box
                 key={resource.id}
@@ -534,18 +492,17 @@ const ResourceCalendarView = ({
                 }}
               >
                 {calendarDates.map((date, dateIndex) => {
-                  // Find orders for this specific resource and date cell
                   const cellOrders = orders.filter(order => {
                     if (order.assignedResourceId !== resource.id) return false;
                     const orderStart = dayjs(order.start.toDate());
                     const orderEnd = dayjs(order.end.toDate());
-                    // Check if the current date cell falls within the order's duration
+
                     return dayjs(date).isBetween(
                       orderStart.subtract(1, "day"),
                       orderEnd.add(1, "day"),
                       "day",
                       "()"
-                    ); // Inclusive check needed adjustment
+                    );
                   });
 
                   return (
@@ -553,24 +510,22 @@ const ResourceCalendarView = ({
                       key={`${resource.id}_${date.toISOString()}`}
                       sx={{
                         width: cellWidth,
-                        minHeight: cellHeight, // Use minHeight
+                        minHeight: cellHeight,
                         borderBottom: 1,
                         borderRight: 1,
                         borderColor: "divider",
                         backgroundColor: isToday(date)
-                          ? theme.palette.action.hover // Lighter background for today
+                          ? theme.palette.action.hover
                           : isWeekend(date)
-                            ? theme.palette.action.disabledBackground // Different background for weekend
+                            ? theme.palette.action.disabledBackground
                             : "background.paper",
                         p: 0.5,
-                        display: "flex", // Use flexbox for stacking
-                        flexDirection: "column", // Stack orders vertically
-                        gap: 0.5, // Add gap between orders
-                        overflowY: "auto", // Allow scrolling if orders exceed cell height
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.5,
+                        overflowY: "auto",
                       }}
-                      // Add Droppable props here if re-implementing drag and drop
                     >
-                      {/* Render orders for this cell */}
                       {cellOrders.map(order => (
                         <Paper
                           key={order.id}
@@ -591,7 +546,7 @@ const ResourceCalendarView = ({
                             },
                           }}
                           onClick={() => handleViewOrder(order.id)}
-                          title={`${order.orderNumber}: ${order.description}`} // Tooltip for full text
+                          title={`${order.orderNumber}: ${order.description}`}
                         >
                           <Typography variant="caption" component="div" fontWeight="bold" noWrap>
                             {order.orderNumber}
@@ -610,7 +565,6 @@ const ResourceCalendarView = ({
         </Box>
       </Paper>
 
-      {/* Order Details Dialog */}
       <OrderDetailsDialog
         open={detailsDialogOpen}
         onClose={() => setDetailsDialogOpen(false)}
