@@ -30,6 +30,7 @@ import {
 import { collection, Timestamp, doc, setDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
+import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
 // Define the form data interface
 interface OrderFormData {
@@ -88,7 +89,7 @@ const initialFormData: OrderFormData = {
 };
 
 // Predefined process templates
-const processTypes = ["Setup", "Assembly", "Testing", "Quality Check", "Packaging", "Shipping"];
+const processTypes = STANDARD_PROCESS_NAMES;
 
 // Available statuses
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
@@ -96,13 +97,14 @@ const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Fi
 // Priority options
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
 
-// Default process templates
+// Default process templates - Use standard names for 'name'
 const defaultProcessTemplates: ProcessTemplate[] = [
-  { type: "Setup", name: "Initial Setup", duration: 1, sequence: 1 },
-  { type: "Assembly", name: "Assembly Process", duration: 3, sequence: 2 },
-  { type: "Testing", name: "Testing & Validation", duration: 2, sequence: 3 },
-  { type: "Quality Check", name: "Quality Inspection", duration: 1, sequence: 4 },
-  { type: "Packaging", name: "Packaging", duration: 1, sequence: 5 },
+  { type: "Setup", name: "Setup", duration: 1, sequence: 1 }, // Use standard name
+  { type: "SMT", name: "SMT", duration: 3, sequence: 2 }, // Use standard name
+  { type: "Inspection", name: "Inspection", duration: 2, sequence: 3 }, // Use standard name
+  { type: "Repair/Rework", name: "Repair/Rework", duration: 1, sequence: 4 }, // Use standard name
+  { type: "HMT", name: "HMT", duration: 1, sequence: 5 }, // Use standard name
+  // Add others like Wash, Cut, Test, Delivery if needed as defaults
 ];
 
 const CreateOrder = () => {
@@ -600,30 +602,25 @@ const CreateOrder = () => {
                       </Box>
                     </Grid>
 
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} md={9}>
                       <FormControl fullWidth>
-                        <InputLabel>Process Type</InputLabel>
+                        <InputLabel>Process Name</InputLabel>
                         <Select
-                          value={process.type}
-                          onChange={e => handleProcessChange(index, "type", e.target.value)}
-                          label="Process Type"
+                          value={process.name} // Bind to process.name
+                          onChange={e => handleProcessChange(index, "name", e.target.value)} // Update process.name
+                          label="Process Name"
                         >
-                          {processTypes.map(type => (
-                            <MenuItem key={type} value={type}>
-                              {type}
-                            </MenuItem>
-                          ))}
+                          {STANDARD_PROCESS_NAMES.map(
+                            (
+                              name // Use standard names for options
+                            ) => (
+                              <MenuItem key={name} value={name}>
+                                {name}
+                              </MenuItem>
+                            )
+                          )}
                         </Select>
                       </FormControl>
-                    </Grid>
-
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Process Name"
-                        value={process.name}
-                        onChange={e => handleProcessChange(index, "name", e.target.value)}
-                      />
                     </Grid>
 
                     <Grid item xs={12} md={3}>

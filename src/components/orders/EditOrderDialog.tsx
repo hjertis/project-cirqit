@@ -44,6 +44,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
+import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
 // Define interfaces
 interface OrderFormData {
@@ -93,15 +94,7 @@ interface EditOrderDialogProps {
 }
 
 // Constants
-const processTypes = [
-  "Setup",
-  "Assembly",
-  "Testing",
-  "Quality Check",
-  "Packaging",
-  "Shipping",
-  "Production",
-];
+const processTypes = STANDARD_PROCESS_NAMES;
 
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
@@ -734,30 +727,23 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                         </Box>
                       </Grid>
 
-                      <Grid item xs={12} md={3}>
+                      <Grid item xs={12} md={6}>
+                        {" "}
+                        {/* Adjusted grid size */}
                         <FormControl fullWidth>
-                          <InputLabel>Process Type</InputLabel>
+                          <InputLabel>Process Name</InputLabel>
                           <Select
-                            value={process.type}
-                            onChange={e => handleProcessChange(index, "type", e.target.value)}
-                            label="Process Type"
+                            value={process.name}
+                            onChange={e => handleProcessChange(index, "name", e.target.value)}
+                            label="Process Name"
                           >
-                            {processTypes.map(type => (
-                              <MenuItem key={type} value={type}>
-                                {type}
+                            {STANDARD_PROCESS_NAMES.map(name => (
+                              <MenuItem key={name} value={name}>
+                                {name}
                               </MenuItem>
                             ))}
                           </Select>
                         </FormControl>
-                      </Grid>
-
-                      <Grid item xs={12} md={3}>
-                        <TextField
-                          fullWidth
-                          label="Process Name"
-                          value={process.name}
-                          onChange={e => handleProcessChange(index, "name", e.target.value)}
-                        />
                       </Grid>
 
                       <Grid item xs={12} md={3}>

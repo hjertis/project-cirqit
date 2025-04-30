@@ -422,6 +422,8 @@ const DailyScheduler: React.FC = () => {
                                       opacity: snapshotDraggable.isDragging ? 0.8 : 1,
                                       cursor: "grab",
                                       overflow: "hidden",
+                                      borderLeft: `4px solid ${theme.palette.primary.main}`, // <-- Add this line for blue border
+                                      "&:hover": { boxShadow: 3 }, // Optional: Add hover effect if desired
                                     }}
                                     title={`${order.orderNumber}: ${order.description}`}
                                   >

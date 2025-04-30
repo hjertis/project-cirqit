@@ -40,6 +40,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
+import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
 // Define the form data interface
 interface OrderFormData {
@@ -125,15 +126,7 @@ const initialFormData: OrderFormData = {
 };
 
 // Predefined process templates
-const processTypes = [
-  "Setup",
-  "Assembly",
-  "Testing",
-  "Quality Check",
-  "Packaging",
-  "Shipping",
-  "Production",
-];
+const processTypes = STANDARD_PROCESS_NAMES;
 
 // Available statuses
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];

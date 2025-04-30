@@ -23,6 +23,8 @@ import ProductionDashboardPage from "../pages/ProductionDashboardPage";
 import PrintOrderPage from "../pages/PrintOrderPage";
 import DailySchedulerPage from "../pages/DailySchedulerPage";
 import MigratePlannedWeekStartDateButton from "../pages/admin/MigrateDates";
+import KanbanPage from "../pages/KanbanPage";
+import StandardizeOrderProcessesPage from "../pages/admin/StandardizeOrderProcessesPage.tsx";
 
 /**
  * Main application routes configuration
@@ -73,6 +75,8 @@ const AppRoutes = () => {
         <Route path="/time" element={<TimeDashboardPage />} />
         {/* Resource Management */}
         <Route path="/resources" element={<ResourceManagementPage />} />
+        {/* Kanban Board */}
+        <Route path="/kanban" element={<KanbanPage />} />
         {/* Admin section */}
         <Route
           path="/admin/migrate-orders"
@@ -83,6 +87,10 @@ const AppRoutes = () => {
           }
         />
         <Route path="/admin/migrate-dates" element={<MigratePlannedWeekStartDateButton />} />
+        <Route
+          path="/admin/standardize-order-processes"
+          element={<StandardizeOrderProcessesPage />}
+        />
         {/* Settings */}
         <Route path="/settings" element={<div>Settings Page</div>} />
         {/* User Profile */}
