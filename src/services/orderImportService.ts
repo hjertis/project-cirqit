@@ -25,6 +25,7 @@ export interface OrderImportData {
   Status: string;
   Notes?: string;
   State?: string;
+  FinishedDate?: string; // Add support for FinishedDate
 }
 
 const washKeywords = ["EVP", "TSP", "SKY", "ETI", "TS PRO"];
@@ -36,6 +37,8 @@ export const importOrder = async (order: OrderImportData) => {
 
   const startDate = dayjs(order.StartingDateTime, "DD-MM-YYYY").toDate();
   const endDate = dayjs(order.EndingDateTime, "DD-MM-YYYY").toDate();
+  // Parse finished date if available
+  const finishedDate = order.FinishedDate ? dayjs(order.FinishedDate, "DD-MM-YYYY").toDate() : null;
 
   const getPriority = (state?: string) => {
     if (state === "URGENT") return "High";
@@ -60,6 +63,8 @@ export const importOrder = async (order: OrderImportData) => {
       notes: order.Notes || "",
       state: order.State || "",
       updated: Timestamp.fromDate(new Date()),
+      // Add finishedDate if available
+      ...(finishedDate && { finishedDate: Timestamp.fromDate(finishedDate) }),
     };
 
     await setDoc(docRef, workOrder);
@@ -78,8 +83,10 @@ export const importOrder = async (order: OrderImportData) => {
     let statusChanged = false;
 
     if (currentData?.status !== order.Status) {
-      updates.status = order.Status;
-      statusChanged = true;
+      if (order.Status === "Finished" || order.Status === "Done") {
+        updates.status = order.Status;
+        statusChanged = true;
+      }
     }
 
     if (
@@ -95,6 +102,14 @@ export const importOrder = async (order: OrderImportData) => {
 
     if (currentData?.quantity !== Number(order.Quantity) && !isNaN(Number(order.Quantity))) {
       updates.quantity = Number(order.Quantity);
+    }
+
+    // Add finishedDate update logic
+    if (finishedDate) {
+      const currentFinishedDate = currentData.finishedDate?.toDate?.();
+      if (!currentFinishedDate || currentFinishedDate.getTime() !== finishedDate.getTime()) {
+        updates.finishedDate = Timestamp.fromDate(finishedDate);
+      }
     }
 
     if (Object.keys(updates).length > 0) {

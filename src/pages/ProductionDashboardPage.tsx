@@ -59,7 +59,7 @@ import {
   ComposedChart,
   Scatter,
   ScatterChart,
-  Tooltip as RechartsTooltip, // Alias Tooltip from recharts
+  Tooltip as RechartsTooltip,
 } from "recharts";
 import { collection, query, getDocs, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -77,6 +77,7 @@ interface Order {
   end: Timestamp;
   status: string;
   updated: Timestamp;
+  finishedDate?: Timestamp;
   isArchived?: boolean;
 }
 
@@ -135,6 +136,14 @@ const ProductionDashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [omittedPartNumbers, setOmittedPartNumbers] = useState<string[]>([
+    "900100099-05",
+    "900100013-06",
+    "900100014-04",
+    "900100155-01",
+    "900100156-01",
+    "900100157-01",
+  ]);
 
   const dashboardRef = useRef<HTMLDivElement>(null);
 
@@ -153,118 +162,121 @@ const ProductionDashboardPage = () => {
   const [exportLoading, setExportLoading] = useState(false);
 
   // Define processOrderData first, as other callbacks depend on it
-  const processOrderData = useCallback((orderData: Order[]) => {
-    const monthlyData: { [key: string]: number } = {};
-    const today = new Date();
-
-    orderData.forEach(order => {
-      const startDate = safeConvertToDate(order.start);
-      if (startDate) {
-        const yearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1)
-          .toString()
-          .padStart(2, "0")}`;
-        monthlyData[yearMonth] = (monthlyData[yearMonth] || 0) + (order.quantity || 0);
-      }
-    });
-
-    const monthlyChartData: MonthlyProductionData[] = Object.keys(monthlyData)
-      .sort()
-      .map(month => {
-        const [year, monthNum] = month.split("-");
-        const monthNames = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-        ];
-        return {
-          month: `${monthNames[parseInt(monthNum) - 1]} ${year}`,
-          quantity: monthlyData[month],
-          isPast: new Date(parseInt(year), parseInt(monthNum) - 1) < today,
-        };
-      });
-
-    setProductionByMonth(monthlyChartData);
-
-    const productsByPartNo: {
-      [key: string]: { count: number; totalQuantity: number; description: string };
-    } = {};
-    orderData.forEach(order => {
-      const partNo = order.partNo || "Unknown";
-      if (!productsByPartNo[partNo]) {
-        productsByPartNo[partNo] = {
-          count: 0,
-          totalQuantity: 0,
-          description: order.description || partNo,
-        };
-      }
-      productsByPartNo[partNo].count += 1;
-      productsByPartNo[partNo].totalQuantity += order.quantity || 0;
-    });
-
-    const topProductsData: ProductData[] = Object.keys(productsByPartNo)
-      .map(partNo => ({
-        partNo,
-        ...productsByPartNo[partNo],
-      }))
-      .sort((a, b) => b.totalQuantity - a.totalQuantity)
-      .slice(0, 15);
-
-    setTopProducts(topProductsData);
-
-    const statusCounts: { [key: string]: number } = {};
-    orderData.forEach(order => {
-      const status = order.status || "Unknown";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
-
-    const statusData: StatusDistributionData[] = Object.keys(statusCounts).map(status => ({
-      status,
-      count: statusCounts[status],
-    }));
-
-    setStatusDistribution(statusData);
-
-    const efficiencyItems: EfficiencyData[] = orderData
-      .filter(
-        order =>
-          (order.status === "Finished" || order.status === "Done") && order.start && order.end
-      )
-      .map(order => {
-        const plannedEnd = safeConvertToDate(order.end);
-        // Use updated if available and valid, otherwise fallback to plannedEnd
-        let actualEnd = safeConvertToDate(order.updated);
-        if (!actualEnd) {
-          actualEnd = plannedEnd;
+  const processOrderData = useCallback(
+    (orderData: Order[]) => {
+      const monthlyData: { [key: string]: number } = {};
+      const today = new Date();
+      orderData.forEach(order => {
+        const startDate = safeConvertToDate(order.start);
+        if (startDate) {
+          const yearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1)
+            .toString()
+            .padStart(2, "0")}`;
+          monthlyData[yearMonth] = (monthlyData[yearMonth] || 0) + (order.quantity || 0);
         }
-
-        if (plannedEnd && actualEnd) {
-          const diff = (actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24);
+      });
+      const monthlyChartData: MonthlyProductionData[] = Object.keys(monthlyData)
+        .sort()
+        .map(month => {
+          const [year, monthNum] = month.split("-");
+          const monthNames = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ];
           return {
-            order: order.orderNumber || order.id,
-            description:
-              (order.description || "").substring(0, 25) +
-              (order.description && order.description.length > 25 ? "..." : ""),
-            plannedEnd: formatDate(plannedEnd),
-            actualEnd: formatDate(actualEnd),
-            difference: diff,
-            onTime: diff <= 0,
+            month: `${monthNames[parseInt(monthNum) - 1]} ${year}`,
+            quantity: monthlyData[month],
+            isPast: new Date(parseInt(year), parseInt(monthNum) - 1) < today,
+          };
+        });
+      setProductionByMonth(monthlyChartData);
+
+      const productsByPartNo: {
+        [key: string]: { count: number; totalQuantity: number; description: string };
+      } = {};
+      orderData.forEach(order => {
+        const partNo = order.partNo || "Unknown";
+        if (!productsByPartNo[partNo]) {
+          productsByPartNo[partNo] = {
+            count: 0,
+            totalQuantity: 0,
+            description: order.description || partNo,
           };
         }
-        return null;
-      })
-      .filter((item): item is EfficiencyData => item !== null);
+        productsByPartNo[partNo].count += 1;
+        productsByPartNo[partNo].totalQuantity += order.quantity || 0;
+      });
+      // Filter out omitted part numbers when creating topProductsData
+      const topProductsData: ProductData[] = Object.keys(productsByPartNo)
+        .filter(
+          partNo =>
+            !omittedPartNumbers.some(omitted =>
+              partNo.toLowerCase().includes(omitted.toLowerCase())
+            )
+        )
+        .map(partNo => ({
+          partNo,
+          ...productsByPartNo[partNo],
+        }))
+        .sort((a, b) => b.totalQuantity - a.totalQuantity)
+        .slice(0, 15);
+      setTopProducts(topProductsData);
 
-    setEfficiencyData(efficiencyItems);
-  }, []); // Keep dependencies minimal if possible, formatDate might need to be added if defined outside
+      const statusCounts: { [key: string]: number } = {};
+      orderData.forEach(order => {
+        const status = order.status || "Unknown";
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      const statusData: StatusDistributionData[] = Object.keys(statusCounts).map(status => ({
+        status,
+        count: statusCounts[status],
+      }));
+      setStatusDistribution(statusData);
+
+      const efficiencyItems: EfficiencyData[] = orderData
+        .filter(
+          order =>
+            (order.status === "Finished" || order.status === "Done") && order.start && order.end
+        )
+        .map(order => {
+          const plannedEnd = safeConvertToDate(order.end);
+
+          // Prioritize finishedDate if available, then updated, then fallback to planned end
+          let actualEnd = safeConvertToDate(order.finishedDate) || safeConvertToDate(order.updated);
+          if (!actualEnd) {
+            actualEnd = plannedEnd;
+          }
+
+          if (plannedEnd && actualEnd) {
+            const diff = (actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24);
+            return {
+              order: order.orderNumber || order.id,
+              description:
+                (order.description || "").substring(0, 25) +
+                (order.description && order.description.length > 25 ? "..." : ""),
+              plannedEnd: formatDate(plannedEnd),
+              actualEnd: formatDate(actualEnd),
+              difference: diff,
+              onTime: diff <= 0,
+            };
+          }
+          return null;
+        })
+        .filter((item): item is EfficiencyData => item !== null);
+      setEfficiencyData(efficiencyItems);
+    },
+    [omittedPartNumbers]
+  ); // Add omittedPartNumbers as dependency
 
   // Define loadSampleData, depends on processOrderData
   const loadSampleData = useCallback(() => {
@@ -279,21 +291,15 @@ const ProductionDashboardPage = () => {
   const fetchFirebaseData = useCallback(async () => {
     try {
       setIsLoading(true);
-
       const ordersRef = collection(db, "orders");
-
       const activeOrdersQuery = query(ordersRef, orderBy("updated", "desc"));
-
       const archivedOrdersRef = collection(db, "archivedOrders");
       const archivedOrdersQuery = query(archivedOrdersRef, orderBy("updated", "desc"));
-
       const [activeSnapshot, archivedSnapshot] = await Promise.all([
         getDocs(activeOrdersQuery),
         getDocs(archivedOrdersQuery),
       ]);
-
       const allOrders: Order[] = [];
-
       activeSnapshot.forEach(doc => {
         allOrders.push({
           id: doc.id,
@@ -301,7 +307,6 @@ const ProductionDashboardPage = () => {
           isArchived: false,
         } as Order);
       });
-
       archivedSnapshot.forEach(doc => {
         allOrders.push({
           id: doc.id,
@@ -309,16 +314,12 @@ const ProductionDashboardPage = () => {
           isArchived: true,
         } as Order);
       });
-
       console.log(`Loaded ${allOrders.length} orders from Firebase`);
       setOrders(allOrders);
-
       const statuses = [...new Set(allOrders.map(order => order.status))].filter(Boolean);
       setAvailableStatuses(statuses);
-
       const products = [...new Set(allOrders.map(order => order.partNo))].filter(Boolean);
       setAvailableProducts(products);
-
       // Initial filter application after fetch
       // setFilteredOrders(allOrders); // applyFilters will handle this
       // processOrderData(allOrders); // applyFilters will handle this
@@ -330,8 +331,7 @@ const ProductionDashboardPage = () => {
     } finally {
       setIsLoading(false);
     }
-    // Add loadSampleData and processOrderData to dependencies
-  }, [loadSampleData]);
+  }, [loadSampleData]); // Add loadSampleData and processOrderData to dependencies
 
   useEffect(() => {
     fetchFirebaseData();
@@ -340,26 +340,21 @@ const ProductionDashboardPage = () => {
   // Define applyFilters, depends on orders and processOrderData
   const applyFilters = useCallback(() => {
     let filtered = [...orders];
-
     if (statusFilter.length > 0) {
       filtered = filtered.filter(order => statusFilter.includes(order.status));
     }
-
     if (dateFilter.start || dateFilter.end) {
       const startDate = dateFilter.start ? new Date(dateFilter.start) : null;
       const endDate = dateFilter.end ? new Date(dateFilter.end) : null;
       if (endDate) endDate.setHours(23, 59, 59, 999); // Include the whole end day
-
       filtered = filtered.filter(order => {
         const orderDate = safeConvertToDate(order.start);
         if (!orderDate) return false; // Skip if no valid start date
-
         const afterStart = startDate ? orderDate >= startDate : true;
         const beforeEnd = endDate ? orderDate <= endDate : true;
         return afterStart && beforeEnd;
       });
     }
-
     if (searchFilter) {
       const searchLower = searchFilter.toLowerCase();
       filtered = filtered.filter(
@@ -368,13 +363,10 @@ const ProductionDashboardPage = () => {
           (order.description && order.description.toLowerCase().includes(searchLower))
       );
     }
-
     if (productFilter) {
       filtered = filtered.filter(order => order.partNo === productFilter);
     }
-
     setFilteredOrders(filtered);
-
     processOrderData(filtered); // Call processOrderData, but don't list it as a dependency here
   }, [orders, statusFilter, dateFilter, searchFilter, productFilter, processOrderData]); // Add processOrderData back
 
@@ -411,13 +403,10 @@ const ProductionDashboardPage = () => {
     const now = new Date();
     const oneMonthAgo = new Date(now);
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
     const twoMonthsAgo = new Date(now);
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-
     const threeMonthsAgo = new Date(now);
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
     return [
       {
         id: "sample-1",
@@ -492,7 +481,6 @@ const ProductionDashboardPage = () => {
 
   const exportDashboard = async (format: string) => {
     setExportLoading(true);
-
     try {
       switch (format) {
         case "pdf":
@@ -518,62 +506,48 @@ const ProductionDashboardPage = () => {
   const exportToPdf = async () => {
     const element = dashboardRef.current;
     if (!element) return;
-
     const canvas = await html2canvas(element, {
       scale: 1,
       useCORS: true,
       logging: false,
     });
-
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("p", "mm", "a4");
-
     pdf.setFontSize(16);
     pdf.text("Production Dashboard Report", 105, 15, { align: "center" });
-
     pdf.setFontSize(10);
     pdf.text(`Generated on ${new Date().toLocaleString()}`, 105, 22, { align: "center" });
-
     let filtersApplied = false;
     let filterText = "Filters applied: ";
-
     if (statusFilter.length > 0) {
       filterText += `Status (${statusFilter.join(", ")}), `;
       filtersApplied = true;
     }
-
     if (dateFilter.start || dateFilter.end) {
       filterText += `Date Range (${dateFilter.start || "any"} to ${dateFilter.end || "any"}), `;
       filtersApplied = true;
     }
-
     if (searchFilter) {
       filterText += `Search (${searchFilter}), `;
       filtersApplied = true;
     }
-
     if (productFilter) {
       filterText += `Product (${productFilter})`;
       filtersApplied = true;
     }
-
     if (filtersApplied) {
       filterText = filterText.endsWith(", ") ? filterText.slice(0, -2) : filterText;
       pdf.text(filterText, 105, 29, { align: "center" });
     }
-
     const imgWidth = 210 - 20;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
     const yPosition = filtersApplied ? 35 : 30;
     pdf.addImage(imgData, "PNG", 10, yPosition, imgWidth, imgHeight);
-
     pdf.save(`production_dashboard_${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const exportToExcel = () => {
     const wb = XLSX.utils.book_new();
-
     const ordersWS = XLSX.utils.json_to_sheet(
       filteredOrders.map(order => ({
         "Order Number": order.orderNumber || order.id,
@@ -588,7 +562,6 @@ const ProductionDashboardPage = () => {
       }))
     );
     XLSX.utils.book_append_sheet(wb, ordersWS, "Orders");
-
     const monthlyWS = XLSX.utils.json_to_sheet(
       productionByMonth.map(item => ({
         Month: item.month,
@@ -596,7 +569,6 @@ const ProductionDashboardPage = () => {
       }))
     );
     XLSX.utils.book_append_sheet(wb, monthlyWS, "Monthly Production");
-
     const productsWS = XLSX.utils.json_to_sheet(
       topProducts.map(item => ({
         "Part Number": item.partNo,
@@ -606,7 +578,6 @@ const ProductionDashboardPage = () => {
       }))
     );
     XLSX.utils.book_append_sheet(wb, productsWS, "Product Distribution");
-
     if (efficiencyData.length > 0) {
       const efficiencyWS = XLSX.utils.json_to_sheet(
         efficiencyData.map(item => ({
@@ -620,14 +591,12 @@ const ProductionDashboardPage = () => {
       );
       XLSX.utils.book_append_sheet(wb, efficiencyWS, "Order Efficiency");
     }
-
     XLSX.writeFile(wb, `production_dashboard_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const exportRawData = () => {
     const dataStr = JSON.stringify(filteredOrders, null, 2);
     const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
-
     const exportFileDefaultName = `production_data_${new Date().toISOString().split("T")[0]}.json`;
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
@@ -705,7 +674,6 @@ const ProductionDashboardPage = () => {
                   <ExportIcon />
                 </IconButton>
               </Tooltip>
-
               <Menu
                 anchorEl={exportMenuAnchor}
                 open={Boolean(exportMenuAnchor)}
@@ -736,7 +704,6 @@ const ProductionDashboardPage = () => {
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
-
             <DialogContent>
               <Grid container spacing={3} sx={{ mt: 0 }}>
                 <Grid item xs={12} md={6}>
@@ -761,7 +728,6 @@ const ProductionDashboardPage = () => {
                       ))}
                     </Select>
                   </FormControl>
-
                   <FormControl fullWidth sx={{ mb: 3 }}>
                     <InputLabel>Product</InputLabel>
                     <Select
@@ -779,7 +745,6 @@ const ProductionDashboardPage = () => {
                     </Select>
                   </FormControl>
                 </Grid>
-
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
@@ -797,7 +762,6 @@ const ProductionDashboardPage = () => {
                       ),
                     }}
                   />
-
                   <TextField
                     fullWidth
                     label="End Date"
@@ -815,7 +779,6 @@ const ProductionDashboardPage = () => {
                     }}
                   />
                 </Grid>
-
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
@@ -840,7 +803,6 @@ const ProductionDashboardPage = () => {
                 </Grid>
               </Grid>
             </DialogContent>
-
             <DialogActions>
               <Button onClick={resetFilters} color="secondary">
                 Reset Filters
@@ -863,7 +825,6 @@ const ProductionDashboardPage = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
               Active filters:
             </Typography>
-
             {statusFilter.length > 0 &&
               statusFilter.map(status => (
                 <Chip
@@ -875,7 +836,6 @@ const ProductionDashboardPage = () => {
                   variant="outlined"
                 />
               ))}
-
             {dateFilter.start && (
               <Chip
                 label={`From: ${dateFilter.start}`}
@@ -885,7 +845,6 @@ const ProductionDashboardPage = () => {
                 variant="outlined"
               />
             )}
-
             {dateFilter.end && (
               <Chip
                 label={`To: ${dateFilter.end}`}
@@ -895,7 +854,6 @@ const ProductionDashboardPage = () => {
                 variant="outlined"
               />
             )}
-
             {searchFilter && (
               <Chip
                 label={`Search: ${searchFilter}`}
@@ -905,7 +863,6 @@ const ProductionDashboardPage = () => {
                 variant="outlined"
               />
             )}
-
             {productFilter && (
               <Chip
                 label={`Product: ${productFilter}`}
@@ -915,7 +872,6 @@ const ProductionDashboardPage = () => {
                 variant="outlined"
               />
             )}
-
             <Button
               size="small"
               variant="text"
@@ -996,7 +952,6 @@ const ProductionDashboardPage = () => {
                 </Box>
               </Paper>
             </Grid>
-
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
@@ -1019,7 +974,6 @@ const ProductionDashboardPage = () => {
                 </Box>
               </Paper>
             </Grid>
-
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
@@ -1028,28 +982,34 @@ const ProductionDashboardPage = () => {
                 <Box sx={{ height: 300 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={topProducts.slice(0, 5)}
+                      data={topProducts}
                       layout="vertical"
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      margin={{ top: 20, right: 30, left: 150, bottom: 20 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" />
                       <YAxis
                         dataKey="description"
                         type="category"
-                        width={150}
+                        width={140}
                         tickFormatter={value =>
-                          value.length > 20 ? value.substring(0, 20) + "..." : value
+                          value.length > 25 ? value.substring(0, 25) + "..." : value
                         }
                       />
-                      <RechartsTooltip formatter={value => [`${value} units`, "Quantity"]} />
-                      <Bar dataKey="totalQuantity" fill="#82ca9d" />
+                      <RechartsTooltip
+                        formatter={(value: number, name: string) => [
+                          `${value} units`,
+                          name === "totalQuantity" ? "Total Quantity" : name,
+                        ]}
+                        labelFormatter={(label: string) => `Product: ${label}`}
+                      />
+                      <Legend />
+                      <Bar dataKey="totalQuantity" name="Total Quantity" fill="#8884d8" />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>
               </Paper>
             </Grid>
-
             <Grid item xs={12} md={6}>
               <Paper sx={{ p: 2, height: "100%" }}>
                 <Typography variant="h6" gutterBottom>
@@ -1149,29 +1109,74 @@ const ProductionDashboardPage = () => {
             <Typography variant="h6" gutterBottom>
               Product Distribution
             </Typography>
-            <Box sx={{ height: 400 }}>
+            <Box sx={{ height: 500 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topProducts} margin={{ top: 5, right: 30, left: 20, bottom: 120 }}>
+                <BarChart
+                  data={topProducts}
+                  layout="vertical"
+                  margin={{ top: 20, right: 50, left: 180, bottom: 20 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
+                    type="number"
+                    label={{
+                      value: "Units Produced",
+                      position: "insideBottom",
+                      offset: -10,
+                    }}
+                  />
+                  <YAxis
+                    type="category"
                     dataKey="description"
-                    angle={-45}
-                    textAnchor="end"
-                    height={120}
+                    width={170}
                     tickFormatter={value =>
-                      value.length > 30 ? value.substring(0, 30) + "..." : value
+                      value.length > 40 ? value.substring(0, 40) + "..." : value
                     }
                   />
-                  <YAxis />
                   <RechartsTooltip
-                    formatter={(value: number, name: string /*, props: any*/) => [
-                      `${value} units`,
-                      name === "totalQuantity" ? "Total Quantity" : name,
-                    ]}
+                    formatter={(value: number, name: string) => [`${value} units`, "Quantity"]}
                     labelFormatter={(label: string) => `Product: ${label}`}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div
+                            style={{
+                              background: "#fff",
+                              border: "1px solid #ccc",
+                              padding: "10px",
+                              borderRadius: "4px",
+                              boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
+                            }}
+                          >
+                            <p style={{ margin: 0 }}>
+                              <strong>Product:</strong> {data.description}
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Part No:</strong> {data.partNo}
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Total Quantity:</strong> {data.totalQuantity} units
+                            </p>
+                            <p style={{ margin: 0 }}>
+                              <strong>Order Count:</strong> {data.count}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
-                  <Legend />
-                  <Bar dataKey="totalQuantity" name="Total Quantity" fill="#8884d8" />
+                  <Bar
+                    dataKey="totalQuantity"
+                    name="Total Quantity"
+                    fill="#8884d8"
+                    radius={[0, 4, 4, 0]}
+                  >
+                    {topProducts.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </Box>

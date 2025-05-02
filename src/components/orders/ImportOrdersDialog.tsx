@@ -136,7 +136,7 @@ const ImportOrdersDialog = ({ open, onClose }: ImportOrdersDialogProps) => {
               Your CSV file should include these columns: No, Description, SourceNo, Quantity,
               StartingDateTime, EndingDateTime, Status
             </Typography>
-            <Typography variant="body2">Optional columns: Notes, State</Typography>
+            <Typography variant="body2">Optional columns: Notes, State, FinishedDate</Typography>
           </Alert>
 
           <TextField

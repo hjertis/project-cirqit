@@ -124,7 +124,7 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
         const startDate = orderData.start.toDate();
         const endDate = orderData.end.toDate();
         let workDays = 0;
-        let currentDate = new Date(startDate);
+        const currentDate = new Date(startDate);
 
         while (currentDate <= endDate) {
           const dayOfWeek = currentDate.getDay();
@@ -162,6 +162,30 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
     console.error("Error fetching planning data:", error);
     throw error;
   }
+};
+
+const calculateEndDate = (startDate: Date, estimatedHours: number): Date => {
+  let remainingHours = estimatedHours;
+  let currentDate = dayjs(startDate);
+  const workHoursPerDay = HOURS_PER_DAY;
+
+  while (remainingHours > 0) {
+    const dayOfWeek = currentDate.day();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      const hoursToWorkToday = Math.min(remainingHours, workHoursPerDay);
+      remainingHours -= hoursToWorkToday;
+      if (remainingHours <= 0) {
+        const endOfDay = dayjs(currentDate).add(hoursToWorkToday, "hour");
+        return endOfDay.toDate();
+      }
+    }
+    currentDate = currentDate.add(1, "day");
+    if (currentDate.diff(startDate, "year") > 5) {
+      console.error("calculateEndDate exceeded safety limit");
+      break;
+    }
+  }
+  return currentDate.toDate();
 };
 
 const ResourcePlanningBoard: React.FC = () => {
@@ -316,15 +340,29 @@ const ResourcePlanningBoard: React.FC = () => {
           const orderId = result.draggableId;
 
           const newPlannedWeekStartDate = dayjs(destWeekStart).format("YYYY-MM-DD");
+
+          // Find the order that was dragged
+          const draggedOrder = orders.find(o => o.id === orderId);
+          if (!draggedOrder) return;
+
+          // Calculate new start and end dates based on the plannedWeekStartDate
+          const newStartDate = dayjs(destWeekStart).hour(8).minute(0).second(0).toDate();
+          const newEndDate = calculateEndDate(newStartDate, draggedOrder.estimatedHours || 8);
+
           console.log("Saving to Firestore:", {
             assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
             plannedWeekStartDate: newPlannedWeekStartDate,
+            start: newStartDate,
+            end: newEndDate,
           });
 
           try {
             await updateDoc(doc(db, "orders", orderId), {
               assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
               plannedWeekStartDate: newPlannedWeekStartDate,
+              start: Timestamp.fromDate(newStartDate),
+              end: Timestamp.fromDate(newEndDate),
+              updated: Timestamp.now(),
             });
             console.log("Firestore updated!");
 

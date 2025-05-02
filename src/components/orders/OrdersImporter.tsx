@@ -38,6 +38,7 @@ interface OrderCsvRow {
   Status: string;
   Notes?: string;
   State?: string;
+  FinishedDate?: string; // Add FinishedDate field
   [key: string]: string | number | undefined;
 }
 
@@ -180,6 +181,26 @@ const OrdersImporter = () => {
             row: index + 1,
             field: "EndingDateTime",
             message: "Invalid date format. Use DD-MM-YYYY",
+          });
+        }
+      }
+
+      // Add validation for FinishedDate if present
+      if (row.FinishedDate) {
+        if (!dateRegex.test(row.FinishedDate) || !isValidDate(row.FinishedDate)) {
+          errors.push({
+            row: index + 1,
+            field: "FinishedDate",
+            message: "Invalid date format. Use DD-MM-YYYY",
+          });
+        }
+
+        // Add warning if finished date is present but status isn't "Finished" or "Done"
+        if (row.Status && row.Status !== "Finished" && row.Status !== "Done") {
+          warnings.push({
+            row: index + 1,
+            field: "FinishedDate",
+            message: "FinishedDate provided but order status is not Finished or Done",
           });
         }
       }
@@ -397,6 +418,7 @@ const OrdersImporter = () => {
                   <TableCell>Quantity</TableCell>
                   <TableCell>Start Date</TableCell>
                   <TableCell>End Date</TableCell>
+                  <TableCell>Finished Date</TableCell>
                   <TableCell>Status</TableCell>
                 </TableRow>
               </TableHead>
@@ -409,6 +431,7 @@ const OrdersImporter = () => {
                     <TableCell>{row.Quantity}</TableCell>
                     <TableCell>{row.StartingDateTime}</TableCell>
                     <TableCell>{row.EndingDateTime}</TableCell>
+                    <TableCell>{row.FinishedDate || "-"}</TableCell>
                     <TableCell>
                       <Chip
                         label={row.Status}
