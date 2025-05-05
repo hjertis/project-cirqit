@@ -66,6 +66,9 @@ import { db } from "../config/firebase";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import * as XLSX from "xlsx";
+import EfficiencyDetailsTable from "../components/dashboard/EfficiencyDetailsTable";
+import ProductDistributionChart from "../components/dashboard/ProductDistributionChart";
+import ProductionTimelineChart from "../components/dashboard/ProductionTimelineChart";
 
 interface Order {
   id: string;
@@ -1064,124 +1067,20 @@ const ProductionDashboardPage = () => {
         )}
 
         {selectedView === "timeline" && (
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Production Timeline
-            </Typography>
-            <Box sx={{ height: 400 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={productionByMonth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" angle={-45} textAnchor="end" height={60} />
-                  <YAxis />
-                  <RechartsTooltip formatter={value => [`${value} units`, "Quantity"]} />
-                  <Legend />
-                  <Bar dataKey="quantity" fill="#8884d8" />
-                  <Line type="monotone" dataKey="quantity" stroke="#ff7300" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </Box>
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Production Insights
-              </Typography>
-              <Box component="ul" sx={{ pl: 4 }}>
-                <li>Total orders in system: {orders.length}</li>
-                <li>
-                  Active orders:{" "}
-                  {orders.filter(o => o.status !== "Finished" && o.status !== "Done").length}
-                </li>
-                <li>
-                  Completed orders:{" "}
-                  {orders.filter(o => o.status === "Finished" || o.status === "Done").length}
-                </li>
-                <li>
-                  Total production volume:{" "}
-                  {orders.reduce((sum, order) => sum + (order.quantity || 0), 0)} units
-                </li>
-              </Box>
-            </Box>
-          </Paper>
+          <ProductionTimelineChart
+            productionByMonth={productionByMonth}
+            ordersCount={orders.length}
+            activeOrdersCount={
+              orders.filter(o => o.status !== "Finished" && o.status !== "Done").length
+            }
+            completedOrdersCount={
+              orders.filter(o => o.status === "Finished" || o.status === "Done").length
+            }
+            totalVolume={orders.reduce((sum, order) => sum + (order.quantity || 0), 0)}
+          />
         )}
 
-        {selectedView === "products" && (
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Product Distribution
-            </Typography>
-            <Box sx={{ height: 500 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={topProducts}
-                  layout="vertical"
-                  margin={{ top: 20, right: 50, left: 180, bottom: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    type="number"
-                    label={{
-                      value: "Units Produced",
-                      position: "insideBottom",
-                      offset: -10,
-                    }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="description"
-                    width={170}
-                    tickFormatter={value =>
-                      value.length > 40 ? value.substring(0, 40) + "..." : value
-                    }
-                  />
-                  <RechartsTooltip
-                    formatter={(value: number, name: string) => [`${value} units`, "Quantity"]}
-                    labelFormatter={(label: string) => `Product: ${label}`}
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div
-                            style={{
-                              background: "#fff",
-                              border: "1px solid #ccc",
-                              padding: "10px",
-                              borderRadius: "4px",
-                              boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
-                            }}
-                          >
-                            <p style={{ margin: 0 }}>
-                              <strong>Product:</strong> {data.description}
-                            </p>
-                            <p style={{ margin: 0 }}>
-                              <strong>Part No:</strong> {data.partNo}
-                            </p>
-                            <p style={{ margin: 0 }}>
-                              <strong>Total Quantity:</strong> {data.totalQuantity} units
-                            </p>
-                            <p style={{ margin: 0 }}>
-                              <strong>Order Count:</strong> {data.count}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar
-                    dataKey="totalQuantity"
-                    name="Total Quantity"
-                    fill="#8884d8"
-                    radius={[0, 4, 4, 0]}
-                  >
-                    {topProducts.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-        )}
+        {selectedView === "products" && <ProductDistributionChart topProducts={topProducts} />}
 
         {selectedView === "efficiency" && (
           <>
@@ -1291,47 +1190,7 @@ const ProductionDashboardPage = () => {
                 <Typography variant="h6" gutterBottom>
                   Order Completion Details
                 </Typography>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow sx={{ backgroundColor: "background.default" }}>
-                        <TableCell>Order No</TableCell>
-                        <TableCell>Product</TableCell>
-                        <TableCell>Planned End</TableCell>
-                        <TableCell>Actual End</TableCell>
-                        <TableCell>Difference</TableCell>
-                        <TableCell>Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {efficiencyData.map((item, index) => (
-                        <TableRow key={index} hover>
-                          <TableCell>{item.order}</TableCell>
-                          <TableCell>{item.description}</TableCell>
-                          <TableCell>{item.plannedEnd}</TableCell>
-                          <TableCell>{item.actualEnd}</TableCell>
-                          <TableCell
-                            sx={{
-                              color: item.difference > 0 ? "error.main" : "success.main",
-                            }}
-                          >
-                            {item.difference > 0
-                              ? `+${item.difference.toFixed(1)}`
-                              : item.difference.toFixed(1)}{" "}
-                            days
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={item.onTime ? "On Time" : "Delayed"}
-                              color={item.onTime ? "success" : "warning"}
-                              size="small"
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                <EfficiencyDetailsTable data={efficiencyData} />
               </Paper>
             )}
           </>

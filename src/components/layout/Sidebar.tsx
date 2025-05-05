@@ -53,7 +53,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   const handleSubmenuToggle = (text: string) => {
-    setOpenSubmenu(openSubmenu === text ? null : text);
+    setOpenSubmenu(text === openSubmenu ? null : text);
   };
 
   const navItems: NavItem[] = [
@@ -123,18 +123,17 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
     }
   };
 
+  // Only auto-open submenu if navigating directly to a child route
   useEffect(() => {
-    const currentTopLevelPath = location.pathname.split("/")[1];
     const parentItem = navItems.find(
-      item =>
-        item.path === `/${currentTopLevelPath}` || location.pathname.startsWith(item.path + "/")
+      item => item.children && item.children.some(child => child.path === location.pathname)
     );
-
-    if (parentItem && parentItem.children) {
+    if (parentItem) {
       setOpenSubmenu(parentItem.text);
-    } else {
     }
-  }, [location.pathname, navItems]);
+    // Do not close openSubmenu on navigation if user opened it manually
+    // eslint-disable-next-line
+  }, [location.pathname]);
 
   const drawer = (
     <div>
