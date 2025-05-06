@@ -15,3 +15,13 @@ export interface Order {
   assignedResourceId?: string;
   assignedResourceName?: string;
 }
+
+export interface Fault {
+  orderId: string;
+  partNumber: string;
+  refPoint?: string;
+  serialNumber?: string;
+  description?: string;
+  addDate: Timestamp;
+  updated: Timestamp;
+}

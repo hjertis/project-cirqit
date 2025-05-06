@@ -25,6 +25,7 @@ import MigratePlannedWeekStartDateButton from "../pages/admin/MigrateDates";
 import KanbanPage from "../pages/KanbanPage";
 import StandardizeProcessesCollectionPage from "../pages/admin/StandardizeProcessesCollectionPage.tsx";
 import FixInvalidOrderResourcesPage from "../pages/admin/FixInvalidOrderResourcesPage.tsx";
+import FaultTrackingPage from "../pages/FaultTrackingPage.tsx";
 
 const AppRoutes = () => {
   return (
@@ -62,6 +63,9 @@ const AppRoutes = () => {
         <Route path="/time" element={<TimeDashboardPage />} />
         <Route path="/resources" element={<ResourceManagementPage />} />
         <Route path="/kanban" element={<KanbanPage />} />
+        <Route path="/faults" element={<div>Faults Page</div>} />
+        <Route path="/fault-tracking" element={<FaultTrackingPage />} />
+        <Route path="/fault-report" element={<div>Fault Report Page</div>} />
         <Route
           path="/admin/migrate-orders"
           element={

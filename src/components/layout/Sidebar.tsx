@@ -28,6 +28,7 @@ import {
   CalendarViewWeek as CalendarViewWeekIcon,
   CalendarToday as CalendarTodayIcon,
   ViewKanban as ViewKanbanIcon,
+  Error as ErrorIcon,
 } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 
@@ -84,6 +85,15 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       text: "Products",
       icon: <ProductsIcon />,
       path: "/products",
+    },
+    {
+      text: "Faults",
+      icon: <ErrorIcon />,
+      path: "/faults",
+      children: [
+        { text: "Log Fault", icon: <ErrorIcon />, path: "/fault-tracking" },
+        { text: "Fault Report", icon: <ErrorIcon />, path: "/fault-report" },
+      ],
     },
     {
       text: "Employees",
