@@ -21,7 +21,16 @@ import {
   Today as TodayIcon,
 } from "@mui/icons-material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -65,6 +74,53 @@ const calculateEndDate = (startDate: Date, estimatedHours: number): Date => {
   }
   return currentDate.startOf("day").toDate();
 };
+
+function SchedulerSortableItem({
+  order,
+  onMove,
+}: {
+  order: SchedulerOrder;
+  onMove: (order: SchedulerOrder) => void;
+}) {
+  const theme = useTheme();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: order.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+    cursor: "grab",
+    borderLeft: `4px solid ${theme.palette.primary.main}`,
+    backgroundColor: "background.paper",
+    fontSize: "0.7rem",
+    marginBottom: 4,
+    padding: 8,
+    boxShadow: isDragging ? theme.shadows[3] : theme.shadows[1],
+    overflow: "hidden",
+  };
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      title={`${order.orderNumber}: ${order.description}`}
+    >
+      <IconButton size="small" onClick={() => onMove(order)} sx={{ ml: 1 }}>
+        <TodayIcon fontSize="inherit" />
+      </IconButton>
+      <Typography variant="caption" component="div" fontWeight="medium" noWrap>
+        {order.orderNumber} ({order.estimatedHours}h)
+      </Typography>
+      <Typography variant="caption" component="div" noWrap color="text.secondary">
+        {order.description}
+      </Typography>
+    </Paper>
+  );
+}
 
 const DailyScheduler: React.FC = () => {
   const theme = useTheme();
@@ -158,34 +214,27 @@ const DailyScheduler: React.FC = () => {
     }
   }, [fetchedOrders]);
 
-  const handleDragEnd = async (result: DropResult) => {
-    const { source, destination, draggableId: orderId } = result;
+  // dnd-kit sensors
+  const sensors = useSensors(useSensor(PointerSensor));
 
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index)
-      return;
-
-    const [resourceId, dateString] = destination.droppableId.split("|");
-
-    const currentSchedulerOrders = [...schedulerOrders];
-    const order = currentSchedulerOrders.find(o => o.id === orderId);
-
-    if (!order) {
-      console.error("Order NOT FOUND in state snapshot!");
-    }
-
+  // dnd-kit drag end handler
+  const handleDndKitDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !active) return;
+    const [resourceId, dateString] = over.id.split("|");
+    const orderId = active.id;
+    const order = schedulerOrders.find(o => o.id === orderId);
+    if (!order) return;
     if (
       order.estimatedHours === undefined ||
       order.estimatedHours === null ||
       order.estimatedHours <= 0
     ) {
-      console.error("Order found, but missing valid estimated hours:", orderId, order);
       return;
     }
     const newStartDate = dayjs(dateString).hour(8).minute(0).second(0).toDate();
     const newEndDate = calculateEndDate(newStartDate, order.estimatedHours);
     const newPlannedWeekStartDate = dayjs(newStartDate).startOf("isoWeek").format("YYYY-MM-DD");
-
     const originalOrders = [...schedulerOrders];
     setSchedulerOrders(prevOrders =>
       prevOrders.map(o =>
@@ -200,9 +249,8 @@ const DailyScheduler: React.FC = () => {
           : o
       )
     );
-
     try {
-      await updateDoc(doc(db, "orders", orderId), {
+      await updateDoc(doc(db, "orders", orderId as string), {
         assignedResourceId: resourceId,
         start: Timestamp.fromDate(newStartDate),
         end: Timestamp.fromDate(newEndDate),
@@ -210,7 +258,6 @@ const DailyScheduler: React.FC = () => {
         updated: Timestamp.now(),
       });
     } catch (err) {
-      console.error("Failed to update schedule:", err);
       setSchedulerOrders(originalOrders);
     }
   };
@@ -263,7 +310,11 @@ const DailyScheduler: React.FC = () => {
 
   return (
     <React.Fragment>
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDndKitDragEnd}
+      >
         <Box sx={{ p: 2 }}>
           <Box
             sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}
@@ -374,77 +425,36 @@ const DailyScheduler: React.FC = () => {
                         )
                     );
                     return (
-                      <Droppable droppableId={droppableId} key={droppableId}>
-                        {(provided, snapshot) => (
-                          <Box
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            sx={{
-                              borderBottom: `1px solid ${theme.palette.divider}`,
-                              borderRight: `1px solid ${theme.palette.divider}`,
-                              minHeight: 100,
-                              p: 0.5,
-                              backgroundColor: snapshot.isDraggingOver
-                                ? theme.palette.action.focus
-                                : dayjs(date).isSame(dayjs(), "day")
-                                  ? theme.palette.action.hover
-                                  : "background.paper",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 0.5,
-                              overflowY: "auto",
-                            }}
-                          >
-                            {cellOrders.map((order, index) => (
-                              <Draggable draggableId={order.id} index={index} key={order.id}>
-                                {(providedDraggable, snapshotDraggable) => (
-                                  <Paper
-                                    ref={providedDraggable.innerRef}
-                                    {...providedDraggable.draggableProps}
-                                    {...providedDraggable.dragHandleProps}
-                                    elevation={snapshotDraggable.isDragging ? 3 : 1}
-                                    sx={{
-                                      p: 0.5,
-                                      fontSize: "0.7rem",
-                                      opacity: snapshotDraggable.isDragging ? 0.8 : 1,
-                                      cursor: "grab",
-                                      overflow: "hidden",
-                                      borderLeft: `4px solid ${theme.palette.primary.main}`,
-                                      "&:hover": { boxShadow: 3 },
-                                    }}
-                                    title={`${order.orderNumber}: ${order.description}`}
-                                  >
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleOpenMoveDialog(order)}
-                                      sx={{ ml: 1 }}
-                                    >
-                                      <TodayIcon fontSize="inherit" />
-                                    </IconButton>
-                                    <Typography
-                                      variant="caption"
-                                      component="div"
-                                      fontWeight="medium"
-                                      noWrap
-                                    >
-                                      {order.orderNumber} ({order.estimatedHours}h)
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      component="div"
-                                      noWrap
-                                      color="text.secondary"
-                                    >
-                                      {order.description}
-                                    </Typography>
-                                  </Paper>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </Box>
-                        )}
-                      </Droppable>
+                      <SortableContext
+                        key={droppableId}
+                        items={cellOrders.map(o => o.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <Box
+                          sx={{
+                            borderBottom: `1px solid ${theme.palette.divider}`,
+                            borderRight: `1px solid ${theme.palette.divider}`,
+                            minHeight: 100,
+                            p: 0.5,
+                            backgroundColor: dayjs(date).isSame(dayjs(), "day")
+                              ? theme.palette.action.hover
+                              : "background.paper",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.5,
+                            overflowY: "auto",
+                          }}
+                          id={droppableId}
+                        >
+                          {cellOrders.map(order => (
+                            <SchedulerSortableItem
+                              key={order.id}
+                              order={order}
+                              onMove={handleOpenMoveDialog}
+                            />
+                          ))}
+                        </Box>
+                      </SortableContext>
                     );
                   })}
                 </React.Fragment>
@@ -452,7 +462,7 @@ const DailyScheduler: React.FC = () => {
             </Box>
           </Paper>
         </Box>
-      </DragDropContext>
+      </DndContext>
       <Dialog open={moveDialogOpen} onClose={handleCloseMoveDialog}>
         <DialogTitle>Move Order to Another Week</DialogTitle>
         <DialogContent>

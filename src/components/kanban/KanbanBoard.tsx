@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { Box, Typography, Paper, CircularProgress, Alert, useTheme } from "@mui/material";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  useDroppable, // <-- add this import
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   collection,
   query,
@@ -24,6 +39,70 @@ interface KanbanOrder extends FirebaseOrder {
 
 type BoardData = {
   [key: string]: KanbanOrder[];
+};
+
+function KanbanSortableItem({
+  order,
+  onClick,
+}: {
+  order: KanbanOrder;
+  onClick: (id: string) => void;
+}) {
+  const theme = useTheme();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: order.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+    cursor: "pointer",
+    borderLeft: `4px solid ${theme.palette.primary.main}`,
+    backgroundColor: "background.paper",
+    userSelect: "none",
+    marginBottom: 8,
+    padding: 12,
+    boxShadow: isDragging ? theme.shadows[4] : theme.shadows[1],
+  };
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => onClick(order.id)}
+    >
+      <Typography variant="subtitle2" fontWeight="bold">
+        {order.orderNumber}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {order.partNo}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {order.description}
+      </Typography>
+    </Paper>
+  );
+}
+
+const KanbanDroppableColumn = ({ id, children }: { id: string; children: React.ReactNode }) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        overflowY: "auto",
+        flexGrow: 1,
+        minHeight: 100,
+        backgroundColor: isOver ? "primary.light" : undefined,
+        transition: "background 0.2s",
+      }}
+    >
+      {children}
+    </Box>
+  );
 };
 
 const InProgressKanbanBoard: React.FC = () => {
@@ -92,44 +171,53 @@ const InProgressKanbanBoard: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleDragEnd = async (result: DropResult) => {
-    const { source, destination, draggableId } = result;
+  // dnd-kit sensors
+  const sensors = useSensors(useSensor(PointerSensor));
 
-    if (!destination) {
-      return;
+  // dnd-kit drag end handler
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !active) return;
+
+    // Find the source column
+    let sourceCol = null;
+    for (const col of KANBAN_COLUMNS) {
+      if (boardData[col].find(o => o.id === active.id)) sourceCol = col;
     }
+    if (!sourceCol) return;
 
-    if (source.droppableId === destination.droppableId && source.index === destination.index) {
-      return;
-    }
-
-    const startColumnName = source.droppableId;
-    const endColumnName = destination.droppableId;
-
-    const startColumn = Array.from(boardData[startColumnName]);
-    const [movedOrder] = startColumn.splice(source.index, 1);
-    const endColumn = Array.from(boardData[endColumnName]);
-
-    if (startColumnName === endColumnName) {
-      endColumn.splice(destination.index, 0, movedOrder);
-      const newBoardData = { ...boardData, [startColumnName]: endColumn };
-      setBoardData(newBoardData);
+    // Determine destination column
+    let destCol = null;
+    if (KANBAN_COLUMNS.includes(over.id as string)) {
+      destCol = over.id;
     } else {
-      endColumn.splice(destination.index, 0, { ...movedOrder, currentProcessName: endColumnName });
-      const newBoardData = {
-        ...boardData,
-        [startColumnName]: startColumn,
-        [endColumnName]: endColumn,
-      };
-      setBoardData(newBoardData);
+      for (const col of KANBAN_COLUMNS) {
+        if (boardData[col].find(o => o.id === over.id)) destCol = col;
+      }
+    }
+    if (!destCol) return;
+
+    // Move the order in the UI
+    const sourceList = Array.from(boardData[sourceCol]);
+    const destList = Array.from(boardData[destCol]);
+    const orderIdx = sourceList.findIndex(o => o.id === active.id);
+    const [movedOrder] = sourceList.splice(orderIdx, 1);
+    if (sourceCol === destCol) {
+      const overIdx = destList.findIndex(o => o.id === over.id);
+      destList.splice(overIdx, 0, movedOrder);
+      setBoardData({ ...boardData, [sourceCol]: destList });
+    } else {
+      movedOrder.currentProcessName = destCol;
+      const overIdx = destList.findIndex(o => o.id === over.id);
+      destList.splice(overIdx === -1 ? destList.length : overIdx, 0, movedOrder);
+      setBoardData({ ...boardData, [sourceCol]: sourceList, [destCol]: destList });
     }
 
+    // Update Firestore
     try {
-      const orderRef = doc(db, "orders", draggableId);
-
+      const orderRef = doc(db, "orders", active.id as string);
       await updateDoc(orderRef, {
-        currentProcessName: endColumnName,
-
+        currentProcessName: destCol,
         updated: Timestamp.now(),
       });
     } catch (err) {
@@ -148,72 +236,43 @@ const InProgressKanbanBoard: React.FC = () => {
 
   return (
     <React.Fragment>
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <Box sx={{ display: "flex", gap: 2, p: 2, overflowX: "auto" }}>
           {KANBAN_COLUMNS.map(columnName => (
-            <Droppable droppableId={columnName} key={columnName}>
-              {(provided, snapshot) => (
-                <Paper
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  sx={{
-                    p: 1,
-                    width: 300,
-                    minWidth: 300,
-                    backgroundColor: snapshot.isDraggingOver
-                      ? theme.palette.action.hover
-                      : theme.palette.grey[100],
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "fit-content",
-                    maxHeight: "80vh",
-                  }}
-                >
-                  <Typography variant="h6" sx={{ p: 1, mb: 1 }}>
-                    {columnName} ({boardData[columnName]?.length || 0})
-                  </Typography>
-                  <Box sx={{ overflowY: "auto", flexGrow: 1, minHeight: 100 }}>
-                    {boardData[columnName]?.map((order, index) => (
-                      <Draggable key={order.id} draggableId={order.id} index={index}>
-                        {(providedDraggable, snapshotDraggable) => (
-                          <Paper
-                            ref={providedDraggable.innerRef}
-                            {...providedDraggable.draggableProps}
-                            {...providedDraggable.dragHandleProps}
-                            elevation={snapshotDraggable.isDragging ? 4 : 1}
-                            sx={{
-                              p: 1.5,
-                              mb: 1,
-                              userSelect: "none",
-                              backgroundColor: "background.paper",
-                              opacity: snapshotDraggable.isDragging ? 0.8 : 1,
-                              cursor: "pointer",
-                              borderLeft: `4px solid ${theme.palette.primary.main}`,
-                              "&:hover": { boxShadow: 3 },
-                            }}
-                            onClick={() => handleOpenDetailsDialog(order.id)}
-                          >
-                            <Typography variant="subtitle2" fontWeight="bold">
-                              {order.orderNumber}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {order.partNo}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {order.description}
-                            </Typography>
-                          </Paper>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </Box>
-                </Paper>
-              )}
-            </Droppable>
+            <Paper
+              key={columnName}
+              sx={{
+                p: 1,
+                width: 300,
+                minWidth: 300,
+                backgroundColor: theme.palette.grey[100],
+                display: "flex",
+                flexDirection: "column",
+                height: "fit-content",
+                maxHeight: "80vh",
+              }}
+            >
+              <Typography variant="h6" sx={{ p: 1, mb: 1 }}>
+                {columnName} ({boardData[columnName]?.length || 0})
+              </Typography>
+              <SortableContext
+                items={boardData[columnName].map(o => o.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <KanbanDroppableColumn id={columnName}>
+                  {boardData[columnName]?.map(order => (
+                    <KanbanSortableItem
+                      key={order.id}
+                      order={order}
+                      onClick={handleOpenDetailsDialog}
+                    />
+                  ))}
+                </KanbanDroppableColumn>
+              </SortableContext>
+            </Paper>
           ))}
         </Box>
-      </DragDropContext>
+      </DndContext>
       {selectedOrderId && (
         <OrderDetailsDialog
           orderId={selectedOrderId}

@@ -15,7 +15,17 @@ import {
   Person as PersonIcon,
   Build as BuildIcon,
 } from "@mui/icons-material";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  useDroppable, // <-- add this import
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import dayjs from "dayjs";
 import weekOfYear from "dayjs/plugin/weekOfYear";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -188,15 +198,147 @@ const calculateEndDate = (startDate: Date, estimatedHours: number): Date => {
   return currentDate.toDate();
 };
 
-const ResourcePlanningBoard: React.FC = () => {
+const getLoadBackgroundColor = (load: number, capacity: number): string => {
+  if (capacity <= 0) return "transparent";
+  const percentage = (load / capacity) * 100;
+  if (percentage > 100) return "#ffebee";
+  if (percentage > 85) return "#fff3e0";
+  return "transparent";
+};
+
+const getOrderBackgroundColor = (status?: string, isDragging?: boolean, theme?: any): string => {
+  if (isDragging && theme) return theme.palette.action.selected;
+  if (status === "Firm Planned") return "#e3f2fd";
+  return theme ? theme.palette.background.paper : "#fff";
+};
+
+function PlanningSortableItem({
+  order,
+  onClick,
+}: {
+  order: PlanningOrder;
+  onClick: (id: string) => void;
+}) {
+  const theme = useTheme();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: String(order.id),
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+    cursor: isDragging ? "grabbing" : "grab",
+    borderLeft: `4px solid ${getPriorityColor(order.priority)}`,
+    backgroundColor: getOrderBackgroundColor(order.status, isDragging, theme),
+    fontSize: "0.75rem",
+    marginBottom: 4,
+    padding: 8,
+    boxShadow: isDragging ? theme.shadows[3] : theme.shadows[1],
+    overflow: "hidden",
+    position: "relative",
+  };
+
+  // Track pointer movement to distinguish click vs drag
+  const pointerDownRef = React.useRef<{ x: number; y: number } | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    pointerDownRef.current = { x: e.clientX, y: e.clientY };
+    if (listeners.onPointerDown) listeners.onPointerDown(e);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (pointerDownRef.current) {
+      const dx = Math.abs(e.clientX - pointerDownRef.current.x);
+      const dy = Math.abs(e.clientY - pointerDownRef.current.y);
+      if (dx < 5 && dy < 5) {
+        // Considered a click, not a drag
+        onClick(order.id);
+      }
+    }
+    pointerDownRef.current = null;
+  };
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      // Remove onClick from here
+      // {...listeners} // Remove listeners from Paper
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      // Attach drag listeners to a drag handle if you want (not required here)
+    >
+      <div {...listeners} style={{ width: "100%", height: "100%" }}>
+        <Typography variant="caption" component="div" fontWeight="medium" noWrap>
+          {order.orderNumber} ({order.estimatedHours}h)
+        </Typography>
+        <Typography variant="caption" component="div" noWrap color="text.secondary">
+          {order.description}
+        </Typography>
+        {order.partNo && (
+          <Typography variant="caption" component="div" noWrap color="text.secondary">
+            Part: {order.partNo}
+          </Typography>
+        )}
+      </div>
+    </Paper>
+  );
+}
+
+// Add a droppable wrapper for each cell
+const PlanningDroppableCell = ({
+  id,
+  children,
+  backgroundColor,
+}: {
+  id: string;
+  children: React.ReactNode;
+  backgroundColor?: string;
+}) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        width: WEEK_CELL_WIDTH,
+        minWidth: WEEK_CELL_WIDTH,
+        flexShrink: 0,
+        p: 1,
+        borderLeft: 1,
+        borderColor: "divider",
+        position: "relative",
+        backgroundColor: isOver ? "primary.light" : backgroundColor,
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.5,
+        minHeight: "100px",
+        transition: "background 0.2s",
+      }}
+      id={id}
+    >
+      {children}
+    </Box>
+  );
+};
+
+interface ResourcePlanningBoardProps {
+  onOrderClick: (orderId: string) => void;
+  refreshKey?: number;
+}
+
+const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
+  onOrderClick,
+  refreshKey,
+}) => {
+  console.log("ResourcePlanningBoard: render/mount");
   const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
   const [resources, setResources] = useState<ResourceWithLoad[]>([]);
   const [orders, setOrders] = useState<PlanningOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  // Remove dialog state
 
   const visibleWeeks = useMemo(
     () =>
@@ -207,11 +349,11 @@ const ResourcePlanningBoard: React.FC = () => {
   );
 
   const fetchData = async () => {
+    console.log("ResourcePlanningBoard: fetchData called");
     setLoading(true);
     setError(null);
     try {
       const fetchedResources = await getResources(true);
-
       const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("isoWeek").toDate();
       const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("isoWeek").toDate();
       const fetchedOrders = await fetchPlanningData(startDate, endDate);
@@ -248,8 +390,9 @@ const ResourcePlanningBoard: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log("ResourcePlanningBoard: useEffect (fetchData) triggered");
     fetchData();
-  }, [currentWeekStart]);
+  }, [currentWeekStart, refreshKey]);
 
   const handlePrevWeek = () => {
     setCurrentWeekStart(dayjs(currentWeekStart).subtract(1, "week").toDate());
@@ -260,8 +403,7 @@ const ResourcePlanningBoard: React.FC = () => {
   };
 
   const handleViewOrder = (orderId: string) => {
-    setSelectedOrderId(orderId);
-    setDetailsDialogOpen(true);
+    onOrderClick(orderId);
   };
 
   const handleGoToToday = () => {
@@ -288,6 +430,47 @@ const ResourcePlanningBoard: React.FC = () => {
     if (isDragging) return theme.palette.action.selected;
     if (status === "Firm Planned") return "#e3f2fd";
     return "background.paper";
+  };
+
+  // dnd-kit sensors
+  const sensors = useSensors(useSensor(PointerSensor));
+
+  // dnd-kit drag end handler
+  const handleDndKitDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !active) return;
+    let cellId = over.id;
+    // If dropped on an order, resolve to its cell
+    if (typeof cellId === "string" && !cellId.includes("|")) {
+      const overOrder = orders.find(o => String(o.id) === cellId);
+      if (overOrder) {
+        cellId = `${overOrder.assignedResourceId ?? "unassigned"}|${overOrder.plannedWeekStartDate}`;
+      }
+    }
+    const [destResourceId, destWeekStart] = String(cellId).split("|");
+    const orderId = active.id;
+    const newPlannedWeekStartDate = dayjs(destWeekStart).format("YYYY-MM-DD");
+    const draggedOrder = orders.find(o => String(o.id) === orderId);
+    if (!draggedOrder) return;
+    const newStartDate = dayjs(destWeekStart).hour(8).minute(0).second(0).toDate();
+    const newEndDate = calculateEndDate(newStartDate, draggedOrder.estimatedHours || 8);
+    try {
+      await updateDoc(doc(db, "orders", String(orderId)), {
+        assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
+        plannedWeekStartDate: newPlannedWeekStartDate,
+        start: Timestamp.fromDate(newStartDate),
+        end: Timestamp.fromDate(newEndDate),
+        updated: Timestamp.now(),
+      });
+      fetchData();
+    } catch (err) {
+      setError("Failed to update order in Firestore.");
+    }
+  };
+
+  // Add a handler to refresh only after an update
+  const handleOrderUpdated = () => {
+    fetchData();
   };
 
   if (loading) {
@@ -332,45 +515,10 @@ const ResourcePlanningBoard: React.FC = () => {
         </Box>
       </Box>
 
-      <DragDropContext
-        onDragEnd={async result => {
-          console.log("Drag result: ", result);
-          if (!result.destination) return;
-          const [destResourceId, destWeekStart] = result.destination.droppableId.split("|");
-          const orderId = result.draggableId;
-
-          const newPlannedWeekStartDate = dayjs(destWeekStart).format("YYYY-MM-DD");
-
-          // Find the order that was dragged
-          const draggedOrder = orders.find(o => o.id === orderId);
-          if (!draggedOrder) return;
-
-          // Calculate new start and end dates based on the plannedWeekStartDate
-          const newStartDate = dayjs(destWeekStart).hour(8).minute(0).second(0).toDate();
-          const newEndDate = calculateEndDate(newStartDate, draggedOrder.estimatedHours || 8);
-
-          console.log("Saving to Firestore:", {
-            assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
-            plannedWeekStartDate: newPlannedWeekStartDate,
-            start: newStartDate,
-            end: newEndDate,
-          });
-
-          try {
-            await updateDoc(doc(db, "orders", orderId), {
-              assignedResourceId: destResourceId === "unassigned" ? null : destResourceId,
-              plannedWeekStartDate: newPlannedWeekStartDate,
-              start: Timestamp.fromDate(newStartDate),
-              end: Timestamp.fromDate(newEndDate),
-              updated: Timestamp.now(),
-            });
-            console.log("Firestore updated!");
-
-            fetchData();
-          } catch (err) {
-            setError("Failed to update order in Firestore.");
-          }
-        }}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDndKitDragEnd}
       >
         <Box sx={{ overflowX: "auto", pb: 1 }}>
           <Box
@@ -470,118 +618,57 @@ const ResourcePlanningBoard: React.FC = () => {
                 const droppableId = `${resource.id}|${weekStartStr}`;
 
                 return (
-                  <Droppable droppableId={droppableId} key={droppableId}>
-                    {(provided, snapshot) => (
+                  <SortableContext
+                    key={droppableId}
+                    items={cellOrders.map(o => String(o.id))}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <PlanningDroppableCell
+                      id={droppableId}
+                      backgroundColor={getLoadBackgroundColor(currentLoad, weeklyCapacity)}
+                    >
                       <Box
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
                         sx={{
-                          width: WEEK_CELL_WIDTH,
-                          minWidth: WEEK_CELL_WIDTH,
-                          flexShrink: 0,
-                          p: 1,
-                          borderLeft: 1,
-                          borderColor: "divider",
-                          position: "relative",
-                          backgroundColor: snapshot.isDraggingOver
-                            ? theme.palette.action.selected
-                            : getLoadBackgroundColor(currentLoad, weeklyCapacity),
                           display: "flex",
-                          flexDirection: "column",
-                          gap: 0.5,
-                          minHeight: "100px",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 0.5,
                         }}
                       >
-                        <Box
+                        <Typography
+                          variant="caption"
                           sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 0.5,
+                            color: getLoadColor(currentLoad, weeklyCapacity),
+                            fontWeight: "bold",
                           }}
                         >
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: getLoadColor(currentLoad, weeklyCapacity),
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {Math.round(currentLoad)}h / {weeklyCapacity}h ({loadPercentage}%)
+                          {Math.round(currentLoad)}h / {weeklyCapacity}h ({loadPercentage}%)
+                        </Typography>
+                      </Box>
+                      {cellOrders.length > 0 ? (
+                        cellOrders.map(order => (
+                          <PlanningSortableItem
+                            key={order.id}
+                            order={order}
+                            onClick={handleViewOrder}
+                          />
+                        ))
+                      ) : (
+                        <Box
+                          sx={{
+                            flexGrow: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Typography variant="caption" color="text.disabled">
+                            No orders
                           </Typography>
                         </Box>
-                        {cellOrders.length > 0 ? (
-                          cellOrders.map((order, index) => (
-                            <Draggable draggableId={String(order.id)} index={index} key={order.id}>
-                              {(provided, snapshot) => (
-                                <Paper
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  elevation={1}
-                                  sx={{
-                                    p: 0.5,
-                                    fontSize: "0.75rem",
-                                    cursor: snapshot.isDragging ? "grabbing" : "grab",
-                                    borderLeft: `4px solid ${getPriorityColor(order.priority)}`,
-                                    "&:hover": { boxShadow: 3, zIndex: 10 },
-                                    position: "relative",
-                                    overflow: "hidden",
-                                    backgroundColor: getOrderBackgroundColor(
-                                      order.status,
-                                      snapshot.isDragging
-                                    ),
-                                  }}
-                                  onClick={() => handleViewOrder(order.id)}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    component="div"
-                                    fontWeight="medium"
-                                    noWrap
-                                  >
-                                    {order.orderNumber} ({order.estimatedHours}h)
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    component="div"
-                                    noWrap
-                                    color="text.secondary"
-                                  >
-                                    {order.description}
-                                  </Typography>
-                                  {order.partNo && (
-                                    <Typography
-                                      variant="caption"
-                                      component="div"
-                                      noWrap
-                                      color="text.secondary"
-                                    >
-                                      Part: {order.partNo}
-                                    </Typography>
-                                  )}
-                                </Paper>
-                              )}
-                            </Draggable>
-                          ))
-                        ) : (
-                          <Box
-                            sx={{
-                              flexGrow: 1,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Typography variant="caption" color="text.disabled">
-                              No orders
-                            </Typography>
-                          </Box>
-                        )}
-                        {provided.placeholder}
-                      </Box>
-                    )}
-                  </Droppable>
+                      )}
+                    </PlanningDroppableCell>
+                  </SortableContext>
                 );
               })}
             </Box>
@@ -621,101 +708,44 @@ const ResourcePlanningBoard: React.FC = () => {
               );
               const droppableId = `unassigned|${weekStartStr}`;
               return (
-                <Droppable droppableId={droppableId} key={droppableId}>
-                  {(provided, snapshot) => (
-                    <Box
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      sx={{
-                        width: WEEK_CELL_WIDTH,
-                        minWidth: WEEK_CELL_WIDTH,
-                        flexShrink: 0,
-                        p: 1,
-                        borderLeft: 1,
-                        borderColor: "divider",
-                        position: "relative",
-                        backgroundColor: snapshot.isDraggingOver
-                          ? theme.palette.action.selected
-                          : theme.palette.action.hover,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 0.5,
-                        minHeight: "100px",
-                      }}
-                    >
-                      {unassignedOrders.length > 0 ? (
-                        unassignedOrders.map((order, index) => (
-                          <Draggable draggableId={String(order.id)} index={index} key={order.id}>
-                            {(provided, snapshot) => (
-                              <Paper
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                elevation={1}
-                                sx={{
-                                  p: 0.5,
-                                  fontSize: "0.75rem",
-                                  cursor: snapshot.isDragging ? "grabbing" : "grab",
-                                  borderLeft: `4px solid ${getPriorityColor(order.priority)}`,
-                                  "&:hover": { boxShadow: 3, zIndex: 10 },
-                                  position: "relative",
-                                  overflow: "hidden",
-                                  backgroundColor: getOrderBackgroundColor(
-                                    order.status,
-                                    snapshot.isDragging
-                                  ),
-                                }}
-                                onClick={() => handleViewOrder(order.id)}
-                              >
-                                <Typography
-                                  variant="caption"
-                                  component="div"
-                                  fontWeight="medium"
-                                  noWrap
-                                >
-                                  {order.orderNumber} ({Math.round(order.estimatedHours)}h)
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  component="div"
-                                  noWrap
-                                  color="text.secondary"
-                                >
-                                  {order.description}
-                                </Typography>
-                              </Paper>
-                            )}
-                          </Draggable>
-                        ))
-                      ) : (
-                        <Box
-                          sx={{
-                            flexGrow: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Typography variant="caption" color="text.disabled">
-                            No unassigned orders
-                          </Typography>
-                        </Box>
-                      )}
-                      {provided.placeholder}
-                    </Box>
-                  )}
-                </Droppable>
+                <SortableContext
+                  key={droppableId}
+                  items={unassignedOrders.map(o => String(o.id))}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <PlanningDroppableCell
+                    id={droppableId}
+                    backgroundColor={getLoadBackgroundColor(0, 0)}
+                  >
+                    {unassignedOrders.length > 0 ? (
+                      unassignedOrders.map(order => (
+                        <PlanningSortableItem
+                          key={order.id}
+                          order={order}
+                          onClick={handleViewOrder}
+                        />
+                      ))
+                    ) : (
+                      <Box
+                        sx={{
+                          flexGrow: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Typography variant="caption" color="text.disabled">
+                          No unassigned orders
+                        </Typography>
+                      </Box>
+                    )}
+                  </PlanningDroppableCell>
+                </SortableContext>
               );
             })}
           </Box>
         </Box>
-      </DragDropContext>
-
-      <OrderDetailsDialog
-        open={detailsDialogOpen}
-        onClose={() => setDetailsDialogOpen(false)}
-        orderId={selectedOrderId}
-      />
+      </DndContext>
     </Paper>
   );
 };
