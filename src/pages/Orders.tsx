@@ -158,7 +158,7 @@ const OrdersPage = () => {
             : "Status: Delayed";
       setActiveFilters([filterLabel]);
     }
-  }, [tabValue, updateFilter]);
+  }, [tabValue]);
 
   const filteredOrders = orders.filter(order => {
     if (!searchTerm) return true;

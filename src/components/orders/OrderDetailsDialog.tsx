@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -133,7 +134,6 @@ const OrderDetailsDialog = ({
 
   const [order, setOrder] = useState<FirebaseOrder | null>(null);
   const [processes, setProcesses] = useState<Process[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [isArchiving, setIsArchiving] = useState(false);
@@ -141,51 +141,41 @@ const OrderDetailsDialog = ({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const fetchOrderDetails = async () => {
-    if (!orderId || !open) return;
-
-    setLoading(true);
-    try {
+  // React Query for order and processes
+  const {
+    data: orderDataBundle,
+    isLoading: loading,
+    isError: isOrderError,
+    error: orderError,
+  } = useQuery({
+    queryKey: ["order-details-dialog", orderId, open],
+    queryFn: async () => {
+      if (!orderId || !open) throw new Error("Order ID is missing");
       const orderDoc = await getDoc(doc(db, "orders", orderId));
-
-      if (!orderDoc.exists()) {
-        setError("Order not found");
-        setLoading(false);
-        return;
-      }
-
-      setOrder({ id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder);
-
+      if (!orderDoc.exists()) throw new Error("Order not found");
+      const orderData = { id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder;
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderId)
       );
-
       const processesSnapshot = await getDocs(processesQuery);
       const processesData: Process[] = [];
-
       processesSnapshot.forEach(doc => {
-        processesData.push({
-          id: doc.id,
-          ...doc.data(),
-        } as Process);
+        processesData.push({ id: doc.id, ...doc.data() } as Process);
       });
-
       processesData.sort((a, b) => a.sequence - b.sequence);
-      setProcesses(processesData);
-
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching order details:", err);
-      setError("Failed to load order details. Please try again later.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return { order: orderData, processes: processesData };
+    },
+    enabled: open && !!orderId,
+  });
 
   useEffect(() => {
-    fetchOrderDetails();
-  }, [orderId, open]);
+    if (orderDataBundle) {
+      setOrder(orderDataBundle.order);
+      setProcesses(orderDataBundle.processes);
+      setError(null);
+    }
+  }, [orderDataBundle]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -247,10 +237,12 @@ const OrderDetailsDialog = ({
       );
     }
 
-    if (error || !order) {
+    if (isOrderError || error || !order) {
       return (
         <Box sx={{ p: 2 }}>
-          <Alert severity="error">{error || "Order not found"}</Alert>
+          <Alert severity="error">
+            {orderError instanceof Error ? orderError.message : error || "Order not found"}
+          </Alert>
         </Box>
       );
     }

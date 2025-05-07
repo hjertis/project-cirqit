@@ -1,4 +1,7 @@
 import { Paper, Typography, Box } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../config/firebase";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -11,56 +14,102 @@ import {
   Line,
 } from "recharts";
 
-interface MonthlyProductionData {
-  month: string;
-  quantity: number;
-  isPast: boolean;
-}
+const ProductionTimelineChart = () => {
+  const fetchProductionTimeline = async () => {
+    const ordersSnap = await getDocs(collection(db, "orders"));
+    const archivedSnap = await getDocs(collection(db, "archivedOrders"));
+    const allOrders = [
+      ...ordersSnap.docs.map(doc => doc.data()),
+      ...archivedSnap.docs.map(doc => doc.data()),
+    ];
+    // Group by month
+    const monthMap = new Map();
+    let ordersCount = allOrders.length;
+    let activeOrdersCount = 0;
+    let completedOrdersCount = 0;
+    let totalVolume = 0;
+    allOrders.forEach(order => {
+      const date = order.start
+        ? new Date(order.start.seconds ? order.start.seconds * 1000 : order.start)
+        : null;
+      if (!date || isNaN(date.getTime())) return;
+      const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      if (!monthMap.has(month)) {
+        monthMap.set(month, { month, quantity: 0, isPast: date < new Date() });
+      }
+      const entry = monthMap.get(month);
+      entry.quantity += order.quantity || 0;
+      totalVolume += order.quantity || 0;
+      if (order.status === "Done" || order.status === "Finished") completedOrdersCount++;
+      else activeOrdersCount++;
+    });
+    const productionByMonth = Array.from(monthMap.values()).sort((a, b) =>
+      a.month.localeCompare(b.month)
+    );
+    return { productionByMonth, ordersCount, activeOrdersCount, completedOrdersCount, totalVolume };
+  };
 
-interface ProductionTimelineChartProps {
-  productionByMonth: MonthlyProductionData[];
-  ordersCount: number;
-  activeOrdersCount: number;
-  completedOrdersCount: number;
-  totalVolume: number;
-}
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["productionTimelineChart"],
+    queryFn: fetchProductionTimeline,
+    staleTime: 1000 * 60 * 5,
+  });
 
-const ProductionTimelineChart = ({
-  productionByMonth,
-  ordersCount,
-  activeOrdersCount,
-  completedOrdersCount,
-  totalVolume,
-}: ProductionTimelineChartProps) => (
-  <Paper sx={{ p: 2 }}>
-    <Typography variant="h6" gutterBottom>
-      Production Timeline
-    </Typography>
-    <Box sx={{ height: 400 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={productionByMonth}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="month" angle={-45} textAnchor="end" height={60} />
-          <YAxis />
-          <RechartsTooltip formatter={value => [`${value} units`, "Quantity"]} />
-          <Legend />
-          <Bar dataKey="quantity" fill="#8884d8" />
-          <Line type="monotone" dataKey="quantity" stroke="#ff7300" />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </Box>
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Production Insights
-      </Typography>
-      <Box component="ul" sx={{ pl: 4 }}>
-        <li>Total orders in system: {ordersCount}</li>
-        <li>Active orders: {activeOrdersCount}</li>
-        <li>Completed orders: {completedOrdersCount}</li>
-        <li>Total production volume: {totalVolume} units</li>
+  if (isLoading)
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
+        <span>Loading...</span>
       </Box>
-    </Box>
-  </Paper>
-);
+    );
+  if (isError)
+    return (
+      <Box sx={{ p: 2 }}>
+        <span style={{ color: "red" }}>
+          {error instanceof Error ? error.message : String(error)}
+        </span>
+      </Box>
+    );
+  if (!data || data.productionByMonth.length === 0)
+    return (
+      <Box sx={{ p: 2 }}>
+        <span>No production timeline data available.</span>
+      </Box>
+    );
+
+  const { productionByMonth, ordersCount, activeOrdersCount, completedOrdersCount, totalVolume } =
+    data;
+
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Production Timeline
+      </Typography>
+      <Box sx={{ height: 400 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={productionByMonth}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" angle={-45} textAnchor="end" height={60} />
+            <YAxis />
+            <RechartsTooltip formatter={value => [`${value} units`, "Quantity"]} />
+            <Legend />
+            <Bar dataKey="quantity" fill="#8884d8" />
+            <Line type="monotone" dataKey="quantity" stroke="#ff7300" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </Box>
+      <Box sx={{ mt: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Production Insights
+        </Typography>
+        <Box component="ul" sx={{ pl: 4 }}>
+          <li>Total orders in system: {ordersCount}</li>
+          <li>Active orders: {activeOrdersCount}</li>
+          <li>Completed orders: {completedOrdersCount}</li>
+          <li>Total production volume: {totalVolume} units</li>
+        </Box>
+      </Box>
+    </Paper>
+  );
+};
 
 export default ProductionTimelineChart;

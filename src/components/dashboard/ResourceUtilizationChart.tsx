@@ -16,6 +16,7 @@ import { getResources, Resource } from "../../services/resourceService";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import dayjs from "dayjs";
+import { useQuery } from "@tanstack/react-query";
 
 const HOURS_PER_DAY = 7.4;
 const HOURS_PER_WEEK = 37;
@@ -44,82 +45,74 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameT
 };
 
 export default function ResourceUtilizationChart() {
-  const [data, setData] = useState<{ name: string; utilization: number }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUtilization = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const resources = await getResources(true);
-        const weekStart = dayjs().startOf("isoWeek");
-        const weekEnd = dayjs().endOf("isoWeek");
-        const ordersQuery = query(
-          collection(db, "orders"),
-          where("status", "in", ["Open", "Released", "In Progress", "Delayed", "Firm Planned"])
-        );
-        const ordersSnap = await getDocs(ordersQuery);
-        const orders = ordersSnap.docs.map(doc => doc.data());
-        const utilizationData = resources.map(resource => {
-          const weeklyCapacity = resource.capacity ? resource.capacity * 5 : HOURS_PER_WEEK;
-          // Sum estimated hours for orders assigned to this resource and planned for this week
-          let assignedHours = 0;
-          orders.forEach(order => {
-            if (order.assignedResourceId === resource.id) {
-              // Use plannedWeekStartDate if available, else calculate from start
-              let plannedWeek = order.plannedWeekStartDate
-                ? dayjs(order.plannedWeekStartDate)
-                : order.start instanceof Timestamp
-                  ? dayjs(order.start.toDate()).startOf("isoWeek")
-                  : dayjs(order.start).startOf("isoWeek");
-              if (plannedWeek.isSame(weekStart, "day")) {
-                let est = order.estimatedHours;
-                if (!est && order.start && order.end) {
-                  // Estimate from start/end
-                  const start =
-                    order.start instanceof Timestamp ? order.start.toDate() : new Date(order.start);
-                  const end =
-                    order.end instanceof Timestamp ? order.end.toDate() : new Date(order.end);
-                  let workDays = 0;
-                  const currentDate = new Date(start);
-                  while (currentDate <= end) {
-                    const dayOfWeek = currentDate.getDay();
-                    if (dayOfWeek !== 0 && dayOfWeek !== 6) workDays++;
-                    currentDate.setDate(currentDate.getDate() + 1);
-                  }
-                  est = Math.max(workDays, 1) * HOURS_PER_DAY;
-                }
-                assignedHours += est || 0;
+  const fetchUtilization = async () => {
+    const resources = await getResources(true);
+    const weekStart = dayjs().startOf("isoWeek");
+    const weekEnd = dayjs().endOf("isoWeek");
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("status", "in", ["Open", "Released", "In Progress", "Delayed", "Firm Planned"])
+    );
+    const ordersSnap = await getDocs(ordersQuery);
+    const orders = ordersSnap.docs.map(doc => doc.data());
+    const utilizationData = resources.map(resource => {
+      const weeklyCapacity = resource.capacity ? resource.capacity * 5 : HOURS_PER_WEEK;
+      let assignedHours = 0;
+      orders.forEach(order => {
+        if (order.assignedResourceId === resource.id) {
+          let plannedWeek = order.plannedWeekStartDate
+            ? dayjs(order.plannedWeekStartDate)
+            : order.start instanceof Timestamp
+              ? dayjs(order.start.toDate()).startOf("isoWeek")
+              : dayjs(order.start).startOf("isoWeek");
+          if (plannedWeek.isSame(weekStart, "day")) {
+            let est = order.estimatedHours;
+            if (!est && order.start && order.end) {
+              const start =
+                order.start instanceof Timestamp ? order.start.toDate() : new Date(order.start);
+              const end = order.end instanceof Timestamp ? order.end.toDate() : new Date(order.end);
+              let workDays = 0;
+              const currentDate = new Date(start);
+              while (currentDate <= end) {
+                const dayOfWeek = currentDate.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) workDays++;
+                currentDate.setDate(currentDate.getDate() + 1);
               }
+              est = Math.max(workDays, 1) * HOURS_PER_DAY;
             }
-          });
-          const utilization =
-            weeklyCapacity > 0 ? Math.round((assignedHours / weeklyCapacity) * 100) : 0;
-          return {
-            name: resource.name,
-            utilization,
-          };
-        });
-        setData(utilizationData);
-      } catch (err) {
-        setError("Failed to load resource utilization data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUtilization();
-  }, []);
+            assignedHours += est || 0;
+          }
+        }
+      });
+      const utilization =
+        weeklyCapacity > 0 ? Math.round((assignedHours / weeklyCapacity) * 100) : 0;
+      return {
+        name: resource.name,
+        utilization,
+      };
+    });
+    return utilizationData;
+  };
 
-  if (loading)
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["resourceUtilizationChart"],
+    queryFn: fetchUtilization,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  if (isLoading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
         <CircularProgress />
       </Box>
     );
-  if (error) return <Alert severity="error">{error}</Alert>;
+  if (isError)
+    return <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>;
   if (data.length === 0)
     return <Alert severity="info">No resource utilization data available for this week.</Alert>;
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogTitle,
@@ -138,62 +139,51 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
 
   const [formData, setFormData] = useState<OrderFormData>(initialFormData);
   const [originalProcesses, setOriginalProcesses] = useState<FirebaseProcess[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loadingResources, setLoadingResources] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (open && orderId) {
-      fetchOrderData();
-    } else {
-      setFormData(initialFormData);
-      setOriginalProcesses([]);
-      setError(null);
-      setValidationErrors({});
-    }
-  }, [open, orderId]);
-
-  const fetchOrderData = async () => {
-    if (!orderId) {
-      setError("Order ID is missing");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
+  // Fetch order and processes
+  const {
+    data: orderDataBundle,
+    isLoading: loading,
+    isError: isOrderError,
+    error: orderError,
+  } = useQuery({
+    queryKey: ["order-edit-dialog", orderId],
+    queryFn: async () => {
+      if (!orderId) throw new Error("Order ID is missing");
       const orderDoc = await getDoc(doc(db, "orders", orderId));
-
-      if (!orderDoc.exists()) {
-        setError("Order not found");
-        setLoading(false);
-        return;
-      }
-
+      if (!orderDoc.exists()) throw new Error("Order not found");
       const orderData = orderDoc.data();
-
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderId)
       );
       const processesSnapshot = await getDocs(processesQuery);
       const processesData: FirebaseProcess[] = [];
-
       processesSnapshot.forEach(doc => {
-        processesData.push({
-          id: doc.id,
-          ...doc.data(),
-        } as FirebaseProcess);
+        processesData.push({ id: doc.id, ...doc.data() } as FirebaseProcess);
       });
-
       processesData.sort((a, b) => a.sequence - b.sequence);
-      setOriginalProcesses(processesData);
+      return { orderData, processesData };
+    },
+    enabled: open && !!orderId,
+  });
 
+  // Fetch resources
+  const { data: resources = [], isLoading: loadingResources } = useQuery({
+    queryKey: ["resources", open],
+    queryFn: async () => await getResources(true),
+    enabled: open,
+  });
+
+  // Set form data when order/processes are loaded
+  useEffect(() => {
+    if (orderDataBundle) {
+      const { orderData, processesData } = orderDataBundle;
+      setOriginalProcesses(processesData);
       const processTemplates: ProcessTemplate[] = processesData.map(process => ({
         id: process.id,
         type: process.type,
@@ -202,7 +192,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         sequence: process.sequence,
         status: process.status,
       }));
-
       setFormData({
         orderNumber: orderData.orderNumber || orderId,
         description: orderData.description || "",
@@ -217,31 +206,14 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         processes: processTemplates,
         assignedResourceId: orderData.assignedResourceId || "",
       });
-
-      if (resources.length === 0) {
-        fetchResources();
-      }
-
       setError(null);
-    } catch (err) {
-      console.error("Error fetching order:", err);
-      setError(`Failed to load order: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setLoading(false);
+    } else if (!open) {
+      setFormData(initialFormData);
+      setOriginalProcesses([]);
+      setError(null);
+      setValidationErrors({});
     }
-  };
-
-  const fetchResources = async () => {
-    setLoadingResources(true);
-    try {
-      const activeResources = await getResources(true);
-      setResources(activeResources);
-    } catch (err) {
-      console.error("Error fetching resources:", err);
-    } finally {
-      setLoadingResources(false);
-    }
-  };
+  }, [orderDataBundle, open, orderId]);
 
   const handleChange =
     (field: keyof OrderFormData) =>
@@ -478,9 +450,11 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
           >
             <CircularProgress />
           </Box>
-        ) : error && !formData.orderNumber ? (
+        ) : isOrderError && !formData.orderNumber ? (
           <Box sx={{ p: 3 }}>
-            <Alert severity="error">{error}</Alert>
+            <Alert severity="error">
+              {orderError instanceof Error ? orderError.message : String(orderError)}
+            </Alert>
           </Box>
         ) : (
           <Box sx={{ p: 2 }}>

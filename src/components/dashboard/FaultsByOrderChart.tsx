@@ -14,6 +14,7 @@ import {
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import ChartWrapper from "../common/ChartWrapper";
+import { useQuery } from "@tanstack/react-query";
 
 interface FaultByOrderData {
   orderId: string;
@@ -35,42 +36,38 @@ const COLORS = [
 ];
 
 const FaultsByOrderChart = () => {
-  const [data, setData] = useState<FaultByOrderData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const snapshot = await getDocs(collection(db, "faults"));
-        const rawFaults = snapshot.docs.map(doc => doc.data());
-        const counts: Record<string, { count: number; partNumber?: string }> = {};
-        rawFaults.forEach(fault => {
-          const orderId = fault.orderId || "Unknown";
-          if (!counts[orderId]) {
-            counts[orderId] = { count: 0, partNumber: fault.partNumber };
-          }
-          counts[orderId].count += 1;
-        });
-        const chartData = Object.entries(counts)
-          .map(([orderId, { count, partNumber }]) => ({ orderId, partNumber, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 15); // Top 15 orders
-        setData(chartData);
-      } catch (err) {
-        setError("Failed to load fault data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchFaultsByOrder = async () => {
+    const snapshot = await getDocs(collection(db, "faults"));
+    const rawFaults = snapshot.docs.map(doc => doc.data());
+    const counts: Record<string, { count: number; partNumber?: string }> = {};
+    rawFaults.forEach(fault => {
+      const orderId = fault.orderId || "Unknown";
+      if (!counts[orderId]) {
+        counts[orderId] = { count: 0, partNumber: fault.partNumber };
       }
-    };
-    loadData();
-  }, []);
+      counts[orderId].count += 1;
+    });
+    const chartData = Object.entries(counts)
+      .map(([orderId, { count, partNumber }]) => ({ orderId, partNumber, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15); // Top 15 orders
+    return chartData;
+  };
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Alert severity="error">{error}</Alert>;
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["faultsByOrderChart"],
+    queryFn: fetchFaultsByOrder,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  if (isLoading) return <CircularProgress />;
+  if (isError)
+    return <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>;
   if (data.length === 0) return <Alert severity="info">No fault data available by order.</Alert>;
 
   return (

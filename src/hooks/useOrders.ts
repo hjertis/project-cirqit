@@ -1,14 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-  Timestamp,
-  QueryConstraint,
-} from "firebase/firestore";
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { collection, query, where, orderBy, limit, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 
 export interface FirebaseOrder {
@@ -37,72 +29,54 @@ export interface OrderFilter {
 }
 
 export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
-  const [orders, setOrders] = useState<FirebaseOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<OrderFilter | undefined>(initialFilter);
   const [itemLimit, setItemLimit] = useState(initialLimit);
+  const queryClient = useQueryClient();
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      let ordersQuery;
-      let queryDescription = "";
-
-      if (filter && filter.status && Array.isArray(filter.status) && filter.status.length > 0) {
-        queryDescription = `Filtering by status: ${filter.status.join(", ")}`;
-
-        ordersQuery = query(
-          collection(db, "orders"),
-          where("status", "in", filter.status),
-          limit(itemLimit)
-        );
-      } else {
-        ordersQuery = query(collection(db, "orders"), orderBy("updated", "desc"), limit(itemLimit));
-      }
-
-      const querySnapshot = await getDocs(ordersQuery);
-
-      const fetchedOrders: FirebaseOrder[] = [];
-      const statusCounts: Record<string, number> = {};
-
-      querySnapshot.forEach(doc => {
-        const data = doc.data();
-        const status = data.status || "unknown";
-
-        statusCounts[status] = (statusCounts[status] || 0) + 1;
-
-        fetchedOrders.push({
-          id: doc.id,
-          ...data,
-        } as FirebaseOrder);
-      });
-
-      setOrders(fetchedOrders);
-    } catch (err) {
-      console.error("Error fetching orders:", err);
-      setError(`Failed to load orders: ${err instanceof Error ? err.message : String(err)}`);
-      setOrders([]);
-    } finally {
-      setLoading(false);
+  const fetchOrders = async () => {
+    let ordersQuery;
+    if (filter && filter.status && Array.isArray(filter.status) && filter.status.length > 0) {
+      ordersQuery = query(
+        collection(db, "orders"),
+        where("status", "in", filter.status),
+        limit(itemLimit)
+      );
+    } else {
+      ordersQuery = query(collection(db, "orders"), orderBy("updated", "desc"), limit(itemLimit));
     }
-  }, [filter, itemLimit]);
+    const querySnapshot = await getDocs(ordersQuery);
+    const fetchedOrders: FirebaseOrder[] = [];
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      fetchedOrders.push({
+        id: doc.id,
+        ...data,
+      } as FirebaseOrder);
+    });
+    return fetchedOrders;
+  };
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  const {
+    data: orders = [],
+    isLoading: loading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["orders", filter ? JSON.stringify(filter) : "", itemLimit],
+    queryFn: fetchOrders,
+    keepPreviousData: true,
+  });
 
-  const updateFilter = useCallback((newFilter: OrderFilter) => {
+  const updateFilter = (newFilter: OrderFilter) => {
     setFilter(newFilter);
-  }, []);
+  };
 
-  const updateLimit = useCallback((newLimit: number) => {
+  const updateLimit = (newLimit: number) => {
     setItemLimit(newLimit);
-  }, []);
+  };
 
-  const formatDate = useCallback((timestamp: Timestamp | undefined) => {
+  const formatDate = (timestamp: Timestamp | undefined) => {
     if (!timestamp || !timestamp.toDate) return "N/A";
     const date = timestamp.toDate();
     return date.toLocaleDateString("da-DK", {
@@ -110,16 +84,16 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
       month: "2-digit",
       day: "2-digit",
     });
-  }, []);
+  };
 
   return {
     orders,
     loading,
-    error,
+    error: isError ? (error instanceof Error ? error.message : String(error)) : null,
     updateFilter,
     updateLimit,
     formatDate,
-    refreshOrders: fetchOrders,
+    refreshOrders: refetch,
   };
 };
 

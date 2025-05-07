@@ -14,6 +14,7 @@ import {
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import ChartWrapper from "../common/ChartWrapper";
+import { useQuery } from "@tanstack/react-query";
 
 interface FaultsByTypeData {
   faultType: string;
@@ -34,39 +35,35 @@ const COLORS = [
 ];
 
 const FaultsByTypeChart = () => {
-  const [data, setData] = useState<FaultsByTypeData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const fetchFaultsByType = async () => {
+    const snapshot = await getDocs(collection(db, "faults"));
+    const rawFaults = snapshot.docs.map(doc => doc.data());
+    const counts: Record<string, number> = {};
+    rawFaults.forEach(fault => {
+      const type = fault.faultType || "Unknown";
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    const chartData = Object.entries(counts)
+      .map(([faultType, count]) => ({ faultType, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15); // Top 15 types
+    return chartData;
+  };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const snapshot = await getDocs(collection(db, "faults"));
-        const rawFaults = snapshot.docs.map(doc => doc.data());
-        const counts: Record<string, number> = {};
-        rawFaults.forEach(fault => {
-          const type = fault.faultType || "Unknown";
-          counts[type] = (counts[type] || 0) + 1;
-        });
-        const chartData = Object.entries(counts)
-          .map(([faultType, count]) => ({ faultType, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 15); // Top 15 types
-        setData(chartData);
-      } catch (err) {
-        setError("Failed to load fault data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["faultsByTypeChart"],
+    queryFn: fetchFaultsByType,
+    staleTime: 1000 * 60 * 5,
+  });
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Alert severity="error">{error}</Alert>;
+  if (isLoading) return <CircularProgress />;
+  if (isError)
+    return <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>;
   if (data.length === 0) return <Alert severity="info">No fault data available by type.</Alert>;
 
   return (

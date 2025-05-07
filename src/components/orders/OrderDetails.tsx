@@ -56,6 +56,7 @@ import {
 import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
 import OrderTimeTracking from "./OrderTimeTracking";
+import { useQuery } from "@tanstack/react-query";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -144,7 +145,6 @@ const OrderDetails = () => {
   const navigate = useNavigate();
   const [order, setOrder] = useState<FirebaseOrder | null>(null);
   const [processes, setProcesses] = useState<Process[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
 
@@ -164,48 +164,39 @@ const OrderDetails = () => {
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveResult, setArchiveResult] = useState<string | null>(null);
 
+  // Fetch order and processes with React Query
+  const {
+    data: orderDataBundle,
+    isLoading: loading,
+    isError: isOrderError,
+    error: orderError,
+  } = useQuery({
+    queryKey: ["order-details", id],
+    queryFn: async () => {
+      if (!id) throw new Error("Order ID is missing");
+      const orderDoc = await getDoc(doc(db, "orders", id));
+      if (!orderDoc.exists()) throw new Error("Order not found");
+      const orderData = { id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder;
+      const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
+      const processesSnapshot = await getDocs(processesQuery);
+      const processesData: Process[] = [];
+      processesSnapshot.forEach(doc => {
+        processesData.push({ id: doc.id, ...doc.data() } as Process);
+      });
+      processesData.sort((a, b) => a.sequence - b.sequence);
+      return { order: orderData, processes: processesData };
+    },
+    enabled: !!id,
+  });
+
+  // Set state when data loads
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!id) return;
-
-      setLoading(true);
-      try {
-        const orderDoc = await getDoc(doc(db, "orders", id));
-
-        if (!orderDoc.exists()) {
-          setError("Order not found");
-          setLoading(false);
-          return;
-        }
-
-        setOrder({ id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder);
-
-        const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
-
-        const processesSnapshot = await getDocs(processesQuery);
-        const processesData: Process[] = [];
-
-        processesSnapshot.forEach(doc => {
-          processesData.push({
-            id: doc.id,
-            ...doc.data(),
-          } as Process);
-        });
-
-        processesData.sort((a, b) => a.sequence - b.sequence);
-        setProcesses(processesData);
-
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching order details:", err);
-        setError("Failed to load order details. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrderDetails();
-  }, [id]);
+    if (orderDataBundle) {
+      setOrder(orderDataBundle.order);
+      setProcesses(orderDataBundle.processes);
+      setError(null);
+    }
+  }, [orderDataBundle]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -360,10 +351,12 @@ const OrderDetails = () => {
     );
   }
 
-  if (error || !order) {
+  if (isOrderError || error || !order) {
     return (
       <Box sx={{ p: 2 }}>
-        <Alert severity="error">{error || "Order not found"}</Alert>
+        <Alert severity="error">
+          {orderError instanceof Error ? orderError.message : error || "Order not found"}
+        </Alert>
         <Button startIcon={<ArrowBackIcon />} onClick={handleBack} sx={{ mt: 2 }}>
           Back to Orders
         </Button>

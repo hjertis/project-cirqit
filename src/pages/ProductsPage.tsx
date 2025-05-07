@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Box,
   Typography,
@@ -17,6 +17,7 @@ import { db } from "../config/firebase";
 import ContentWrapper from "../components/layout/ContentWrapper";
 import TablePagination from "@mui/material/TablePagination";
 import TableSortLabel from "@mui/material/TableSortLabel";
+import { useQuery } from "@tanstack/react-query";
 
 interface ProductCount {
   partNo: string;
@@ -24,48 +25,43 @@ interface ProductCount {
   description: string;
 }
 
+const fetchProducts = async (): Promise<ProductCount[]> => {
+  const ordersSnapshot = await getDocs(collection(db, "orders"));
+  const partCount: Record<string, { count: number; description: string }> = {};
+  ordersSnapshot.forEach(doc => {
+    const data = doc.data();
+    const partNo = data.partNo || "Unknown";
+    const description = data.description || "";
+    if (!partCount[partNo]) {
+      partCount[partNo] = { count: 1, description };
+    } else {
+      partCount[partNo].count += 1;
+      if (!partCount[partNo].description && description) {
+        partCount[partNo].description = description;
+      }
+    }
+  });
+  return Object.entries(partCount)
+    .map(([partNo, { count, description }]) => ({ partNo, count, description }))
+    .sort((a, b) => b.count - a.count);
+};
+
 const ProductsPage = () => {
-  const [products, setProducts] = useState<ProductCount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [orderBy, setOrderBy] = useState<"partNo" | "count" | "description">("count");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const ordersSnapshot = await getDocs(collection(db, "orders"));
-        const partCount: Record<string, { count: number; description: string }> = {};
-        ordersSnapshot.forEach(doc => {
-          const data = doc.data();
-          const partNo = data.partNo || "Unknown";
-          const description = data.description || "";
-          if (!partCount[partNo]) {
-            partCount[partNo] = { count: 1, description };
-          } else {
-            partCount[partNo].count += 1;
-            // Prefer the first non-empty description
-            if (!partCount[partNo].description && description) {
-              partCount[partNo].description = description;
-            }
-          }
-        });
-        const productList = Object.entries(partCount)
-          .map(([partNo, { count, description }]) => ({ partNo, count, description }))
-          .sort((a, b) => b.count - a.count); // Sort descending by count
-        setProducts(productList);
-        setError(null);
-      } catch (err) {
-        setError("Failed to load products");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
+  const {
+    data: products = [],
+    isLoading: loading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["products"],
+    queryFn: fetchProducts,
+    staleTime: 1000 * 60 * 5,
+  });
 
   const handleRequestSort = (property: "partNo" | "count" | "description") => {
     const isAsc = orderBy === property && order === "asc";
@@ -105,8 +101,8 @@ const ProductsPage = () => {
         <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
           <CircularProgress />
         </Box>
-      ) : error ? (
-        <Alert severity="error">{error}</Alert>
+      ) : isError ? (
+        <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>
       ) : (
         <Paper>
           <TableContainer>

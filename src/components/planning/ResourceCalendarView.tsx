@@ -43,6 +43,7 @@ import isBetween from "dayjs/plugin/isBetween";
 import weekOfYear from "dayjs/plugin/weekOfYear";
 import OrderDetailsDialog from "../orders/OrderDetailsDialog";
 import { DndContext, useDraggable, useDroppable, DragEndEvent } from "@dnd-kit/core";
+import { useQuery } from "@tanstack/react-query";
 
 dayjs.extend(isBetween);
 dayjs.extend(weekOfYear);
@@ -104,10 +105,6 @@ const ResourceCalendarView = ({
   const theme = useTheme();
   const [viewType, setViewType] = useState<"week" | "month">(defaultView);
   const [currentDate, setCurrentDate] = useState<Date>(defaultDate);
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
@@ -137,61 +134,67 @@ const ResourceCalendarView = ({
     return dates;
   }, [currentDate, viewType]);
 
-  useEffect(() => {
-    const fetchResourcesAndOrders = async () => {
-      setLoading(true);
-      try {
-        const fetchedResources = await getResources(true);
-        setResources(fetchedResources);
+  // React Query for resources
+  const {
+    data: resources = [],
+    isLoading: loadingResources,
+    isError: isResourcesError,
+    error: resourcesError,
+  } = useQuery({
+    queryKey: ["calendar-resources"],
+    queryFn: async () => await getResources(true),
+    staleTime: 1000 * 60 * 5,
+  });
 
-        const startDate = dayjs(calendarDates[0]).startOf("day");
-        const endDate = dayjs(calendarDates[calendarDates.length - 1]).endOf("day");
+  // React Query for orders
+  const startDate = useMemo(() => dayjs(calendarDates[0]).startOf("day"), [calendarDates]);
+  const endDate = useMemo(
+    () => dayjs(calendarDates[calendarDates.length - 1]).endOf("day"),
+    [calendarDates]
+  );
+  const {
+    data: orders = [],
+    isLoading: loadingOrders,
+    isError: isOrdersError,
+    error: ordersError,
+  } = useQuery({
+    queryKey: ["calendar-orders", startDate.toISOString(), endDate.toISOString()],
+    queryFn: async () => {
+      const ordersQuery = query(
+        collection(db, "orders"),
+        where("status", "in", ["Open", "Released", "In Progress", "Delayed"]),
+        orderBy("start", "asc")
+      );
+      const querySnapshot = await getDocs(ordersQuery);
+      const fetchedOrders: Order[] = [];
+      querySnapshot.forEach(doc => {
+        const data = doc.data();
+        const orderStart = dayjs(data.start.toDate());
+        const orderEnd = dayjs(data.end.toDate());
+        if (
+          (orderStart.isBefore(endDate) && orderEnd.isAfter(startDate)) ||
+          orderStart.isSame(startDate) ||
+          orderEnd.isSame(endDate)
+        ) {
+          fetchedOrders.push({
+            id: doc.id,
+            orderNumber: data.orderNumber,
+            description: data.description,
+            status: data.status,
+            start: data.start,
+            end: data.end,
+            priority: data.priority,
+            assignedResourceId: data.assignedResourceId || null,
+          });
+        }
+      });
+      return fetchedOrders;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
 
-        const ordersQuery = query(
-          collection(db, "orders"),
-          where("status", "in", ["Open", "Released", "In Progress", "Delayed"]),
-          orderBy("start", "asc")
-        );
-
-        const querySnapshot = await getDocs(ordersQuery);
-        const fetchedOrders: Order[] = [];
-
-        querySnapshot.forEach(doc => {
-          const data = doc.data();
-
-          const orderStart = dayjs(data.start.toDate());
-          const orderEnd = dayjs(data.end.toDate());
-
-          if (
-            (orderStart.isBefore(endDate) && orderEnd.isAfter(startDate)) ||
-            orderStart.isSame(startDate) ||
-            orderEnd.isSame(endDate)
-          ) {
-            fetchedOrders.push({
-              id: doc.id,
-              orderNumber: data.orderNumber,
-              description: data.description,
-              status: data.status,
-              start: data.start,
-              end: data.end,
-              priority: data.priority,
-              assignedResourceId: data.assignedResourceId || null,
-            });
-          }
-        });
-
-        setOrders(fetchedOrders);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError(`Failed to load data: ${err instanceof Error ? err.message : String(err)}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchResourcesAndOrders();
-  }, [calendarDates]);
+  const loading = loadingResources || loadingOrders;
+  const error = resourcesError || ordersError;
 
   const handleViewTypeChange = (
     event: React.MouseEvent<HTMLElement>,

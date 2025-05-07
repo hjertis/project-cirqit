@@ -40,6 +40,7 @@ import {
 import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
+import { useQuery } from "@tanstack/react-query";
 
 interface OrderFormData {
   orderNumber: string;
@@ -128,98 +129,75 @@ const EditOrder = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<OrderFormData>(initialFormData);
   const [originalProcesses, setOriginalProcesses] = useState<FirebaseProcess[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loadingResources, setLoadingResources] = useState<boolean>(false);
+  // Fetch order and processes with React Query
+  const {
+    data: orderBundle,
+    isLoading: loading,
+    isError,
+    error: fetchError,
+  } = useQuery({
+    queryKey: ["edit-order-bundle", id],
+    queryFn: async () => {
+      if (!id) throw new Error("Order ID is missing");
+      const orderDoc = await getDoc(doc(db, "orders", id));
+      if (!orderDoc.exists()) throw new Error("Order not found");
+      const orderData = orderDoc.data();
+      const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
+      const processesSnapshot = await getDocs(processesQuery);
+      const processesData: FirebaseProcess[] = [];
+      processesSnapshot.forEach(doc => {
+        processesData.push({ id: doc.id, ...doc.data() } as FirebaseProcess);
+      });
+      processesData.sort((a, b) => a.sequence - b.sequence);
+      return { orderData, processesData };
+    },
+    enabled: !!id,
+  });
 
+  // Fetch resources with React Query
+  const { data: resources = [], isLoading: loadingResources } = useQuery({
+    queryKey: ["resources", true],
+    queryFn: async () => await getResources(true),
+  });
+
+  // Set form data when order/processes are loaded
   useEffect(() => {
-    const fetchOrderData = async () => {
-      if (!id) {
-        setError("Order ID is missing");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const orderDoc = await getDoc(doc(db, "orders", id));
-
-        if (!orderDoc.exists()) {
-          setError("Order not found");
-          setLoading(false);
-          return;
-        }
-
-        const orderData = orderDoc.data();
-
-        const processesQuery = query(collection(db, "processes"), where("workOrderId", "==", id));
-
-        const processesSnapshot = await getDocs(processesQuery);
-        const processesData: FirebaseProcess[] = [];
-
-        processesSnapshot.forEach(doc => {
-          processesData.push({
-            id: doc.id,
-            ...doc.data(),
-          } as FirebaseProcess);
-        });
-
-        processesData.sort((a, b) => a.sequence - b.sequence);
-        setOriginalProcesses(processesData);
-
-        const processTemplates: ProcessTemplate[] = processesData.map(process => ({
-          id: process.id,
-          type: process.type,
-          name: process.name,
-          duration: calculateDuration(process.startDate.toDate(), process.endDate.toDate()),
-          sequence: process.sequence,
-          status: process.status,
-        }));
-
-        setFormData({
-          orderNumber: orderData.orderNumber || id,
-          description: orderData.description || "",
-          partNo: orderData.partNo || "",
-          quantity: orderData.quantity || 1,
-          status: orderData.status || "Open",
-          startDate: formatTimestampForInput(orderData.start),
-          endDate: formatTimestampForInput(orderData.end),
-          customer: orderData.customer || "",
-          priority: orderData.priority || "Medium",
-          notes: orderData.notes || "",
-          processes: processTemplates,
-
-          assignedResourceId: orderData.assignedResourceId || "",
-        });
-
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching order:", err);
-        setError(`Failed to load order: ${err instanceof Error ? err.message : String(err)}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchResources = async () => {
-      setLoadingResources(true);
-      try {
-        const activeResources = await getResources(true);
-        setResources(activeResources);
-      } catch (err) {
-        console.error("Error fetching resources:", err);
-      } finally {
-        setLoadingResources(false);
-      }
-    };
-
-    fetchOrderData();
-    fetchResources();
-  }, [id]);
+    if (orderBundle) {
+      const { orderData, processesData } = orderBundle;
+      setOriginalProcesses(processesData);
+      const processTemplates: ProcessTemplate[] = processesData.map(process => ({
+        id: process.id,
+        type: process.type,
+        name: process.name,
+        duration: calculateDuration(process.startDate.toDate(), process.endDate.toDate()),
+        sequence: process.sequence,
+        status: process.status,
+      }));
+      setFormData({
+        orderNumber: orderData.orderNumber || id,
+        description: orderData.description || "",
+        partNo: orderData.partNo || "",
+        quantity: orderData.quantity || 1,
+        status: orderData.status || "Open",
+        startDate: formatTimestampForInput(orderData.start),
+        endDate: formatTimestampForInput(orderData.end),
+        customer: orderData.customer || "",
+        priority: orderData.priority || "Medium",
+        notes: orderData.notes || "",
+        processes: processTemplates,
+        assignedResourceId: orderData.assignedResourceId || "",
+      });
+      setError(null);
+    }
+    if (isError && fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
+    }
+  }, [orderBundle, isError, fetchError, id]);
 
   const handleChange =
     (field: keyof OrderFormData) =>

@@ -13,6 +13,7 @@ import {
 import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import dayjs from "dayjs";
+import { useQuery } from "@tanstack/react-query";
 
 interface DailyOrdersData {
   day: string; // e.g. 'Mon'
@@ -29,63 +30,56 @@ const getLast7Days = () => {
 };
 
 export default function DailyOrdersChart() {
-  const [data, setData] = useState<DailyOrdersData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const fetchDailyOrders = async () => {
+    const [activeSnap, archivedSnap] = await Promise.all([
+      getDocs(collection(db, "orders")),
+      getDocs(collection(db, "archivedOrders")),
+    ]);
+    const allOrders = [
+      ...activeSnap.docs.map(doc => doc.data()),
+      ...archivedSnap.docs.map(doc => doc.data()),
+    ];
+    const last7 = getLast7Days();
+    const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dailyData: DailyOrdersData[] = last7.map(d => ({
+      day: dayLabels[d.day()],
+      orders: 0,
+      completed: 0,
+    }));
+    allOrders.forEach(order => {
+      let start = order.start instanceof Timestamp ? order.start.toDate() : new Date(order.start);
+      let finished = order.finishedDate
+        ? order.finishedDate instanceof Timestamp
+          ? order.finishedDate.toDate()
+          : new Date(order.finishedDate)
+        : null;
+      last7.forEach((d, idx) => {
+        if (start && dayjs(start).isSame(d, "day")) dailyData[idx].orders++;
+        if (finished && dayjs(finished).isSame(d, "day")) dailyData[idx].completed++;
+      });
+    });
+    return dailyData;
+  };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [activeSnap, archivedSnap] = await Promise.all([
-          getDocs(collection(db, "orders")),
-          getDocs(collection(db, "archivedOrders")),
-        ]);
-        const allOrders = [
-          ...activeSnap.docs.map(doc => doc.data()),
-          ...archivedSnap.docs.map(doc => doc.data()),
-        ];
-        const last7 = getLast7Days();
-        const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        const dailyData: DailyOrdersData[] = last7.map(d => ({
-          day: dayLabels[d.day()],
-          orders: 0,
-          completed: 0,
-        }));
-        allOrders.forEach(order => {
-          // Count started
-          let start =
-            order.start instanceof Timestamp ? order.start.toDate() : new Date(order.start);
-          let finished = order.finishedDate
-            ? order.finishedDate instanceof Timestamp
-              ? order.finishedDate.toDate()
-              : new Date(order.finishedDate)
-            : null;
-          // Find index for start
-          last7.forEach((d, idx) => {
-            if (start && dayjs(start).isSame(d, "day")) dailyData[idx].orders++;
-            if (finished && dayjs(finished).isSame(d, "day")) dailyData[idx].completed++;
-          });
-        });
-        setData(dailyData);
-      } catch (err) {
-        setError("Failed to load daily orders data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["dailyOrdersChart"],
+    queryFn: fetchDailyOrders,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-  if (loading)
+  if (isLoading)
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
         <CircularProgress />
       </Box>
     );
-  if (error) return <Alert severity="error">{error}</Alert>;
+  if (isError)
+    return <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>;
   if (data.length === 0)
     return <Alert severity="info">No order data available for the last 7 days.</Alert>;
 

@@ -14,6 +14,7 @@ import {
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import ChartWrapper from "../common/ChartWrapper";
+import { useQuery } from "@tanstack/react-query";
 
 interface FaultData {
   faultType: string;
@@ -22,57 +23,46 @@ interface FaultData {
 }
 
 const FaultParetoChart = () => {
-  const [chartData, setChartData] = useState<FaultData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const fetchFaultPareto = async () => {
+    const snapshot = await getDocs(collection(db, "faults"));
+    const rawFaults = snapshot.docs.map(doc => doc.data());
+    const counts: Record<string, number> = {};
+    rawFaults.forEach(fault => {
+      const type = fault.faultType || "Unknown";
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    const sortedFaults = Object.entries(counts)
+      .map(([faultType, count]) => ({ faultType, count }))
+      .sort((a, b) => b.count - a.count);
+    const totalCount = rawFaults.length;
+    let cumulativeCount = 0;
+    const processedData = sortedFaults.map(fault => {
+      cumulativeCount += fault.count;
+      return {
+        ...fault,
+        cumulativePercentage: Math.round((cumulativeCount / totalCount) * 100),
+      };
+    });
+    return processedData;
+  };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Fetch real faults from Firestore
-        const snapshot = await getDocs(collection(db, "faults"));
-        const rawFaults = snapshot.docs.map(doc => doc.data());
+  const {
+    data: chartData = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["faultParetoChart"],
+    queryFn: fetchFaultPareto,
+    staleTime: 1000 * 60 * 5,
+  });
 
-        const counts: Record<string, number> = {};
-        rawFaults.forEach(fault => {
-          const type = fault.faultType || "Unknown";
-          counts[type] = (counts[type] || 0) + 1;
-        });
-
-        const sortedFaults = Object.entries(counts)
-          .map(([faultType, count]) => ({ faultType, count }))
-          .sort((a, b) => b.count - a.count);
-
-        const totalCount = rawFaults.length;
-        let cumulativeCount = 0;
-        const processedData = sortedFaults.map(fault => {
-          cumulativeCount += fault.count;
-          return {
-            ...fault,
-            cumulativePercentage: Math.round((cumulativeCount / totalCount) * 100),
-          };
-        });
-
-        setChartData(processedData);
-      } catch (err) {
-        setError("Failed to load fault data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return <CircularProgress />;
   }
 
-  if (error) {
-    return <Alert severity="error">{error}</Alert>;
+  if (isError) {
+    return <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>;
   }
 
   if (chartData.length === 0) {

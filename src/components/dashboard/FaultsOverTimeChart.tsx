@@ -14,6 +14,7 @@ import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import ChartWrapper from "../common/ChartWrapper";
 import dayjs from "dayjs";
+import { useQuery } from "@tanstack/react-query";
 
 interface FaultsOverTimeData {
   week: string; // e.g. '2025-W18'
@@ -21,46 +22,41 @@ interface FaultsOverTimeData {
 }
 
 const FaultsOverTimeChart = () => {
-  const [data, setData] = useState<FaultsOverTimeData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const snapshot = await getDocs(collection(db, "faults"));
-        const rawFaults = snapshot.docs.map(doc => doc.data());
-        // Group by week (ISO week number)
-        const weekCounts: Record<string, number> = {};
-        rawFaults.forEach(fault => {
-          let date: Date | null = null;
-          if (fault.addDate instanceof Timestamp) {
-            date = fault.addDate.toDate();
-          } else if (fault.addDate) {
-            date = new Date(fault.addDate);
-          }
-          if (!date || isNaN(date.getTime())) return;
-          const week = dayjs(date).format("YYYY-[W]WW");
-          weekCounts[week] = (weekCounts[week] || 0) + 1;
-        });
-        const chartData = Object.entries(weekCounts)
-          .map(([week, count]) => ({ week, count }))
-          .sort((a, b) => a.week.localeCompare(b.week));
-        setData(chartData);
-      } catch (err) {
-        setError("Failed to load fault data.");
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchFaultsOverTime = async () => {
+    const snapshot = await getDocs(collection(db, "faults"));
+    const rawFaults = snapshot.docs.map(doc => doc.data());
+    const weekCounts: Record<string, number> = {};
+    rawFaults.forEach(fault => {
+      let date: Date | null = null;
+      if (fault.addDate instanceof Timestamp) {
+        date = fault.addDate.toDate();
+      } else if (fault.addDate) {
+        date = new Date(fault.addDate);
       }
-    };
-    loadData();
-  }, []);
+      if (!date || isNaN(date.getTime())) return;
+      const week = dayjs(date).format("YYYY-[W]WW");
+      weekCounts[week] = (weekCounts[week] || 0) + 1;
+    });
+    const chartData = Object.entries(weekCounts)
+      .map(([week, count]) => ({ week, count }))
+      .sort((a, b) => a.week.localeCompare(b.week));
+    return chartData;
+  };
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Alert severity="error">{error}</Alert>;
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["faultsOverTimeChart"],
+    queryFn: fetchFaultsOverTime,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  if (isLoading) return <CircularProgress />;
+  if (isError)
+    return <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>;
   if (data.length === 0) return <Alert severity="info">No fault data available over time.</Alert>;
 
   return (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Box,
   Typography,
@@ -54,6 +54,7 @@ import {
   deactivateResource,
   reactivateResource,
 } from "../services/resourceService";
+import { useQuery } from "@tanstack/react-query";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -101,10 +102,6 @@ const getTypeIcon = (type: string) => {
 
 const ResourceManagementPage = () => {
   const [tabValue, setTabValue] = useState(0);
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
@@ -124,56 +121,43 @@ const ResourceManagementPage = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchResources();
-  }, []);
+  // React Query for resources
+  const {
+    data: resources = [],
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ["resources", false],
+    queryFn: async () => await getResources(false),
+    staleTime: 1000 * 60 * 5,
+  });
 
-  useEffect(() => {
-    filterResources();
-  }, [tabValue, searchTerm, resources]);
-
-  const fetchResources = async () => {
-    setLoading(true);
-    try {
-      const allResources = await getResources(false);
-      setResources(allResources);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching resources:", err);
-      setError(`Failed to load resources: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterResources = () => {
-    let filtered = [...resources];
-
+  // Filtering logic
+  const filteredResources = resources.filter(resource => {
+    let matchesTab = true;
     if (tabValue === 1) {
-      filtered = filtered.filter(resource => resource.type === "person");
+      matchesTab = resource.type === "person";
     } else if (tabValue === 2) {
-      filtered = filtered.filter(resource => resource.type === "machine");
+      matchesTab = resource.type === "machine";
     } else if (tabValue === 3) {
-      filtered = filtered.filter(resource => resource.type === "tool" || resource.type === "area");
+      matchesTab = resource.type === "tool" || resource.type === "area";
     } else if (tabValue === 4) {
-      filtered = filtered.filter(resource => !resource.active);
+      matchesTab = !resource.active;
     } else {
-      filtered = filtered.filter(resource => resource.active);
+      matchesTab = resource.active;
     }
-
+    let matchesSearch = true;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        resource =>
-          resource.name.toLowerCase().includes(term) ||
-          (resource.department && resource.department.toLowerCase().includes(term)) ||
-          (resource.email && resource.email.toLowerCase().includes(term))
+      matchesSearch = Boolean(
+        resource.name.toLowerCase().includes(term) ||
+        (resource.department && resource.department.toLowerCase().includes(term)) ||
+        (resource.email && resource.email.toLowerCase().includes(term))
       );
     }
-
-    setFilteredResources(filtered);
-    setPage(0);
-  };
+    return matchesTab && matchesSearch;
+  });
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -277,7 +261,7 @@ const ResourceManagementPage = () => {
       }
 
       setIsFormDialogOpen(false);
-      fetchResources();
+      refetch();
     } catch (err) {
       console.error("Error saving resource:", err);
       setError(`Failed to save resource: ${err instanceof Error ? err.message : String(err)}`);
@@ -292,7 +276,7 @@ const ResourceManagementPage = () => {
       try {
         await deactivateResource(resource.id);
         setSuccessMessage(`Resource "${resource.name}" deactivated successfully`);
-        fetchResources();
+        refetch();
       } catch (err) {
         console.error("Error deactivating resource:", err);
         setError(
@@ -309,7 +293,7 @@ const ResourceManagementPage = () => {
     try {
       await reactivateResource(resource.id);
       setSuccessMessage(`Resource "${resource.name}" reactivated successfully`);
-      fetchResources();
+      refetch();
     } catch (err) {
       console.error("Error reactivating resource:", err);
       setError(
@@ -345,7 +329,7 @@ const ResourceManagementPage = () => {
               <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
-                onClick={fetchResources}
+                onClick={() => refetch()}
                 disabled={loading}
                 sx={{ mr: 2 }}
               >
@@ -368,9 +352,9 @@ const ResourceManagementPage = () => {
           </Alert>
         )}
 
-        {error && (
+        {queryError && (
           <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-            {error}
+            {queryError instanceof Error ? queryError.message : String(queryError)}
           </Alert>
         )}
 
@@ -457,7 +441,7 @@ const ResourceManagementPage = () => {
                   <Select
                     labelId="resource-type-label"
                     value={formData.type || "person"}
-                    onChange={handleFormChange("type") as any}
+                    onChange={handleFormChange("type") as React.ChangeEventHandler<HTMLInputElement>}
                     label="Type *"
                   >
                     <MenuItem value="person">Personnel</MenuItem>

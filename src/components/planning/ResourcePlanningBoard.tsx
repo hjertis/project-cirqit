@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -44,6 +44,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
+import { useQuery } from "@tanstack/react-query";
 
 dayjs.extend(weekOfYear);
 dayjs.extend(isoWeek);
@@ -334,11 +335,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
   console.log("ResourcePlanningBoard: render/mount");
   const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
-  const [resources, setResources] = useState<ResourceWithLoad[]>([]);
-  const [orders, setOrders] = useState<PlanningOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Remove dialog state
 
   const visibleWeeks = useMemo(
     () =>
@@ -348,51 +344,63 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
     [currentWeekStart]
   );
 
-  const fetchData = async () => {
-    console.log("ResourcePlanningBoard: fetchData called");
-    setLoading(true);
-    setError(null);
-    try {
-      const fetchedResources = await getResources(true);
-      const startDate = dayjs(currentWeekStart).subtract(1, "week").startOf("isoWeek").toDate();
-      const endDate = dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("isoWeek").toDate();
-      const fetchedOrders = await fetchPlanningData(startDate, endDate);
+  // React Query for resources
+  const {
+    data: resourcesRaw = [],
+    isLoading: loadingResources,
+    isError: isResourcesError,
+    error: resourcesError,
+  } = useQuery({
+    queryKey: ["planning-resources"],
+    queryFn: async () => await getResources(true),
+    staleTime: 1000 * 60 * 5,
+  });
 
-      const filteredOrders = fetchedOrders.filter(order => {
-        const orderDate = dayjs(order.plannedWeekStartDate);
-        return orderDate.isBetween(dayjs(startDate), dayjs(endDate), null, "[]");
+  // React Query for planning orders
+  const startDate = useMemo(
+    () => dayjs(currentWeekStart).subtract(1, "week").startOf("isoWeek").toDate(),
+    [currentWeekStart]
+  );
+  const endDate = useMemo(
+    () => dayjs(currentWeekStart).add(WEEKS_TO_SHOW, "week").endOf("isoWeek").toDate(),
+    [currentWeekStart]
+  );
+  const {
+    data: planningOrders = [],
+    isLoading: loadingOrders,
+    isError: isOrdersError,
+    error: ordersError,
+  } = useQuery({
+    queryKey: ["planning-orders", startDate, endDate],
+    queryFn: async () => await fetchPlanningData(startDate, endDate),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Filtered orders for visible weeks
+  const filteredOrders = useMemo(() => {
+    return planningOrders.filter(order => {
+      const orderDate = dayjs(order.plannedWeekStartDate);
+      return orderDate.isBetween(dayjs(startDate), dayjs(endDate), null, "[]");
+    });
+  }, [planningOrders, startDate, endDate]);
+
+  // Compute resources with load
+  const resources = useMemo(() => {
+    return resourcesRaw.map(res => {
+      const weeklyLoad: { [weekStartDate: string]: number } = {};
+      visibleWeeks.forEach(weekDate => {
+        const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
+        const load = planningOrders
+          .filter(o => o.assignedResourceId === res.id && o.plannedWeekStartDate === weekStartStr)
+          .reduce((sum, o) => sum + (o.estimatedHours || 0), 0);
+        weeklyLoad[weekStartStr] = load;
       });
+      return { ...res, weeklyLoad };
+    });
+  }, [resourcesRaw, planningOrders, visibleWeeks]);
 
-      setOrders(filteredOrders);
-
-      const resourcesWithLoad = fetchedResources.map(res => {
-        const weeklyLoad: { [weekStartDate: string]: number } = {};
-        visibleWeeks.forEach(weekDate => {
-          const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
-
-          const load = fetchedOrders
-            .filter(o => o.assignedResourceId === res.id && o.plannedWeekStartDate === weekStartStr)
-            .reduce((sum, o) => sum + (o.estimatedHours || 0), 0);
-          weeklyLoad[weekStartStr] = load;
-        });
-        return { ...res, weeklyLoad };
-      });
-
-      setResources(resourcesWithLoad);
-    } catch (err) {
-      console.error("Error fetching planning data:", err);
-      setError(
-        `Failed to load planning board: ${err instanceof Error ? err.message : String(err)}`
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    console.log("ResourcePlanningBoard: useEffect (fetchData) triggered");
-    fetchData();
-  }, [currentWeekStart, refreshKey]);
+  const loading = loadingResources || loadingOrders;
+  const error = resourcesError || ordersError;
 
   const handlePrevWeek = () => {
     setCurrentWeekStart(dayjs(currentWeekStart).subtract(1, "week").toDate());
@@ -442,7 +450,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
     let cellId = over.id;
     // If dropped on an order, resolve to its cell
     if (typeof cellId === "string" && !cellId.includes("|")) {
-      const overOrder = orders.find(o => String(o.id) === cellId);
+      const overOrder = filteredOrders.find(o => String(o.id) === cellId);
       if (overOrder) {
         cellId = `${overOrder.assignedResourceId ?? "unassigned"}|${overOrder.plannedWeekStartDate}`;
       }
@@ -450,7 +458,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
     const [destResourceId, destWeekStart] = String(cellId).split("|");
     const orderId = active.id;
     const newPlannedWeekStartDate = dayjs(destWeekStart).format("YYYY-MM-DD");
-    const draggedOrder = orders.find(o => String(o.id) === orderId);
+    const draggedOrder = filteredOrders.find(o => String(o.id) === orderId);
     if (!draggedOrder) return;
     const newStartDate = dayjs(destWeekStart).hour(8).minute(0).second(0).toDate();
     const newEndDate = calculateEndDate(newStartDate, draggedOrder.estimatedHours || 8);
@@ -462,15 +470,9 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
         end: Timestamp.fromDate(newEndDate),
         updated: Timestamp.now(),
       });
-      fetchData();
     } catch (err) {
-      setError("Failed to update order in Firestore.");
+      console.error("Failed to update order in Firestore.", err);
     }
-  };
-
-  // Add a handler to refresh only after an update
-  const handleOrderUpdated = () => {
-    fetchData();
   };
 
   if (loading) {
@@ -482,7 +484,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
   }
 
   if (error) {
-    return <Alert severity="error">{error}</Alert>;
+    return <Alert severity="error">{String(error)}</Alert>;
   }
 
   return (
@@ -611,7 +613,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
                 const currentLoad = resource.weeklyLoad?.[weekStartStr] ?? 0;
                 const loadPercentage =
                   weeklyCapacity > 0 ? Math.round((currentLoad / weeklyCapacity) * 100) : 0;
-                const cellOrders = orders.filter(
+                const cellOrders = filteredOrders.filter(
                   o =>
                     o.assignedResourceId === resource.id && o.plannedWeekStartDate === weekStartStr
                 );
@@ -703,7 +705,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
             </Box>
             {visibleWeeks.map(weekDate => {
               const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
-              const unassignedOrders = orders.filter(
+              const unassignedOrders = filteredOrders.filter(
                 o => o.assignedResourceId === null && o.plannedWeekStartDate === weekStartStr
               );
               const droppableId = `unassigned|${weekStartStr}`;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   collection,
   query,
@@ -37,69 +38,53 @@ export interface ArchiveFilter {
 }
 
 export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 50) => {
-  const [archivedOrders, setArchivedOrders] = useState<ArchivedOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ArchiveFilter | undefined>(initialFilter);
   const [itemLimit, setItemLimit] = useState(initialLimit);
+  const queryClient = useQueryClient();
 
-  const fetchArchivedOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      let ordersQuery;
-
-      const baseQuery = collection(db, "archivedOrders");
-
-      const queryConstraints: QueryConstraint[] = [orderBy("archivedAt", "desc"), limit(itemLimit)];
-
-      if (filter?.dateRange) {
-        const { start, end } = filter.dateRange;
-        queryConstraints.push(
-          where("archivedAt", ">=", Timestamp.fromDate(start)),
-          where("archivedAt", "<=", Timestamp.fromDate(end))
-        );
-      }
-
-      ordersQuery = query(baseQuery, ...queryConstraints);
-
-      const querySnapshot = await getDocs(ordersQuery);
-
-      const fetchedOrders: ArchivedOrder[] = [];
-
-      querySnapshot.forEach(doc => {
-        fetchedOrders.push({
-          id: doc.id,
-          ...doc.data(),
-        } as ArchivedOrder);
-      });
-
-      setArchivedOrders(fetchedOrders);
-    } catch (err) {
-      console.error("Error fetching archived orders:", err);
-      setError(
-        `Failed to load archived orders: ${err instanceof Error ? err.message : String(err)}`
+  const fetchArchivedOrders = async () => {
+    const baseQuery = collection(db, "archivedOrders");
+    const queryConstraints: QueryConstraint[] = [orderBy("archivedAt", "desc"), limit(itemLimit)];
+    if (filter?.dateRange) {
+      const { start, end } = filter.dateRange;
+      queryConstraints.push(
+        where("archivedAt", ">=", Timestamp.fromDate(start)),
+        where("archivedAt", "<=", Timestamp.fromDate(end))
       );
-      setArchivedOrders([]);
-    } finally {
-      setLoading(false);
     }
-  }, [filter, itemLimit]);
+    const ordersQuery = query(baseQuery, ...queryConstraints);
+    const querySnapshot = await getDocs(ordersQuery);
+    const fetchedOrders: ArchivedOrder[] = [];
+    querySnapshot.forEach(doc => {
+      fetchedOrders.push({
+        id: doc.id,
+        ...doc.data(),
+      } as ArchivedOrder);
+    });
+    return fetchedOrders;
+  };
 
-  useEffect(() => {
-    fetchArchivedOrders();
-  }, [fetchArchivedOrders]);
+  const {
+    data: archivedOrders = [],
+    isLoading: loading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["archivedOrders", filter ? JSON.stringify(filter) : "", itemLimit],
+    queryFn: fetchArchivedOrders,
+    keepPreviousData: true,
+  });
 
-  const updateFilter = useCallback((newFilter: ArchiveFilter) => {
+  const updateFilter = (newFilter: ArchiveFilter) => {
     setFilter(newFilter);
-  }, []);
+  };
 
-  const updateLimit = useCallback((newLimit: number) => {
+  const updateLimit = (newLimit: number) => {
     setItemLimit(newLimit);
-  }, []);
+  };
 
-  const formatDate = useCallback((timestamp: Timestamp | undefined) => {
+  const formatDate = (timestamp: Timestamp | undefined) => {
     if (!timestamp || !timestamp.toDate) return "N/A";
     const date = timestamp.toDate();
     return date.toLocaleDateString("en-US", {
@@ -107,16 +92,16 @@ export const useArchivedOrders = (initialFilter?: ArchiveFilter, initialLimit = 
       month: "2-digit",
       day: "2-digit",
     });
-  }, []);
+  };
 
   return {
     archivedOrders,
     loading,
-    error,
+    error: isError ? (error instanceof Error ? error.message : String(error)) : null,
     updateFilter,
     updateLimit,
     formatDate,
-    refreshArchivedOrders: fetchArchivedOrders,
+    refreshArchivedOrders: refetch,
   };
 };
 
