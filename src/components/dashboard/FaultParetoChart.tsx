@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Typography, Paper, CircularProgress, Alert } from "@mui/material";
+import { Typography, CircularProgress, Alert } from "@mui/material";
 import {
   Bar,
   Line,
@@ -11,6 +11,9 @@ import {
   ResponsiveContainer,
   ComposedChart,
 } from "recharts";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../config/firebase";
+import ChartWrapper from "../common/ChartWrapper";
 
 interface FaultData {
   faultType: string;
@@ -28,22 +31,14 @@ const FaultParetoChart = () => {
       setLoading(true);
       setError(null);
       try {
-        const rawFaults = [
-          { faultType: "Solder Bridge" },
-          { faultType: "Missing Component" },
-          { faultType: "Solder Bridge" },
-          { faultType: "Wrong Polarity" },
-          { faultType: "Solder Bridge" },
-          { faultType: "Missing Component" },
-          { faultType: "Test Failure" },
-          { faultType: "Solder Bridge" },
-          { faultType: "Cosmetic Defect" },
-          { faultType: "Missing Component" },
-        ];
+        // Fetch real faults from Firestore
+        const snapshot = await getDocs(collection(db, "faults"));
+        const rawFaults = snapshot.docs.map(doc => doc.data());
 
         const counts: Record<string, number> = {};
         rawFaults.forEach(fault => {
-          counts[fault.faultType] = (counts[fault.faultType] || 0) + 1;
+          const type = fault.faultType || "Unknown";
+          counts[type] = (counts[type] || 0) + 1;
         });
 
         const sortedFaults = Object.entries(counts)
@@ -85,10 +80,10 @@ const FaultParetoChart = () => {
   }
 
   return (
-    <Paper sx={{ p: 2, height: 400 }}>
-      <Typography variant="h6" gutterBottom>
-        Fault Pareto Analysis
-      </Typography>
+    <ChartWrapper
+      title="Fault Pareto Analysis"
+      description="Most frequent fault types and their cumulative impact."
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 50 }}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -121,7 +116,7 @@ const FaultParetoChart = () => {
           />
         </ComposedChart>
       </ResponsiveContainer>
-    </Paper>
+    </ChartWrapper>
   );
 };
 

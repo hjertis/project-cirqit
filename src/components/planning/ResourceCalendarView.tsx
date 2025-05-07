@@ -42,6 +42,7 @@ import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import weekOfYear from "dayjs/plugin/weekOfYear";
 import OrderDetailsDialog from "../orders/OrderDetailsDialog";
+import { DndContext, useDraggable, useDroppable, DragEndEvent } from "@dnd-kit/core";
 
 dayjs.extend(isBetween);
 dayjs.extend(weekOfYear);
@@ -306,10 +307,88 @@ const ResourceCalendarView = ({
     }
   };
 
-  if (loading) {
+  // Helper for draggable event bar
+  function DraggableEventBar({ order, startIdx, endIdx, level, cellWidth, onDrop, children }) {
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+      id: order.id,
+      data: { orderId: order.id, startIdx },
+    });
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
-        <CircularProgress />
+      <Paper
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        elevation={2}
+        sx={{
+          position: "absolute",
+          left: `calc(${startIdx} * ${cellWidth}px)`,
+          width: `calc((${endIdx} - ${startIdx} + 1) * ${cellWidth}px - 8px)`,
+          top: level * 36,
+          zIndex: isDragging ? 10 : 3,
+          opacity: isDragging ? 0.7 : 1,
+          p: 1,
+          fontSize: "0.8rem",
+          backgroundColor: "background.paper",
+          color: "text.primary",
+          borderLeft: `4px solid ${getPriorityColor(order.priority)}`,
+          cursor: "grab",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          mb: 0.5,
+          boxShadow: isDragging ? 4 : 2,
+          display: "flex",
+          alignItems: "center",
+          minHeight: 32,
+          "&:hover": {
+            opacity: 0.95,
+            boxShadow: 4,
+          },
+        }}
+        title={`${order.orderNumber}: ${order.description}`}
+      >
+        {children}
+      </Paper>
+    );
+  }
+
+  // Helper for droppable date cell
+  function DroppableDateCell({ resourceId, dateIdx, date, children, onDrop, sx = {}, ...props }) {
+    const droppableId = `${resourceId}_${dateIdx}`;
+    const { setNodeRef, isOver } = useDroppable({
+      id: droppableId,
+      data: { resourceId, dateIdx, date },
+    });
+    return (
+      <Box
+        ref={setNodeRef}
+        sx={{
+          borderBottom: 1,
+          borderRight: 1,
+          borderColor: "divider",
+          backgroundColor: isOver
+            ? theme.palette.primary.light
+            : isToday(date)
+              ? theme.palette.action.hover
+              : isWeekend(date)
+                ? theme.palette.action.disabledBackground
+                : "background.paper",
+          boxShadow: isOver ? 4 : undefined,
+          outline: isOver ? `2px solid ${theme.palette.primary.main}` : undefined,
+          zIndex: isOver ? 20 : 1,
+          transition: "background 0.1s, box-shadow 0.1s, outline 0.1s, z-index 0s",
+          p: 0.5,
+          gridColumn: dateIdx + 2,
+          minHeight: 36,
+          position: "absolute",
+          left: dateIdx * cellWidth,
+          top: 0,
+          width: cellWidth,
+          ...sx,
+        }}
+        {...props}
+      >
+        {children}
       </Box>
     );
   }
@@ -394,11 +473,60 @@ const ResourceCalendarView = ({
       )}
 
       <Paper sx={{ overflowX: "auto" }}>
-        <Box sx={{ display: "flex", minWidth: cellWidth * calendarDates.length + 200 }}>
-          <Box sx={{ width: 200, flexShrink: 0 }}>
+        <DndContext
+          onDragEnd={async (event: DragEndEvent) => {
+            const { active, over } = event;
+            if (!over || !active) return;
+            const orderId = active.id;
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+            const [resourceId, dateIdxStr] = over.id.split("_");
+            const dateIdx = parseInt(dateIdxStr, 10);
+            if (isNaN(dateIdx) || !calendarDates[dateIdx]) return;
+            // Only allow drop on same resource row
+            if (order.assignedResourceId !== resourceId) return;
+            // Calculate duration
+            const origStart = dayjs(order.start.toDate());
+            const origEnd = dayjs(order.end.toDate());
+            const duration = origEnd.diff(origStart, "day");
+            const newStart = dayjs(calendarDates[dateIdx]).startOf("day");
+            const newEnd = newStart.add(duration, "day");
+            // Update Firestore and local state
+            try {
+              const orderRef = doc(db, "orders", order.id);
+              await updateDoc(orderRef, {
+                start: Timestamp.fromDate(newStart.toDate()),
+                end: Timestamp.fromDate(newEnd.toDate()),
+                updated: Timestamp.fromDate(new Date()),
+              });
+              setOrders(prev =>
+                prev.map(o =>
+                  o.id === order.id
+                    ? {
+                        ...o,
+                        start: Timestamp.fromDate(newStart.toDate()),
+                        end: Timestamp.fromDate(newEnd.toDate()),
+                      }
+                    : o
+                )
+              );
+            } catch (err) {
+              setError("Failed to update order date");
+            }
+          }}
+        >
+          <Box
+            sx={{
+              position: "relative",
+              display: "grid",
+              gridTemplateRows: `60px repeat(${resources.length}, auto)`,
+              gridTemplateColumns: `200px repeat(${calendarDates.length}, ${cellWidth}px)`,
+              minWidth: 200 + cellWidth * calendarDates.length,
+            }}
+          >
+            {/* Header Row */}
             <Box
               sx={{
-                height: 60,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -407,162 +535,190 @@ const ResourceCalendarView = ({
                 borderColor: "divider",
                 backgroundColor: "background.default",
                 p: 1,
+                gridColumn: 1,
+                gridRow: 1,
+                zIndex: 2,
+                position: "sticky",
+                left: 0,
               }}
             >
               <Typography variant="subtitle1" fontWeight="bold">
                 Resources
               </Typography>
             </Box>
-
-            {resources.map(resource => (
+            {calendarDates.map((date, index) => (
               <Box
-                key={resource.id}
+                key={index}
                 sx={{
-                  height: cellHeight,
-                  display: "flex",
-                  alignItems: "center",
                   borderBottom: 1,
                   borderRight: 1,
                   borderColor: "divider",
+                  backgroundColor: isToday(date)
+                    ? "primary.lighter"
+                    : isWeekend(date)
+                      ? "action.hover"
+                      : "background.default",
                   p: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gridColumn: index + 2,
+                  gridRow: 1,
+                  zIndex: 1,
+                  height: 60,
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  {resource.type === "person" ? (
-                    <PersonIcon sx={{ mr: 1, color: resource.color }} />
-                  ) : (
-                    <BuildIcon sx={{ mr: 1, color: resource.color }} />
-                  )}
-                  <Typography variant="body2" noWrap>
-                    {resource.name}
-                  </Typography>
-                </Box>
+                <Typography
+                  variant="body2"
+                  fontWeight={isToday(date) ? "bold" : "normal"}
+                  color={isToday(date) ? "primary.main" : "text.primary"}
+                >
+                  {dayjs(date).format("ddd")}
+                </Typography>
+                <Typography
+                  variant="body1"
+                  fontWeight={isToday(date) ? "bold" : "normal"}
+                  color={isToday(date) ? "primary.main" : "text.primary"}
+                >
+                  {dayjs(date).format("MMM D")}
+                </Typography>
               </Box>
             ))}
-          </Box>
 
-          <Box sx={{ flexGrow: 1 }}>
-            <Box sx={{ display: "flex", height: 60 }}>
-              {calendarDates.map((date, index) => (
+            {/* Resource Rows (sidebar and event area) */}
+            {resources.map((resource, rowIdx) => {
+              // Sidebar cell
+              const sidebar = (
                 <Box
-                  key={index}
+                  key={resource.id + "_sidebar"}
                   sx={{
-                    width: cellWidth,
+                    display: "flex",
+                    alignItems: "center",
                     borderBottom: 1,
                     borderRight: 1,
                     borderColor: "divider",
-                    backgroundColor: isToday(date)
-                      ? "primary.lighter"
-                      : isWeekend(date)
-                        ? "action.hover"
-                        : "background.default",
                     p: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    gridColumn: 1,
+                    gridRow: rowIdx + 2,
+                    position: "sticky",
+                    left: 0,
+                    backgroundColor: "background.paper",
+                    zIndex: 1,
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    fontWeight={isToday(date) ? "bold" : "normal"}
-                    color={isToday(date) ? "primary.main" : "text.primary"}
-                  >
-                    {dayjs(date).format("ddd")}
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    fontWeight={isToday(date) ? "bold" : "normal"}
-                    color={isToday(date) ? "primary.main" : "text.primary"}
-                  >
-                    {dayjs(date).format("MMM D")}
-                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    {resource.type === "person" ? (
+                      <PersonIcon sx={{ mr: 1, color: resource.color }} />
+                    ) : (
+                      <BuildIcon sx={{ mr: 1, color: resource.color }} />
+                    )}
+                    <Typography variant="body2" noWrap>
+                      {resource.name}
+                    </Typography>
+                  </Box>
                 </Box>
-              ))}
-            </Box>
+              );
 
-            {resources.map(resource => (
-              <Box
-                key={resource.id}
-                sx={{
-                  display: "flex",
-                  minHeight: cellHeight,
-                  borderTop: 1,
-                  borderColor: "divider",
-                }}
-              >
-                {calendarDates.map((date, dateIndex) => {
-                  const cellOrders = orders.filter(order => {
-                    if (order.assignedResourceId !== resource.id) return false;
-                    const orderStart = dayjs(order.start.toDate());
-                    const orderEnd = dayjs(order.end.toDate());
+              // Event area cell (spans all date columns)
+              // Calculate event stacking as before
+              const resourceOrders = orders
+                .filter(order => order.assignedResourceId === resource.id)
+                .map(order => {
+                  const orderStart = dayjs(order.start.toDate());
+                  const orderEnd = dayjs(order.end.toDate());
+                  let startIdx = calendarDates.findIndex(date =>
+                    dayjs(date).isSame(orderStart, "day")
+                  );
+                  let endIdx = calendarDates.findIndex(date => dayjs(date).isSame(orderEnd, "day"));
+                  if (startIdx === -1) startIdx = 0;
+                  if (endIdx === -1) endIdx = calendarDates.length - 1;
+                  return { ...order, startIdx, endIdx };
+                })
+                .sort((a, b) => a.startIdx - b.startIdx || a.endIdx - b.endIdx);
+              const levels: { endIdx: number }[] = [];
+              const ordersWithLevel = resourceOrders.map(order => {
+                let level = 0;
+                while (levels[level] && levels[level].endIdx >= order.startIdx) {
+                  level++;
+                }
+                levels[level] = { endIdx: order.endIdx };
+                return { ...order, level };
+              });
+              const maxLevel = ordersWithLevel.reduce((max, o) => Math.max(max, o.level), 0);
 
-                    return dayjs(date).isBetween(
-                      orderStart.subtract(1, "day"),
-                      orderEnd.add(1, "day"),
-                      "day",
-                      "()"
-                    );
-                  });
-
-                  return (
-                    <Box
+              const eventArea = (
+                <Box
+                  key={resource.id + "_eventarea"}
+                  sx={{
+                    gridColumn: `2 / ${calendarDates.length + 2}`,
+                    gridRow: rowIdx + 2,
+                    position: "relative",
+                    minHeight: 36 * (maxLevel + 1),
+                    borderBottom: 1,
+                  }}
+                >
+                  {/* Droppable overlays for each date cell */}
+                  {calendarDates.map((date, dateIdx) => (
+                    <DroppableDateCell
                       key={`${resource.id}_${date.toISOString()}`}
+                      resourceId={resource.id}
+                      dateIdx={dateIdx}
+                      date={date}
                       sx={{
+                        position: "absolute",
+                        left: dateIdx * cellWidth,
+                        top: 0,
                         width: cellWidth,
-                        minHeight: cellHeight,
-                        borderBottom: 1,
+                        height: 36 * (maxLevel + 1),
+                        zIndex: 1,
+                        p: 0.5,
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  ))}
+                  {/* Event bars, absolutely positioned */}
+                  {ordersWithLevel.map(order => (
+                    <DraggableEventBar
+                      key={order.id}
+                      order={order}
+                      startIdx={order.startIdx}
+                      endIdx={order.endIdx}
+                      level={order.level}
+                      cellWidth={cellWidth}
+                    >
+                      <Typography variant="subtitle2" fontWeight="bold" noWrap>
+                        {order.orderNumber}
+                      </Typography>
+                      <Typography variant="body2" noWrap color="text.secondary" sx={{ ml: 1 }}>
+                        {order.description}
+                      </Typography>
+                    </DraggableEventBar>
+                  ))}
+                  {/* Grid lines for each date cell */}
+                  {calendarDates.map((date, dateIdx) => (
+                    <Box
+                      key={"gridline_" + dateIdx}
+                      sx={{
+                        position: "absolute",
+                        left: dateIdx * cellWidth,
+                        top: 0,
+                        width: cellWidth,
+                        height: 36 * (maxLevel + 1),
                         borderRight: 1,
                         borderColor: "divider",
-                        backgroundColor: isToday(date)
-                          ? theme.palette.action.hover
-                          : isWeekend(date)
-                            ? theme.palette.action.disabledBackground
-                            : "background.paper",
-                        p: 0.5,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 0.5,
-                        overflowY: "auto",
+                        pointerEvents: "none",
+                        zIndex: 0,
                       }}
-                    >
-                      {cellOrders.map(order => (
-                        <Paper
-                          key={order.id}
-                          elevation={1}
-                          sx={{
-                            p: 0.5,
-                            fontSize: "0.7rem",
-                            backgroundColor: getStatusColor(order.status),
-                            color: theme.palette.getContrastText(getStatusColor(order.status)),
-                            borderLeft: `3px solid ${getPriorityColor(order.priority)}`,
-                            cursor: "pointer",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            "&:hover": {
-                              opacity: 0.9,
-                              boxShadow: 2,
-                            },
-                          }}
-                          onClick={() => handleViewOrder(order.id)}
-                          title={`${order.orderNumber}: ${order.description}`}
-                        >
-                          <Typography variant="caption" component="div" fontWeight="bold" noWrap>
-                            {order.orderNumber}
-                          </Typography>
-                          <Typography variant="caption" component="div" noWrap>
-                            {order.description}
-                          </Typography>
-                        </Paper>
-                      ))}
-                    </Box>
-                  );
-                })}
-              </Box>
-            ))}
+                    />
+                  ))}
+                </Box>
+              );
+
+              return [sidebar, eventArea];
+            })}
           </Box>
-        </Box>
+        </DndContext>
       </Paper>
 
       <OrderDetailsDialog

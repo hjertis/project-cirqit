@@ -20,12 +20,12 @@ import FaultParetoChart from "../components/dashboard/FaultParetoChart";
 import ResourceBoardPage from "../pages/ResourceBoardPage";
 import ProductionDashboardPage from "../pages/ProductionDashboardPage";
 import PrintOrderPage from "../pages/PrintOrderPage";
-import DailySchedulerPage from "../pages/DailySchedulerPage";
 import MigratePlannedWeekStartDateButton from "../pages/admin/MigrateDates";
 import KanbanPage from "../pages/KanbanPage";
 import StandardizeProcessesCollectionPage from "../pages/admin/StandardizeProcessesCollectionPage.tsx";
 import FixInvalidOrderResourcesPage from "../pages/admin/FixInvalidOrderResourcesPage.tsx";
 import FaultTrackingPage from "../pages/FaultTrackingPage.tsx";
+import FaultReportsPage from "../pages/FaultReportsPage.tsx";
 
 const AppRoutes = () => {
   return (
@@ -49,7 +49,6 @@ const AppRoutes = () => {
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
         <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
         <Route path="/orders/resource-board" element={<ResourceBoardPage />} />
-        <Route path="/orders/resource-scheduler" element={<DailySchedulerPage />} />
         <Route path="/orders/:id/print" element={<PrintOrderPage />} />
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
@@ -65,7 +64,7 @@ const AppRoutes = () => {
         <Route path="/kanban" element={<KanbanPage />} />
         <Route path="/faults" element={<div>Faults Page</div>} />
         <Route path="/fault-tracking" element={<FaultTrackingPage />} />
-        <Route path="/fault-report" element={<div>Fault Report Page</div>} />
+        <Route path="/fault-report" element={<FaultReportsPage />} />
         <Route
           path="/admin/migrate-orders"
           element={
