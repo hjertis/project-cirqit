@@ -31,6 +31,11 @@ import {
   getActiveTimeEntry,
 } from "../../services/timeTrackingService";
 import { formatDuration } from "../../utils/helpers";
+import dayjs from "dayjs";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
 
 interface TimeEntryWidgetProps {
   orderId: string;
@@ -53,6 +58,9 @@ const TimeEntryWidget = ({
   const [success, setSuccess] = useState<string | null>(null);
   const [activeEntry, setActiveEntry] = useState<any | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const [unclosedEntry, setUnclosedEntry] = useState<any | null>(null);
+  const [showUnclosedDialog, setShowUnclosedDialog] = useState(false);
+  const [unclosedEndTime, setUnclosedEndTime] = useState<string>("16:00");
 
   useEffect(() => {
     const fetchActiveEntry = async () => {
@@ -96,7 +104,48 @@ const TimeEntryWidget = ({
     };
   }, [activeEntry]);
 
+  useEffect(() => {
+    const checkUnclosedEntry = async () => {
+      if (!currentUser) return;
+      // Find any active/paused entry from a previous day
+      const entry = await getActiveTimeEntry(currentUser.uid, orderId);
+      if (entry && entry.startTime && dayjs(entry.startTime.toDate()).isBefore(dayjs(), "day")) {
+        setUnclosedEntry(entry);
+        setShowUnclosedDialog(true);
+      } else {
+        setUnclosedEntry(null);
+        setShowUnclosedDialog(false);
+      }
+    };
+    checkUnclosedEntry();
+  }, [currentUser, orderId]);
+
+  const handleConfirmUnclosed = async () => {
+    if (!unclosedEntry) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Set end time to previous day at chosen time
+      const start = dayjs(unclosedEntry.startTime.toDate());
+      const [h, m] = unclosedEndTime.split(":").map(Number);
+      const end = start.hour(h).minute(m).second(0);
+      await stopTimeEntry(unclosedEntry.id, notes, end.toDate());
+      setUnclosedEntry(null);
+      setShowUnclosedDialog(false);
+      setSuccess("Previous day's time entry closed.");
+      if (onTimeEntryUpdated) onTimeEntryUpdated();
+    } catch (err) {
+      setError("Failed to close previous day's entry");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleStartTime = async () => {
+    if (unclosedEntry) {
+      setShowUnclosedDialog(true);
+      return;
+    }
     if (!currentUser) return;
 
     try {
@@ -337,6 +386,30 @@ const TimeEntryWidget = ({
           </Box>
         )}
       </Box>
+
+      {/* Unclosed entry dialog */}
+      <Dialog open={showUnclosedDialog} onClose={() => setShowUnclosedDialog(false)}>
+        <DialogTitle>Unclosed Time Entry</DialogTitle>
+        <DialogContent>
+          <Typography gutterBottom>
+            You have an unfinished time entry from a previous day. When did you leave?
+          </Typography>
+          <TextField
+            label="End Time (HH:mm)"
+            type="time"
+            value={unclosedEndTime}
+            onChange={e => setUnclosedEndTime(e.target.value)}
+            inputProps={{ step: 60 }}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowUnclosedDialog(false)}>Cancel</Button>
+          <Button onClick={handleConfirmUnclosed} variant="contained" disabled={isLoading}>
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };

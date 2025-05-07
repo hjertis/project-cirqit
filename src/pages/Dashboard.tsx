@@ -110,10 +110,10 @@ const Dashboard = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Revenue This Month"
-              value={stats.revenueThisMonth}
-              icon={<PaidIcon />}
-              color="#ff9800"
+              title="Average Lead Time"
+              value={stats.averageLeadTime}
+              icon={<TimelineIcon />}
+              color="#4caf50"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>

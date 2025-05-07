@@ -18,6 +18,7 @@ import {
   Tooltip,
   Badge,
   Chip,
+  Autocomplete,
 } from "@mui/material";
 import {
   AccessTime as TimeIcon,
@@ -36,6 +37,9 @@ import {
 } from "../../services/timeTrackingService";
 import { useNavigate } from "react-router-dom";
 import { formatDuration } from "../../utils/helpers";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../config/firebase";
+import dayjs from "dayjs";
 
 const QuickTimeClockWidget = () => {
   const { currentUser } = useAuth();
@@ -49,6 +53,12 @@ const QuickTimeClockWidget = () => {
   const [error, setError] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [timerRunning, setTimerRunning] = useState<boolean>(false);
+  const [orderOptions, setOrderOptions] = useState<{ orderNumber: string; description: string }[]>(
+    []
+  );
+  const [unclosedEntry, setUnclosedEntry] = useState<any | null>(null);
+  const [showUnclosedDialog, setShowUnclosedDialog] = useState(false);
+  const [unclosedEndTime, setUnclosedEndTime] = useState<string>("16:00");
 
   useEffect(() => {
     const checkActiveEntries = async () => {
@@ -98,6 +108,40 @@ const QuickTimeClockWidget = () => {
     };
   }, [timerRunning]);
 
+  useEffect(() => {
+    // Fetch only in-progress orders for autocomplete
+    const fetchOrders = async () => {
+      try {
+        const q = query(collection(db, "orders"), where("status", "==", "In Progress"));
+        const snap = await getDocs(q);
+        const options = snap.docs.map(doc => ({
+          orderNumber: doc.data().orderNumber || doc.id,
+          description: doc.data().description || "",
+        }));
+        setOrderOptions(options);
+      } catch (err) {
+        // ignore autocomplete errors
+      }
+    };
+    fetchOrders();
+  }, [currentUser]);
+
+  useEffect(() => {
+    // Check for unclosed time entry from previous day
+    const checkUnclosedEntry = async () => {
+      if (!currentUser) return;
+      const entry = await getActiveTimeEntry(currentUser.uid, "");
+      if (entry && entry.startTime && dayjs(entry.startTime.toDate()).isBefore(dayjs(), "day")) {
+        setUnclosedEntry(entry);
+        setShowUnclosedDialog(true);
+      } else {
+        setUnclosedEntry(null);
+        setShowUnclosedDialog(false);
+      }
+    };
+    checkUnclosedEntry();
+  }, [currentUser]);
+
   const handleOpenDialog = () => {
     setDialogOpen(true);
   };
@@ -108,6 +152,11 @@ const QuickTimeClockWidget = () => {
   };
 
   const handleStartTime = async () => {
+    if (unclosedEntry) {
+      setShowUnclosedDialog(true);
+      return;
+    }
+
     if (!currentUser || !orderNumber) {
       setError("Please enter an order number");
       return;
@@ -192,6 +241,25 @@ const QuickTimeClockWidget = () => {
     } catch (err) {
       console.error("Error resuming time:", err);
       setError(`Failed to resume time: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmUnclosed = async () => {
+    if (!unclosedEntry) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const start = dayjs(unclosedEntry.startTime.toDate());
+      const [h, m] = unclosedEndTime.split(":").map(Number);
+      const end = start.hour(h).minute(m).second(0);
+      await stopTimeEntry(unclosedEntry.id, notes, end.toDate());
+      setUnclosedEntry(null);
+      setShowUnclosedDialog(false);
+      // Optionally refresh state here
+    } catch (err) {
+      setError("Failed to close previous day's entry");
     } finally {
       setLoading(false);
     }
@@ -289,15 +357,37 @@ const QuickTimeClockWidget = () => {
             </Box>
           ) : (
             <Box sx={{ py: 2 }}>
-              <TextField
-                fullWidth
-                label="Order Number"
-                value={orderNumber}
-                onChange={e => setOrderNumber(e.target.value)}
+              <Autocomplete
+                freeSolo
+                options={orderOptions}
+                getOptionLabel={option =>
+                  typeof option === "string"
+                    ? option
+                    : `${option.orderNumber}${option.description ? ` - ${option.description}` : ""}`
+                }
+                value={orderOptions.find(o => o.orderNumber === orderNumber) || orderNumber}
+                onInputChange={(_e, value) => setOrderNumber(value)}
+                renderInput={params => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    label="Order Number"
+                    disabled={loading}
+                    sx={{ mb: 2 }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.orderNumber}>
+                    <Box>
+                      <strong>{option.orderNumber}</strong>
+                      {option.description && (
+                        <span style={{ color: "#888", marginLeft: 8 }}>{option.description}</span>
+                      )}
+                    </Box>
+                  </li>
+                )}
                 disabled={loading}
-                sx={{ mb: 2 }}
               />
-
               <TextField
                 fullWidth
                 label="Notes"
@@ -327,6 +417,30 @@ const QuickTimeClockWidget = () => {
           <Button onClick={handleCloseDialog}>Close</Button>
           <Button variant="outlined" onClick={handleViewTimesheet}>
             View Timesheet
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Unclosed entry dialog */}
+      <Dialog open={showUnclosedDialog} onClose={() => setShowUnclosedDialog(false)}>
+        <DialogTitle>Unclosed Time Entry</DialogTitle>
+        <DialogContent>
+          <Typography gutterBottom>
+            You have an unfinished time entry from a previous day. When did you leave?
+          </Typography>
+          <TextField
+            label="End Time (HH:mm)"
+            type="time"
+            value={unclosedEndTime}
+            onChange={e => setUnclosedEndTime(e.target.value)}
+            inputProps={{ step: 60 }}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowUnclosedDialog(false)}>Cancel</Button>
+          <Button onClick={handleConfirmUnclosed} variant="contained" disabled={loading}>
+            Confirm
           </Button>
         </DialogActions>
       </Dialog>

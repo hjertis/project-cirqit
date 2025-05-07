@@ -26,6 +26,7 @@ import StandardizeProcessesCollectionPage from "../pages/admin/StandardizeProces
 import FixInvalidOrderResourcesPage from "../pages/admin/FixInvalidOrderResourcesPage.tsx";
 import FaultTrackingPage from "../pages/FaultTrackingPage.tsx";
 import FaultReportsPage from "../pages/FaultReportsPage.tsx";
+import ProductsPage from "../pages/ProductsPage.tsx";
 
 const AppRoutes = () => {
   return (
@@ -52,7 +53,7 @@ const AppRoutes = () => {
         <Route path="/orders/:id/print" element={<PrintOrderPage />} />
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
-        <Route path="/products" element={<div>Products Page</div>} />
+        <Route path="/products" element={<ProductsPage />} />
         <Route path="/products/create" element={<div>Create Product Page</div>} />
         <Route path="/products/:id" element={<div>Product Details Page</div>} />
         <Route path="/employees" element={<div>Employees Page</div>} />

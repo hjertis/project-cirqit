@@ -4,19 +4,17 @@ import { useMemo } from "react";
 export const useDashboardData = () => {
   const { stats, refreshStats, lastUpdated } = useDashboard();
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(value);
+  const formatLeadTime = (days: number) => {
+    if (days === 0) return "N/A";
+    if (days < 1) return `${(days * 24).toFixed(1)} hrs`;
+    return `${days.toFixed(1)} days`;
   };
 
   const formattedStats = useMemo(
     () => ({
       ordersCompletionRate: `${stats.ordersCompletionRate}%`,
       onTimeDeliveryRate: `${stats.onTimeDeliveryRate}%`,
-      revenueThisMonth: formatCurrency(stats.revenueThisMonth),
+      averageLeadTime: formatLeadTime(stats.averageLeadTime ?? 0),
       completedOrdersCount: stats.completedOrdersCount.toString(),
     }),
     [stats]
