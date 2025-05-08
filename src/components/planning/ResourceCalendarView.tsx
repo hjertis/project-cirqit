@@ -44,6 +44,7 @@ import weekOfYear from "dayjs/plugin/weekOfYear";
 import OrderDetailsDialog from "../orders/OrderDetailsDialog";
 import { DndContext, useDraggable, useDroppable, DragEndEvent } from "@dnd-kit/core";
 import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 dayjs.extend(isBetween);
 dayjs.extend(weekOfYear);
@@ -103,6 +104,7 @@ const ResourceCalendarView = ({
   defaultDate = new Date(),
 }: CalendarViewProps) => {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const [viewType, setViewType] = useState<"week" | "month">(defaultView);
   const [currentDate, setCurrentDate] = useState<Date>(defaultDate);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -285,19 +287,6 @@ const ResourceCalendarView = ({
         end: Timestamp.fromDate(newEndDate.toDate()),
         updated: Timestamp.fromDate(new Date()),
       });
-
-      setOrders(prev =>
-        prev.map(order =>
-          order.id === orderToUpdate.id
-            ? {
-                ...order,
-                assignedResourceId: resourceId,
-                start: Timestamp.fromDate(newStartDate.toDate()),
-                end: Timestamp.fromDate(newEndDate.toDate()),
-              }
-            : order
-        )
-      );
 
       setUpdateSuccess(`Order ${orderToUpdate.orderNumber} successfully reassigned`);
 
@@ -494,7 +483,7 @@ const ResourceCalendarView = ({
             const duration = origEnd.diff(origStart, "day");
             const newStart = dayjs(calendarDates[dateIdx]).startOf("day");
             const newEnd = newStart.add(duration, "day");
-            // Update Firestore and local state
+            // Update Firestore and refetch orders
             try {
               const orderRef = doc(db, "orders", order.id);
               await updateDoc(orderRef, {
@@ -502,19 +491,10 @@ const ResourceCalendarView = ({
                 end: Timestamp.fromDate(newEnd.toDate()),
                 updated: Timestamp.fromDate(new Date()),
               });
-              setOrders(prev =>
-                prev.map(o =>
-                  o.id === order.id
-                    ? {
-                        ...o,
-                        start: Timestamp.fromDate(newStart.toDate()),
-                        end: Timestamp.fromDate(newEnd.toDate()),
-                      }
-                    : o
-                )
-              );
+              // Invalidate orders query to refresh UI
+              queryClient.invalidateQueries({ queryKey: ["calendar-orders"] });
             } catch (err) {
-              setError("Failed to update order date");
+              // Optionally show error to user
             }
           }}
         >

@@ -59,7 +59,6 @@ interface OrderFormData {
 
 interface ProcessTemplate {
   id?: string;
-  type: string;
   name: string;
   duration: number;
   sequence: number;
@@ -172,9 +171,10 @@ const EditOrder = () => {
       setOriginalProcesses(processesData);
       const processTemplates: ProcessTemplate[] = processesData.map(process => ({
         id: process.id,
-        type: process.type,
         name: process.name,
-        duration: calculateDuration(process.startDate.toDate(), process.endDate.toDate()),
+        duration:
+          (process.endDate.toDate().getTime() - process.startDate.toDate().getTime()) /
+          (1000 * 60 * 60),
         sequence: process.sequence,
         status: process.status,
       }));
@@ -225,7 +225,6 @@ const EditOrder = () => {
       processes: [
         ...formData.processes,
         {
-          type: processTypes[0],
           name: `New Process ${newSequence}`,
           duration: 1,
           sequence: newSequence,
@@ -355,21 +354,18 @@ const EditOrder = () => {
 
       for (const process of formData.processes) {
         const processStartDate = new Date(startDate);
-        const processEndDate = new Date(processStartDate);
-
-        const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
-        if (previousProcesses.length > 0) {
+        if (process.sequence > 1) {
+          const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
           const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
-          processStartDate.setDate(startDate.getDate() + totalPreviousDuration);
+          processStartDate.setHours(startDate.getHours() + totalPreviousDuration);
         }
-
-        processEndDate.setDate(processStartDate.getDate() + process.duration);
+        const processEndDate = new Date(processStartDate);
+        processEndDate.setHours(processEndDate.getHours() + process.duration);
 
         if (process.id) {
           const processRef = doc(db, "processes", process.id);
           await updateDoc(processRef, {
             workOrderId: formData.orderNumber,
-            type: process.type,
             name: process.name,
             sequence: process.sequence,
             status: process.status || "Not Started",
@@ -382,7 +378,6 @@ const EditOrder = () => {
           await setDoc(processRef, {
             workOrderId: formData.orderNumber,
             processId: processRef.id,
-            type: process.type,
             name: process.name,
             sequence: process.sequence,
             status: process.status || "Not Started",
@@ -657,17 +652,17 @@ const EditOrder = () => {
                       </Box>
                     </Grid>
 
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} md={6}>
                       <FormControl fullWidth>
-                        <InputLabel>Process Type</InputLabel>
+                        <InputLabel>Process Name</InputLabel>
                         <Select
-                          value={process.type}
-                          onChange={e => handleProcessChange(index, "type", e.target.value)}
-                          label="Process Type"
+                          value={process.name}
+                          onChange={e => handleProcessChange(index, "name", e.target.value)}
+                          label="Process Name"
                         >
-                          {processTypes.map(type => (
-                            <MenuItem key={type} value={type}>
-                              {type}
+                          {STANDARD_PROCESS_NAMES.map(name => (
+                            <MenuItem key={name} value={name}>
+                              {name}
                             </MenuItem>
                           ))}
                         </Select>
@@ -677,22 +672,13 @@ const EditOrder = () => {
                     <Grid item xs={12} md={3}>
                       <TextField
                         fullWidth
-                        label="Process Name"
-                        value={process.name}
-                        onChange={e => handleProcessChange(index, "name", e.target.value)}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} md={3}>
-                      <TextField
-                        fullWidth
                         type="number"
-                        label="Duration (days)"
+                        label="Duration (hours)"
                         value={process.duration}
                         onChange={e =>
                           handleProcessChange(index, "duration", Number(e.target.value))
                         }
-                        InputProps={{ inputProps: { min: 1 } }}
+                        InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
                       />
                     </Grid>
 

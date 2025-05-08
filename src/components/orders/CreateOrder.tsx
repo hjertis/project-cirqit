@@ -47,7 +47,6 @@ interface OrderFormData {
 }
 
 interface ProcessTemplate {
-  type: string;
   name: string;
   duration: number;
   sequence: number;
@@ -88,11 +87,11 @@ const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Fi
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
 
 const defaultProcessTemplates: ProcessTemplate[] = [
-  { type: "Setup", name: "Setup", duration: 1, sequence: 1 },
-  { type: "SMT", name: "SMT", duration: 3, sequence: 2 },
-  { type: "Inspection", name: "Inspection", duration: 2, sequence: 3 },
-  { type: "Repair/Rework", name: "Repair/Rework", duration: 1, sequence: 4 },
-  { type: "HMT", name: "HMT", duration: 1, sequence: 5 },
+  { name: "Setup", duration: 1, sequence: 1 },
+  { name: "SMT", duration: 3, sequence: 2 },
+  { name: "Inspection", duration: 2, sequence: 3 },
+  { name: "Repair/Rework", duration: 1, sequence: 4 },
+  { name: "HMT", duration: 1, sequence: 5 },
 ];
 
 const CreateOrder = () => {
@@ -152,7 +151,6 @@ const CreateOrder = () => {
       processes: [
         ...formData.processes,
         {
-          type: processTypes[0],
           name: `New Process ${newSequence}`,
           duration: 1,
           sequence: newSequence,
@@ -292,20 +290,17 @@ const CreateOrder = () => {
         const processRef = doc(collection(db, "processes"));
 
         const processStartDate = new Date(startDate);
-        const processEndDate = new Date(processStartDate);
-
-        const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
-        if (previousProcesses.length > 0) {
+        if (process.sequence > 1) {
+          const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
           const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
-          processStartDate.setDate(startDate.getDate() + totalPreviousDuration);
+          processStartDate.setHours(startDate.getHours() + totalPreviousDuration);
         }
-
-        processEndDate.setDate(processStartDate.getDate() + process.duration);
+        const processEndDate = new Date(processStartDate);
+        processEndDate.setHours(processEndDate.getHours() + process.duration);
 
         await setDoc(processRef, {
           workOrderId: formData.orderNumber,
           processId: processRef.id,
-          type: process.type,
           name: process.name,
           sequence: process.sequence,
           status: process.sequence === 1 ? "Pending" : "Not Started",
@@ -585,12 +580,12 @@ const CreateOrder = () => {
                       <TextField
                         fullWidth
                         type="number"
-                        label="Duration (days)"
+                        label="Duration (hours)"
                         value={process.duration}
                         onChange={e =>
                           handleProcessChange(index, "duration", Number(e.target.value))
                         }
-                        InputProps={{ inputProps: { min: 1 } }}
+                        InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
                       />
                     </Grid>
                   </Grid>

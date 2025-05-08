@@ -152,8 +152,8 @@ const ResourceManagementPage = () => {
       const term = searchTerm.toLowerCase();
       matchesSearch = Boolean(
         resource.name.toLowerCase().includes(term) ||
-        (resource.department && resource.department.toLowerCase().includes(term)) ||
-        (resource.email && resource.email.toLowerCase().includes(term))
+          (resource.department && resource.department.toLowerCase().includes(term)) ||
+          (resource.email && resource.email.toLowerCase().includes(term))
       );
     }
     return matchesTab && matchesSearch;
@@ -441,7 +441,9 @@ const ResourceManagementPage = () => {
                   <Select
                     labelId="resource-type-label"
                     value={formData.type || "person"}
-                    onChange={handleFormChange("type") as React.ChangeEventHandler<HTMLInputElement>}
+                    onChange={
+                      handleFormChange("type") as React.ChangeEventHandler<HTMLInputElement>
+                    }
                     label="Type *"
                   >
                     <MenuItem value="person">Personnel</MenuItem>

@@ -578,8 +578,8 @@ const OrderDetails = () => {
                 </Grid>
                 <Grid item xs={8}>
                   <Typography variant="body2">
-                    {order.start && order.end
-                      ? `${Math.ceil((order.end.toDate().getTime() - order.start.toDate().getTime()) / (1000 * 60 * 60 * 24))} days`
+                    {processes && processes.length > 0
+                      ? `${processes.reduce((sum, p) => sum + (p.duration || 0), 0).toFixed(1)} hours`
                       : "N/A"}
                   </Typography>
                 </Grid>

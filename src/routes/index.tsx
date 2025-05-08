@@ -27,6 +27,7 @@ import FixInvalidOrderResourcesPage from "../pages/admin/FixInvalidOrderResource
 import FaultTrackingPage from "../pages/FaultTrackingPage.tsx";
 import FaultReportsPage from "../pages/FaultReportsPage.tsx";
 import ProductsPage from "../pages/ProductsPage.tsx";
+import MigrateProcessDurationsToHoursPage from "../pages/admin/migrateProcessDurationsToHours.tsx";
 
 const AppRoutes = () => {
   return (
@@ -73,6 +74,10 @@ const AppRoutes = () => {
               <MigrateOrdersPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/admin/migrate-process-durations"
+          element={<MigrateProcessDurationsToHoursPage />}
         />
         <Route path="/admin/migrate-dates" element={<MigratePlannedWeekStartDateButton />} />
         <Route

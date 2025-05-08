@@ -22,6 +22,7 @@ interface Process {
   endDate: Timestamp;
   assignedResource: string | null;
   progress: number;
+  duration?: number;
 }
 
 interface CompactProcessesTableProps {
@@ -73,6 +74,7 @@ const CompactProcessesTable = ({
             <TableCell sx={{ width: "20%" }}>Date Range</TableCell>
             <TableCell sx={{ width: "12%" }}>Resource</TableCell>
             <TableCell sx={{ width: "26%" }}>Progress</TableCell>
+            <TableCell sx={{ width: "10%" }}>Duration (hours)</TableCell>
             <TableCell sx={{ width: "18%" }}>Notes</TableCell>
           </TableRow>
         </TableHead>
@@ -170,6 +172,11 @@ const CompactProcessesTable = ({
                     ))}
                   </Box>
                 </Box>
+              </TableCell>
+              <TableCell align="center">
+                <Typography variant="caption">
+                  {process.duration !== undefined ? process.duration.toFixed(1) : "—"}
+                </Typography>
               </TableCell>
               <TableCell sx={{ p: 0.5 }}>
                 <Box

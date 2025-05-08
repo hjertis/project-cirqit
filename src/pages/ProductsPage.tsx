@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -18,6 +18,11 @@ import ContentWrapper from "../components/layout/ContentWrapper";
 import TablePagination from "@mui/material/TablePagination";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import { useQuery } from "@tanstack/react-query";
+import IconButton from "@mui/material/IconButton";
+import EditIcon from "@mui/icons-material/Edit";
+import ProcessTemplateDialog from "../components/products/ProcessTemplateDialog";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { Product, ProcessTemplate } from "../types";
 
 interface ProductCount {
   partNo: string;
@@ -51,6 +56,18 @@ const ProductsPage = () => {
   const [orderBy, setOrderBy] = useState<"partNo" | "count" | "description">("count");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [processDialogOpen, setProcessDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [loadingProcessTemplates, setLoadingProcessTemplates] = useState(false);
+  const [processTemplates, setProcessTemplates] = useState<ProcessTemplate[]>([]);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const {
     data: products = [],
@@ -76,6 +93,44 @@ const ProductsPage = () => {
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  const handleEditProcesses = async (product: ProductCount) => {
+    setLoadingProcessTemplates(true);
+    setSelectedProduct({
+      partNo: product.partNo,
+      description: product.description,
+      processTemplates: [],
+    });
+    const productRef = doc(db, "products", product.partNo);
+    const productSnap = await getDoc(productRef);
+    let templates: ProcessTemplate[] = [];
+    if (productSnap.exists()) {
+      const data = productSnap.data();
+      templates = data.processTemplates || [];
+    }
+    if (isMounted.current) {
+      setProcessTemplates(templates);
+      setProcessDialogOpen(true);
+      setLoadingProcessTemplates(false);
+    }
+  };
+
+  const handleSaveProcessTemplates = async (templates: ProcessTemplate[]) => {
+    if (!selectedProduct) return;
+    const productRef = doc(db, "products", selectedProduct.partNo);
+    await setDoc(
+      productRef,
+      {
+        partNo: selectedProduct.partNo,
+        description: selectedProduct.description,
+        processTemplates: templates,
+      },
+      { merge: true }
+    );
+    setProcessDialogOpen(false);
+    setSelectedProduct(null);
+    setProcessTemplates([]);
   };
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -104,63 +159,83 @@ const ProductsPage = () => {
       ) : isError ? (
         <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>
       ) : (
-        <Paper>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === "partNo"}
-                      direction={orderBy === "partNo" ? order : "asc"}
-                      onClick={() => handleRequestSort("partNo")}
-                    >
-                      Part Number
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === "description"}
-                      direction={orderBy === "description" ? order : "asc"}
-                      onClick={() => handleRequestSort("description")}
-                    >
-                      Description
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell align="right">
-                    <TableSortLabel
-                      active={orderBy === "count"}
-                      direction={orderBy === "count" ? order : "desc"}
-                      onClick={() => handleRequestSort("count")}
-                    >
-                      Order Count
-                    </TableSortLabel>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sortedProducts
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map(product => (
-                    <TableRow key={product.partNo}>
-                      <TableCell>{product.partNo}</TableCell>
-                      <TableCell>{product.description}</TableCell>
-                      <TableCell align="right">{product.count}</TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            component="div"
-            count={products.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
+        <>
+          <ProcessTemplateDialog
+            open={processDialogOpen}
+            onClose={() => setProcessDialogOpen(false)}
+            processTemplates={processTemplates}
+            onSave={handleSaveProcessTemplates}
+            loading={loadingProcessTemplates}
+            product={selectedProduct}
           />
-        </Paper>
+          <Paper>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === "partNo"}
+                        direction={orderBy === "partNo" ? order : "asc"}
+                        onClick={() => handleRequestSort("partNo")}
+                      >
+                        Part Number
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={orderBy === "description"}
+                        direction={orderBy === "description" ? order : "asc"}
+                        onClick={() => handleRequestSort("description")}
+                      >
+                        Description
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={orderBy === "count"}
+                        direction={orderBy === "count" ? order : "desc"}
+                        onClick={() => handleRequestSort("count")}
+                      >
+                        Order Count
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="center">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedProducts
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map(product => (
+                      <TableRow key={product.partNo}>
+                        <TableCell>{product.partNo}</TableCell>
+                        <TableCell>{product.description}</TableCell>
+                        <TableCell align="right">{product.count}</TableCell>
+                        <TableCell align="center">
+                          <IconButton
+                            aria-label="Edit Processes"
+                            onClick={() => handleEditProcesses(product)}
+                            disabled={loadingProcessTemplates}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              component="div"
+              count={products.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </Paper>
+        </>
       )}
     </ContentWrapper>
   );

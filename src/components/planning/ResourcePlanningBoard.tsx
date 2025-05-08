@@ -44,7 +44,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 dayjs.extend(weekOfYear);
 dayjs.extend(isoWeek);
@@ -67,7 +67,7 @@ interface ResourceWithLoad extends Resource {
   weeklyLoad: { [weekStartDate: string]: number };
 }
 
-const WEEKS_TO_SHOW = 6;
+const WEEKS_TO_SHOW = 8;
 const HOURS_PER_DAY = 7.4;
 const HOURS_PER_WEEK = 37;
 const RESOURCE_HEADER_WIDTH = "220px";
@@ -335,6 +335,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
   console.log("ResourcePlanningBoard: render/mount");
   const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
+  const queryClient = useQueryClient();
 
   const visibleWeeks = useMemo(
     () =>
@@ -385,6 +386,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
   }, [planningOrders, startDate, endDate]);
 
   // Compute resources with load
+  const resourceIds = useMemo(() => resourcesRaw.map(r => r.id), [resourcesRaw]);
   const resources = useMemo(() => {
     return resourcesRaw.map(res => {
       const weeklyLoad: { [weekStartDate: string]: number } = {};
@@ -470,6 +472,8 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
         end: Timestamp.fromDate(newEndDate),
         updated: Timestamp.now(),
       });
+      // Invalidate planning-orders query to refresh board
+      queryClient.invalidateQueries({ queryKey: ["planning-orders"] });
     } catch (err) {
       console.error("Failed to update order in Firestore.", err);
     }
@@ -706,7 +710,9 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
             {visibleWeeks.map(weekDate => {
               const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
               const unassignedOrders = filteredOrders.filter(
-                o => o.assignedResourceId === null && o.plannedWeekStartDate === weekStartStr
+                o =>
+                  (!o.assignedResourceId || !resourceIds.includes(o.assignedResourceId)) &&
+                  o.plannedWeekStartDate === weekStartStr
               );
               const droppableId = `unassigned|${weekStartStr}`;
               return (

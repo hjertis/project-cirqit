@@ -269,11 +269,10 @@ const OptimizedPrintableWorkOrder = ({
                         sx={{ fontSize: "0.8rem" }}
                         className="detail-value"
                       >
-                        {Math.ceil(
-                          (order.end.toDate().getTime() - order.start.toDate().getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        )}{" "}
-                        days
+                        {/* Show total expected duration in hours if available, else fallback to N/A */}
+                        {processes && processes.length > 0
+                          ? `${processes.reduce((sum, p) => sum + (p.duration || 0), 0).toFixed(1)} hours`
+                          : "N/A"}
                       </Typography>
                     </Box>
                   </Box>

@@ -25,3 +25,16 @@ export interface Fault {
   addDate: Timestamp;
   updated: Timestamp;
 }
+
+export interface ProcessTemplate {
+  name: string;
+  duration: number;
+  sequence: number;
+}
+
+export interface Product {
+  partNo: string;
+  description: string;
+  processTemplates: ProcessTemplate[];
+  // Add other fields as needed (e.g., count, etc.)
+}
