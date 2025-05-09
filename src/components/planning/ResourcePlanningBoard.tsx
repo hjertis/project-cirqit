@@ -73,7 +73,7 @@ const WEEKS_TO_SHOW = 8;
 const HOURS_PER_DAY = 7.4;
 const HOURS_PER_WEEK = 37;
 const RESOURCE_HEADER_WIDTH = "220px";
-const WEEK_CELL_WIDTH = "250px";
+const WEEK_CELL_MIN_WIDTH = "200px"; // Changed from fixed width to minimum width
 const DEFAULT_ESTIMATED_HOURS = HOURS_PER_DAY;
 
 const getPriorityColor = (priority: string = "Medium"): string => {
@@ -199,7 +199,7 @@ const calculateEndDate = (startDate: Date, estimatedHours: number): Date => {
 
 const getOrderBackgroundColor = (status?: string, isDragging?: boolean, theme?: any): string => {
   if (isDragging && theme) return theme.palette.action.selected;
-  if (status === "Firm Planned") return theme.palette.action.hover;
+  if (status === "Firm Planned") return "#E6E6FA";
   return theme ? theme.palette.background.paper : "#fff";
 };
 
@@ -229,7 +229,6 @@ function PlanningSortableItem({
     position: "relative",
   };
 
-  // Track pointer movement to distinguish click vs drag
   const pointerDownRef = React.useRef<{ x: number; y: number } | null>(null);
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -242,7 +241,6 @@ function PlanningSortableItem({
       const dx = Math.abs(e.clientX - pointerDownRef.current.x);
       const dy = Math.abs(e.clientY - pointerDownRef.current.y);
       if (dx < 5 && dy < 5) {
-        // Considered a click, not a drag
         onClick(order.id);
       }
     }
@@ -274,7 +272,6 @@ function PlanningSortableItem({
   );
 }
 
-// Add a droppable wrapper for each cell
 const PlanningDroppableCell = ({
   id,
   children,
@@ -289,9 +286,8 @@ const PlanningDroppableCell = ({
     <Box
       ref={setNodeRef}
       sx={{
-        width: WEEK_CELL_WIDTH,
-        minWidth: WEEK_CELL_WIDTH,
-        flexShrink: 0,
+        flex: 1, // Add flex to allow cells to grow
+        minWidth: WEEK_CELL_MIN_WIDTH,
         p: 1,
         borderLeft: 1,
         borderColor: "divider",
@@ -319,9 +315,9 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
   const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
   const queryClient = useQueryClient();
-  const planningBoardRef = React.useRef<HTMLDivElement>(null); // <-- Add ref for PDF export
-  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null); // <-- Add state for export menu
-  const [exportLoading, setExportLoading] = React.useState(false); // <-- Add state for export loading
+  const planningBoardRef = React.useRef<HTMLDivElement>(null);
+  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [exportLoading, setExportLoading] = React.useState(false);
 
   const visibleWeeks = useMemo(
     () =>
@@ -331,7 +327,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
     [currentWeekStart]
   );
 
-  // React Query for resources
   const {
     data: resourcesRaw = [],
     isLoading: loadingResources,
@@ -342,7 +337,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
     staleTime: 1000 * 60 * 5,
   });
 
-  // React Query for planning orders
   const startDate = useMemo(
     () => dayjs(currentWeekStart).subtract(1, "week").startOf("isoWeek").toDate(),
     [currentWeekStart]
@@ -361,7 +355,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
     staleTime: 1000 * 60 * 5,
   });
 
-  // Filtered orders for visible weeks
   const filteredOrders = useMemo(() => {
     return planningOrders.filter(order => {
       const orderDate = dayjs(order.plannedWeekStartDate);
@@ -369,7 +362,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
     });
   }, [planningOrders, startDate, endDate]);
 
-  // Compute resources with load
   const resourceIds = useMemo(() => resourcesRaw.map(r => r.id), [resourcesRaw]);
   const resources = useMemo(() => {
     return resourcesRaw.map(res => {
@@ -420,15 +412,13 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
     return "transparent";
   };
 
-  // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor));
 
-  // dnd-kit drag end handler
   const handleDndKitDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || !active) return;
     let cellId = over.id;
-    // If dropped on an order, resolve to its cell
+
     if (typeof cellId === "string" && !cellId.includes("|")) {
       const overOrder = filteredOrders.find(o => String(o.id) === cellId);
       if (overOrder) {
@@ -450,7 +440,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
         end: Timestamp.fromDate(newEndDate),
         updated: Timestamp.now(),
       });
-      // Invalidate planning-orders query to refresh board
+
       queryClient.invalidateQueries({ queryKey: ["planning-orders"] });
     } catch (err) {
       console.error("Failed to update order in Firestore.", err);
@@ -468,29 +458,26 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
 
     try {
       const canvas = await html2canvas(element, {
-        scale: 1, // Adjust scale as needed
+        scale: 1,
         useCORS: true,
         logging: false,
-        // Ensure sticky elements are captured correctly if possible, might need specific handling
+
         onclone: (documentClone: Document) => {
-          // Attempt to make sticky headers appear in the canvas
-          // This is a common challenge with html2canvas and sticky/fixed elements
-          // You might need to adjust styles or temporarily change them for capture
           const stickyHeaders = documentClone.querySelectorAll('[style*="position: sticky"]');
           stickyHeaders.forEach(headerNode => {
-            (headerNode as HTMLElement).style.position = "relative"; // Or 'absolute' depending on layout
+            (headerNode as HTMLElement).style.position = "relative";
           });
         },
       });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("l", "mm", "a3"); // Landscape, mm, A3 for wider content
+      const pdf = new jsPDF("l", "mm", "a3");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 15; // Margin from top
+      const imgY = 15;
 
       pdf.setFontSize(16);
       pdf.text("Resource Planning Board", pdfWidth / 2, 10, { align: "center" });
@@ -498,7 +485,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
       pdf.save(`resource_planning_board_${dayjs().format("YYYYMMDD_HHmmss")}.pdf`);
     } catch (err) {
       console.error("Error exporting planning board to PDF:", err);
-      // Consider adding user feedback here (e.g., a snackbar message)
     } finally {
       setExportLoading(false);
     }
@@ -532,88 +518,242 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
   }
 
   return (
-    <Paper sx={{ p: 2, overflow: "hidden", width: "100%" }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-        <Typography variant="h6">Resource Planning Board</Typography>
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <IconButton onClick={handlePrevWeek} aria-label="Previous Week" size="small">
-            <PrevIcon />
-          </IconButton>
-          <Typography
-            variant="subtitle1"
-            component="span"
-            sx={{ mx: 2, textAlign: "center", minWidth: "200px" }}
-          >
-            {dayjs(currentWeekStart).format("MMM D")} -{" "}
-            {dayjs(currentWeekStart)
-              .add(WEEKS_TO_SHOW - 1, "week")
-              .endOf("isoWeek")
-              .format("MMM D, YYYY")}
-          </Typography>
-          <IconButton onClick={handleNextWeek} aria-label="Next Week" size="small">
-            <NextIcon />
-          </IconButton>
-          <IconButton onClick={handleGoToToday} aria-label="Go to Today" size="small">
-            <Tooltip title="Go to current week">
-              <span>Today</span>
+    <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+      {/* Controls section */}
+      <Box sx={{ mb: 2 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="h6">Resource Planning Board</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <IconButton onClick={handlePrevWeek} aria-label="Previous Week" size="small">
+              <PrevIcon />
+            </IconButton>
+            <Typography
+              variant="subtitle1"
+              component="span"
+              sx={{ mx: 2, textAlign: "center", minWidth: "200px" }}
+            >
+              {dayjs(currentWeekStart).format("MMM D")} -{" "}
+              {dayjs(currentWeekStart)
+                .add(WEEKS_TO_SHOW - 1, "week")
+                .endOf("isoWeek")
+                .format("MMM D, YYYY")}
+            </Typography>
+            <IconButton onClick={handleNextWeek} aria-label="Next Week" size="small">
+              <NextIcon />
+            </IconButton>
+            <IconButton onClick={handleGoToToday} aria-label="Go to Today" size="small">
+              <Tooltip title="Go to current week">
+                <span>Today</span>
+              </Tooltip>
+            </IconButton>
+            <Tooltip title="Export Board">
+              <IconButton onClick={handleExportClick} disabled={exportLoading}>
+                <ExportIcon />
+              </IconButton>
             </Tooltip>
-          </IconButton>
+          </Box>
         </Box>
       </Box>
 
+      <Menu
+        anchorEl={exportMenuAnchor}
+        open={Boolean(exportMenuAnchor)}
+        onClose={handleExportMenuClose}
+      >
+        <MenuItem onClick={() => handleExportFormat("pdf")} disabled={exportLoading}>
+          <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
+          Export as PDF
+          {exportLoading && <CircularProgress size={20} sx={{ ml: 1 }} />}
+        </MenuItem>
+      </Menu>
+
+      {/* Main content */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragEnd={handleDndKitDragEnd}
       >
-        <Box ref={planningBoardRef} sx={{ overflowX: "auto", pb: 1 }}>
-          {" "}
-          {/* Attach ref here and ensure this Box wraps all content to be exported */}
+        <Box
+          ref={planningBoardRef}
+          sx={{
+            flexGrow: 1,
+            overflowX: "auto",
+            minHeight: 0, // Important! This allows a flex item to shrink below its content size
+          }}
+        >
           <Box
             sx={{
               display: "flex",
-              minWidth: `calc(${RESOURCE_HEADER_WIDTH} + ${WEEKS_TO_SHOW} * ${WEEK_CELL_WIDTH})`,
+              flexDirection: "column",
+              minWidth: `calc(${RESOURCE_HEADER_WIDTH} + ${WEEKS_TO_SHOW} * ${WEEK_CELL_MIN_WIDTH})`,
             }}
           >
             <Box
               sx={{
-                width: RESOURCE_HEADER_WIDTH,
-                flexShrink: 0,
-                p: 1,
-                borderBottom: 1,
-                borderColor: "divider",
-                fontWeight: "bold",
-                backgroundColor: "background.default",
-                position: "sticky",
-                left: 0,
-                zIndex: 2,
+                display: "flex",
+                minWidth: `calc(${RESOURCE_HEADER_WIDTH} + ${WEEKS_TO_SHOW} * ${WEEK_CELL_MIN_WIDTH})`,
               }}
             >
-              Resource
-            </Box>
-            {visibleWeeks.map(weekDate => (
               <Box
-                key={weekDate.toISOString()}
                 sx={{
-                  width: WEEK_CELL_WIDTH,
+                  width: RESOURCE_HEADER_WIDTH,
                   flexShrink: 0,
                   p: 1,
-                  textAlign: "center",
                   borderBottom: 1,
-                  borderLeft: 1,
                   borderColor: "divider",
                   fontWeight: "bold",
                   backgroundColor: "background.default",
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 2,
                 }}
               >
-                Week {dayjs(weekDate).week()} <br /> ({dayjs(weekDate).format("MMM D")})
+                Resource
+              </Box>
+              {visibleWeeks.map(weekDate => (
+                <Box
+                  key={weekDate.toISOString()}
+                  sx={{
+                    flex: 1, // Make columns grow to fill space
+                    minWidth: WEEK_CELL_MIN_WIDTH,
+                    p: 1,
+                    textAlign: "center",
+                    borderBottom: 1,
+                    borderLeft: 1,
+                    borderColor: "divider",
+                    fontWeight: "bold",
+                    backgroundColor: "background.default",
+                  }}
+                >
+                  Week {dayjs(weekDate).week()} <br /> ({dayjs(weekDate).format("MMM D")})
+                </Box>
+              ))}
+            </Box>
+            {resources.map(resource => (
+              <Box
+                key={resource.id}
+                sx={{
+                  display: "flex",
+                  borderBottom: 1,
+                  borderColor: "divider",
+                  minHeight: "100px",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: RESOURCE_HEADER_WIDTH,
+                    flexShrink: 0,
+                    p: 1,
+                    borderRight: 1,
+                    borderColor: "divider",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    position: "sticky",
+                    left: 0,
+                    backgroundColor: "background.paper",
+                    zIndex: 1,
+                  }}
+                >
+                  <Tooltip title={resource.type || ""} placement="top-start">
+                    {resource.type === "person" ? (
+                      <PersonIcon
+                        sx={{
+                          mr: 1,
+                          fontSize: "1.1rem",
+                          color: resource.color || theme.palette.primary.main,
+                        }}
+                      />
+                    ) : (
+                      <BuildIcon
+                        sx={{
+                          mr: 1,
+                          fontSize: "1.1rem",
+                          color: resource.color || theme.palette.secondary.main,
+                        }}
+                      />
+                    )}
+                  </Tooltip>
+                  <Typography variant="body2" fontWeight="medium">
+                    {resource.name}
+                  </Typography>
+                </Box>
+                {visibleWeeks.map(weekDate => {
+                  const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
+                  const weeklyCapacity = resource.capacity ? resource.capacity * 5 : HOURS_PER_WEEK;
+                  const currentLoad = resource.weeklyLoad?.[weekStartStr] ?? 0;
+                  const loadPercentage =
+                    weeklyCapacity > 0 ? Math.round((currentLoad / weeklyCapacity) * 100) : 0;
+                  const cellOrders = filteredOrders.filter(
+                    o =>
+                      o.assignedResourceId === resource.id &&
+                      o.plannedWeekStartDate === weekStartStr
+                  );
+                  const droppableId = `${resource.id}|${weekStartStr}`;
+
+                  return (
+                    <SortableContext
+                      key={droppableId}
+                      items={cellOrders.map(o => String(o.id))}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <PlanningDroppableCell
+                        id={droppableId}
+                        backgroundColor={getLoadBackgroundColor(currentLoad, weeklyCapacity)}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 0.5,
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: getLoadColor(currentLoad, weeklyCapacity),
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {Math.round(currentLoad)}h / {weeklyCapacity}h ({loadPercentage}%)
+                          </Typography>
+                        </Box>
+                        {cellOrders.length > 0 ? (
+                          cellOrders.map(order => (
+                            <PlanningSortableItem
+                              key={order.id}
+                              order={order}
+                              onClick={handleViewOrder}
+                            />
+                          ))
+                        ) : (
+                          <Box
+                            sx={{
+                              flexGrow: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Typography variant="caption" color="text.disabled">
+                              No orders
+                            </Typography>
+                          </Box>
+                        )}
+                      </PlanningDroppableCell>
+                    </SortableContext>
+                  );
+                })}
               </Box>
             ))}
-          </Box>
-          {resources.map(resource => (
             <Box
-              key={resource.id}
-              sx={{ display: "flex", borderBottom: 1, borderColor: "divider", minHeight: "100px" }}
+              sx={{
+                display: "flex",
+                borderBottom: 1,
+                borderColor: "divider",
+                minHeight: "100px",
+                backgroundColor: "background.default",
+              }}
             >
               <Box
                 sx={{
@@ -626,75 +766,34 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                   alignItems: "flex-start",
                   position: "sticky",
                   left: 0,
-                  backgroundColor: "background.paper",
+                  backgroundColor: "background.default",
                   zIndex: 1,
                 }}
               >
-                <Tooltip title={resource.type || ""} placement="top-start">
-                  {resource.type === "person" ? (
-                    <PersonIcon
-                      sx={{
-                        mr: 1,
-                        fontSize: "1.1rem",
-                        color: resource.color || theme.palette.primary.main,
-                      }}
-                    />
-                  ) : (
-                    <BuildIcon
-                      sx={{
-                        mr: 1,
-                        fontSize: "1.1rem",
-                        color: resource.color || theme.palette.secondary.main,
-                      }}
-                    />
-                  )}
-                </Tooltip>
-                <Typography variant="body2" fontWeight="medium">
-                  {resource.name}
+                <Typography variant="body2" fontWeight="medium" color="text.secondary">
+                  Unassigned
                 </Typography>
               </Box>
               {visibleWeeks.map(weekDate => {
                 const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
-                const weeklyCapacity = resource.capacity ? resource.capacity * 5 : HOURS_PER_WEEK;
-                const currentLoad = resource.weeklyLoad?.[weekStartStr] ?? 0;
-                const loadPercentage =
-                  weeklyCapacity > 0 ? Math.round((currentLoad / weeklyCapacity) * 100) : 0;
-                const cellOrders = filteredOrders.filter(
+                const unassignedOrders = filteredOrders.filter(
                   o =>
-                    o.assignedResourceId === resource.id && o.plannedWeekStartDate === weekStartStr
+                    (!o.assignedResourceId || !resourceIds.includes(o.assignedResourceId)) &&
+                    o.plannedWeekStartDate === weekStartStr
                 );
-                const droppableId = `${resource.id}|${weekStartStr}`;
-
+                const droppableId = `unassigned|${weekStartStr}`;
                 return (
                   <SortableContext
                     key={droppableId}
-                    items={cellOrders.map(o => String(o.id))}
+                    items={unassignedOrders.map(o => String(o.id))}
                     strategy={verticalListSortingStrategy}
                   >
                     <PlanningDroppableCell
                       id={droppableId}
-                      backgroundColor={getLoadBackgroundColor(currentLoad, weeklyCapacity)}
+                      backgroundColor={getLoadBackgroundColor(0, 0)}
                     >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          mb: 0.5,
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: getLoadColor(currentLoad, weeklyCapacity),
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {Math.round(currentLoad)}h / {weeklyCapacity}h ({loadPercentage}%)
-                        </Typography>
-                      </Box>
-                      {cellOrders.length > 0 ? (
-                        cellOrders.map(order => (
+                      {unassignedOrders.length > 0 ? (
+                        unassignedOrders.map(order => (
                           <PlanningSortableItem
                             key={order.id}
                             order={order}
@@ -711,7 +810,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                           }}
                         >
                           <Typography variant="caption" color="text.disabled">
-                            No orders
+                            No unassigned orders
                           </Typography>
                         </Box>
                       )}
@@ -720,101 +819,9 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                 );
               })}
             </Box>
-          ))}
-          <Box
-            sx={{
-              display: "flex",
-              borderBottom: 1,
-              borderColor: "divider",
-              minHeight: "100px",
-              backgroundColor: "background.default",
-            }}
-          >
-            <Box
-              sx={{
-                width: RESOURCE_HEADER_WIDTH,
-                flexShrink: 0,
-                p: 1,
-                borderRight: 1,
-                borderColor: "divider",
-                display: "flex",
-                alignItems: "flex-start",
-                position: "sticky",
-                left: 0,
-                backgroundColor: "background.default",
-                zIndex: 1,
-              }}
-            >
-              <Typography variant="body2" fontWeight="medium" color="text.secondary">
-                Unassigned
-              </Typography>
-            </Box>
-            {visibleWeeks.map(weekDate => {
-              const weekStartStr = dayjs(weekDate).format("YYYY-MM-DD");
-              const unassignedOrders = filteredOrders.filter(
-                o =>
-                  (!o.assignedResourceId || !resourceIds.includes(o.assignedResourceId)) &&
-                  o.plannedWeekStartDate === weekStartStr
-              );
-              const droppableId = `unassigned|${weekStartStr}`;
-              return (
-                <SortableContext
-                  key={droppableId}
-                  items={unassignedOrders.map(o => String(o.id))}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <PlanningDroppableCell
-                    id={droppableId}
-                    backgroundColor={getLoadBackgroundColor(0, 0)}
-                  >
-                    {unassignedOrders.length > 0 ? (
-                      unassignedOrders.map(order => (
-                        <PlanningSortableItem
-                          key={order.id}
-                          order={order}
-                          onClick={handleViewOrder}
-                        />
-                      ))
-                    ) : (
-                      <Box
-                        sx={{
-                          flexGrow: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Typography variant="caption" color="text.disabled">
-                          No unassigned orders
-                        </Typography>
-                      </Box>
-                    )}
-                  </PlanningDroppableCell>
-                </SortableContext>
-              );
-            })}
           </Box>
         </Box>
       </DndContext>
-      {/* Add Export Button and Menu near other controls */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-        <Tooltip title="Export Board">
-          <IconButton onClick={handleExportClick} disabled={exportLoading}>
-            <ExportIcon />
-          </IconButton>
-        </Tooltip>
-        <Menu
-          anchorEl={exportMenuAnchor}
-          open={Boolean(exportMenuAnchor)}
-          onClose={handleExportMenuClose}
-        >
-          <MenuItem onClick={() => handleExportFormat("pdf")} disabled={exportLoading}>
-            <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
-            Export as PDF
-            {exportLoading && <CircularProgress size={20} sx={{ ml: 1 }} />}
-          </MenuItem>
-        </Menu>
-      </Box>
     </Paper>
   );
 };
