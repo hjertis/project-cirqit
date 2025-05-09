@@ -8,12 +8,16 @@ import {
   IconButton,
   Tooltip,
   useTheme,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import {
   ArrowBackIosNew as PrevIcon,
   ArrowForwardIos as NextIcon,
   Person as PersonIcon,
   Build as BuildIcon,
+  GetApp as DownloadIcon,
+  SystemUpdateAlt as ExportIcon,
 } from "@mui/icons-material";
 import {
   DndContext,
@@ -22,7 +26,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  useDroppable, // <-- add this import
+  useDroppable,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -45,6 +49,8 @@ import {
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 dayjs.extend(weekOfYear);
 dayjs.extend(isoWeek);
@@ -61,10 +67,6 @@ interface PlanningOrder {
 
   partNo?: string;
   status?: string;
-}
-
-interface ResourceWithLoad extends Resource {
-  weeklyLoad: { [weekStartDate: string]: number };
 }
 
 const WEEKS_TO_SHOW = 8;
@@ -101,9 +103,6 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
   try {
     const ordersRef = collection(db, "orders");
 
-    const startTimestamp = Timestamp.fromDate(startDate);
-    const endTimestamp = Timestamp.fromDate(endDate);
-
     const q = query(
       ordersRef,
       where("status", "in", ["Open", "Released", "In Progress", "Delayed", "Firm Planned"]),
@@ -125,7 +124,6 @@ const fetchPlanningData = async (startDate: Date, endDate: Date): Promise<Planni
       }
 
       const orderStartDate = orderData.start ? orderData.start.toDate() : new Date();
-      const weekStartDate = dayjs(orderStartDate).startOf("isoWeek").format("YYYY-MM-DD");
 
       let estimatedHours = DEFAULT_ESTIMATED_HOURS;
 
@@ -199,17 +197,9 @@ const calculateEndDate = (startDate: Date, estimatedHours: number): Date => {
   return currentDate.toDate();
 };
 
-const getLoadBackgroundColor = (load: number, capacity: number): string => {
-  if (capacity <= 0) return "transparent";
-  const percentage = (load / capacity) * 100;
-  if (percentage > 100) return "#ffebee";
-  if (percentage > 85) return "#fff3e0";
-  return "transparent";
-};
-
 const getOrderBackgroundColor = (status?: string, isDragging?: boolean, theme?: any): string => {
   if (isDragging && theme) return theme.palette.action.selected;
-  if (status === "Firm Planned") return "#e3f2fd";
+  if (status === "Firm Planned") return theme.palette.action.hover;
   return theme ? theme.palette.background.paper : "#fff";
 };
 
@@ -224,7 +214,7 @@ function PlanningSortableItem({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(order.id),
   });
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.8 : 1,
@@ -244,7 +234,7 @@ function PlanningSortableItem({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     pointerDownRef.current = { x: e.clientX, y: e.clientY };
-    if (listeners.onPointerDown) listeners.onPointerDown(e);
+    if (listeners && listeners.onPointerDown) listeners.onPointerDown(e);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -264,11 +254,8 @@ function PlanningSortableItem({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      // Remove onClick from here
-      // {...listeners} // Remove listeners from Paper
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      // Attach drag listeners to a drag handle if you want (not required here)
     >
       <div {...listeners} style={{ width: "100%", height: "100%" }}>
         <Typography variant="caption" component="div" fontWeight="medium" noWrap>
@@ -325,17 +312,16 @@ const PlanningDroppableCell = ({
 
 interface ResourcePlanningBoardProps {
   onOrderClick: (orderId: string) => void;
-  refreshKey?: number;
 }
 
-const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
-  onOrderClick,
-  refreshKey,
-}) => {
+const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderClick }) => {
   console.log("ResourcePlanningBoard: render/mount");
   const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
   const queryClient = useQueryClient();
+  const planningBoardRef = React.useRef<HTMLDivElement>(null); // <-- Add ref for PDF export
+  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null); // <-- Add state for export menu
+  const [exportLoading, setExportLoading] = React.useState(false); // <-- Add state for export loading
 
   const visibleWeeks = useMemo(
     () =>
@@ -349,7 +335,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
   const {
     data: resourcesRaw = [],
     isLoading: loadingResources,
-    isError: isResourcesError,
     error: resourcesError,
   } = useQuery({
     queryKey: ["planning-resources"],
@@ -369,7 +354,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
   const {
     data: planningOrders = [],
     isLoading: loadingOrders,
-    isError: isOrdersError,
     error: ordersError,
   } = useQuery({
     queryKey: ["planning-orders", startDate, endDate],
@@ -436,12 +420,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
     return "transparent";
   };
 
-  const getOrderBackgroundColor = (status?: string, isDragging?: boolean): string => {
-    if (isDragging) return theme.palette.action.selected;
-    if (status === "Firm Planned") return "#e3f2fd";
-    return "background.paper";
-  };
-
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -476,6 +454,68 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
       queryClient.invalidateQueries({ queryKey: ["planning-orders"] });
     } catch (err) {
       console.error("Failed to update order in Firestore.", err);
+    }
+  };
+
+  const exportToPdf = async () => {
+    setExportLoading(true);
+    const element = planningBoardRef.current;
+    if (!element) {
+      console.error("Planning board element not found for PDF export.");
+      setExportLoading(false);
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 1, // Adjust scale as needed
+        useCORS: true,
+        logging: false,
+        // Ensure sticky elements are captured correctly if possible, might need specific handling
+        onclone: (documentClone: Document) => {
+          // Attempt to make sticky headers appear in the canvas
+          // This is a common challenge with html2canvas and sticky/fixed elements
+          // You might need to adjust styles or temporarily change them for capture
+          const stickyHeaders = documentClone.querySelectorAll('[style*="position: sticky"]');
+          stickyHeaders.forEach(headerNode => {
+            (headerNode as HTMLElement).style.position = "relative"; // Or 'absolute' depending on layout
+          });
+        },
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("l", "mm", "a3"); // Landscape, mm, A3 for wider content
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 15; // Margin from top
+
+      pdf.setFontSize(16);
+      pdf.text("Resource Planning Board", pdfWidth / 2, 10, { align: "center" });
+      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.save(`resource_planning_board_${dayjs().format("YYYYMMDD_HHmmss")}.pdf`);
+    } catch (err) {
+      console.error("Error exporting planning board to PDF:", err);
+      // Consider adding user feedback here (e.g., a snackbar message)
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleExportClick = (event: React.MouseEvent<HTMLElement>) => {
+    setExportMenuAnchor(event.currentTarget);
+  };
+
+  const handleExportMenuClose = () => {
+    setExportMenuAnchor(null);
+  };
+
+  const handleExportFormat = async (format: string) => {
+    handleExportMenuClose();
+    if (format === "pdf") {
+      await exportToPdf();
     }
   };
 
@@ -526,7 +566,9 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
         collisionDetection={closestCenter}
         onDragEnd={handleDndKitDragEnd}
       >
-        <Box sx={{ overflowX: "auto", pb: 1 }}>
+        <Box ref={planningBoardRef} sx={{ overflowX: "auto", pb: 1 }}>
+          {" "}
+          {/* Attach ref here and ensure this Box wraps all content to be exported */}
           <Box
             sx={{
               display: "flex",
@@ -754,6 +796,25 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({
           </Box>
         </Box>
       </DndContext>
+      {/* Add Export Button and Menu near other controls */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+        <Tooltip title="Export Board">
+          <IconButton onClick={handleExportClick} disabled={exportLoading}>
+            <ExportIcon />
+          </IconButton>
+        </Tooltip>
+        <Menu
+          anchorEl={exportMenuAnchor}
+          open={Boolean(exportMenuAnchor)}
+          onClose={handleExportMenuClose}
+        >
+          <MenuItem onClick={() => handleExportFormat("pdf")} disabled={exportLoading}>
+            <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
+            Export as PDF
+            {exportLoading && <CircularProgress size={20} sx={{ ml: 1 }} />}
+          </MenuItem>
+        </Menu>
+      </Box>
     </Paper>
   );
 };
