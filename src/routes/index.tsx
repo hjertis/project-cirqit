@@ -7,6 +7,7 @@ import CreateOrderPage from "../pages/CreateOrderPage";
 import OrderDetailsPage from "../pages/OrderDetailsPage";
 import OrderPlanningPage from "../pages/OrderPlanningPage";
 import ArchivedOrdersPage from "../pages/ArchivedOrdersPage";
+import RemovedOrdersPage from "../pages/RemovedOrdersPage";
 import MigrateOrdersPage from "../pages/admin/MigrateOrdersPage";
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
@@ -44,11 +45,13 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
+        {" "}
         <Route path="/" element={<Dashboard />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/create" element={<CreateOrderPage />} />
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
+        <Route path="/removed-orders" element={<RemovedOrdersPage />} />
         <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
         <Route path="/orders/resource-board" element={<ResourceBoardPage />} />
         <Route path="/orders/:id/print" element={<PrintOrderPage />} />

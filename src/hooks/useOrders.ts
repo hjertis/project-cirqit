@@ -17,6 +17,7 @@ export interface FirebaseOrder {
   notes?: string;
   updated?: Timestamp;
   state?: string;
+  removedDate?: Timestamp;
 }
 
 export interface OrderFilter {
@@ -31,7 +32,6 @@ export interface OrderFilter {
 export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
   const [filter, setFilter] = useState<OrderFilter | undefined>(initialFilter);
   const [itemLimit, setItemLimit] = useState(initialLimit);
-  const queryClient = useQueryClient();
 
   const fetchOrders = async () => {
     let ordersQuery;
@@ -55,7 +55,6 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
     });
     return fetchedOrders;
   };
-
   const {
     data: orders = [],
     isLoading: loading,
@@ -65,7 +64,8 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
   } = useQuery({
     queryKey: ["orders", filter ? JSON.stringify(filter) : "", itemLimit],
     queryFn: fetchOrders,
-    keepPreviousData: true,
+    staleTime: 30000, // Data remains fresh for 30 seconds
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   const updateFilter = (newFilter: OrderFilter) => {

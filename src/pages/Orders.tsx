@@ -89,6 +89,8 @@ const getStatusColor = (status: string) => {
       return "success";
     case "Delayed":
       return "error";
+    case "Removed":
+      return "error";
     default:
       return "default";
   }
@@ -114,7 +116,6 @@ const OrdersPage = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [orderBy, setOrderBy] = useState<string>("start");
-
   const getFilterForTab = (tabIndex: number): OrderFilter => {
     let filter: OrderFilter;
 
@@ -127,6 +128,9 @@ const OrdersPage = () => {
         break;
       case 3:
         filter = { status: ["Delayed"] };
+        break;
+      case 4:
+        filter = { status: ["Removed"] };
         break;
       default:
         filter = {
@@ -141,7 +145,6 @@ const OrdersPage = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-
   useEffect(() => {
     const newFilter = getFilterForTab(tabValue);
 
@@ -155,10 +158,12 @@ const OrdersPage = () => {
           ? "Status: In Progress"
           : tabValue === 2
             ? "Status: Completed"
-            : "Status: Delayed";
+            : tabValue === 3
+              ? "Status: Delayed"
+              : "Status: Removed";
       setActiveFilters([filterLabel]);
     }
-  }, [tabValue]);
+  }, [tabValue, updateFilter]);
 
   const filteredOrders = orders.filter(order => {
     if (!searchTerm) return true;
@@ -397,7 +402,7 @@ const OrdersPage = () => {
               sx={{ mr: 2 }}
             >
               Resource Calendar
-            </Button>
+            </Button>{" "}
             <Button
               variant="outlined"
               startIcon={<CloudUploadIcon />}
@@ -414,8 +419,16 @@ const OrdersPage = () => {
             >
               Quick Import
             </Button>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleNewOrder}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleNewOrder}
+              sx={{ mr: 2 }}
+            >
               New Order
+            </Button>{" "}
+            <Button variant="outlined" color="error" component={RouterLink} to="/removed-orders">
+              View Removed Orders
             </Button>
           </Box>
         </Box>
@@ -464,28 +477,29 @@ const OrdersPage = () => {
         </Paper>
 
         <Paper>
+          {" "}
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="orders tabs">
               <Tab label="All Orders" />
               <Tab label="In Progress" />
               <Tab label="Completed" />
               <Tab label="Delayed" />
+              <Tab label="Removed" />
             </Tabs>
-          </Box>
-
+          </Box>{" "}
           <TabPanel value={tabValue} index={0}>
             {renderOrdersTable()}
           </TabPanel>
-
           <TabPanel value={tabValue} index={1}>
             {renderOrdersTable()}
           </TabPanel>
-
           <TabPanel value={tabValue} index={2}>
             {renderOrdersTable()}
-          </TabPanel>
-
+          </TabPanel>{" "}
           <TabPanel value={tabValue} index={3}>
+            {renderOrdersTable()}
+          </TabPanel>
+          <TabPanel value={tabValue} index={4}>
             {renderOrdersTable()}
           </TabPanel>
         </Paper>

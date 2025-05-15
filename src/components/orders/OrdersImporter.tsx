@@ -18,6 +18,8 @@ import {
   TableRow,
   Chip,
   Divider,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
   Upload as UploadIcon,
@@ -71,6 +73,7 @@ const OrdersImporter = () => {
   const [importSuccess, setImportSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<any>(null);
+  const [detectRemovedOrders, setDetectRemovedOrders] = useState<boolean>(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,7 +157,7 @@ const OrdersImporter = () => {
         });
       }
 
-      const validStatuses = ["Released", "Finished", "In Progress", "Firm Planned"];
+      const validStatuses = ["Released", "Finished", "In Progress", "Firm Planned", "Removed"];
       if (row.Status && !validStatuses.includes(row.Status)) {
         warnings.push({
           row: index + 1,
@@ -163,14 +166,14 @@ const OrdersImporter = () => {
         });
       }
 
-      const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
+      const dateRegex = /^\d{2}[-/]\d{2}[-/]\d{4}$/;
 
       if (row.StartingDateTime) {
         if (!dateRegex.test(row.StartingDateTime) || !isValidDate(row.StartingDateTime)) {
           errors.push({
             row: index + 1,
             field: "StartingDateTime",
-            message: "Invalid date format. Use DD-MM-YYYY",
+            message: "Invalid date format. Supported formats are DD-MM-YYYY and DD/MM/YYYY",
           });
         }
       }
@@ -180,7 +183,7 @@ const OrdersImporter = () => {
           errors.push({
             row: index + 1,
             field: "EndingDateTime",
-            message: "Invalid date format. Use DD-MM-YYYY",
+            message: "Invalid date format. Supported formats are DD-MM-YYYY and DD/MM/YYYY",
           });
         }
       }
@@ -191,7 +194,7 @@ const OrdersImporter = () => {
           errors.push({
             row: index + 1,
             field: "FinishedDate",
-            message: "Invalid date format. Use DD-MM-YYYY",
+            message: "Invalid date format. Supported formats are DD-MM-YYYY and DD/MM/YYYY",
           });
         }
 
@@ -236,17 +239,19 @@ const OrdersImporter = () => {
   };
 
   const isValidDate = (dateString: string): boolean => {
-    const parts = dateString.split("-");
-    if (parts.length !== 3) return false;
+    const formats = ["DD-MM-YYYY", "DD/MM/YYYY"];
+    return formats.some(format => {
+      const parts = dateString.split(format.includes("/") ? "/" : "-");
+      if (parts.length !== 3) return false;
 
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const year = parseInt(parts[2], 10);
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
 
-    const date = new Date(year, month, day);
-    return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day;
+      const date = new Date(year, month, day);
+      return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day;
+    });
   };
-
   const handleImport = async () => {
     if (validationResult.data.length === 0) {
       console.log("No data to import");
@@ -259,14 +264,17 @@ const OrdersImporter = () => {
     try {
       const orderImportService = await import("../../services/orderImportService");
 
-      const importResults = await orderImportService.importOrdersBatch(validationResult.data);
+      const importResults = await orderImportService.importOrdersBatch(
+        validationResult.data,
+        detectRemovedOrders
+      );
 
       if (importResults.errors > 0) {
         const errorMessage = importResults.errorMessages[0];
         setImportError(`Some orders could not be imported. ${errorMessage}`);
       }
 
-      if (importResults.created > 0 || importResults.updated > 0) {
+      if (importResults.created > 0 || importResults.updated > 0 || importResults.autoRemoved > 0) {
         setImportSuccess(true);
         setImportResults(importResults);
         setActiveStep(3);
@@ -433,6 +441,7 @@ const OrdersImporter = () => {
                     <TableCell>{row.EndingDateTime}</TableCell>
                     <TableCell>{row.FinishedDate || "-"}</TableCell>
                     <TableCell>
+                      {" "}
                       <Chip
                         label={row.Status}
                         size="small"
@@ -445,7 +454,9 @@ const OrdersImporter = () => {
                                 ? "success"
                                 : row.Status === "Planned"
                                   ? "info"
-                                  : "default"
+                                  : row.Status === "Removed"
+                                    ? "error"
+                                    : "default"
                         }
                         variant="outlined"
                       />
@@ -484,13 +495,29 @@ const OrdersImporter = () => {
     <Box sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>
         Import Orders
-      </Typography>
-
+      </Typography>{" "}
       <Alert severity="info" sx={{ mb: 3 }}>
         <AlertTitle>Ready to Import</AlertTitle>
         You are about to import {parsedData.length} orders into the system
-      </Alert>
-
+      </Alert>{" "}
+      <Box sx={{ mb: 3 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={detectRemovedOrders}
+              onChange={e => setDetectRemovedOrders(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="Auto-detect removed orders (mark orders that exist in the system but not in this import file as Removed)"
+        />
+        {detectRemovedOrders && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, pl: 4 }}>
+            Orders that are currently active in the system (not Finished, Done, or Removed) but
+            don't appear in this import file will be automatically marked as Removed.
+          </Typography>
+        )}
+      </Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="body2" gutterBottom>
           <strong>Summary:</strong>
@@ -508,11 +535,13 @@ const OrdersImporter = () => {
           </Typography>
           <Typography variant="body2">
             • Done: {parsedData.filter(row => row.Status === "Done").length}
-          </Typography>
+          </Typography>{" "}
           <Typography variant="body2">
             • Planned: {parsedData.filter(row => row.Status === "Planned").length}
           </Typography>
-
+          <Typography variant="body2">
+            • Removed: {parsedData.filter(row => row.Status === "Removed").length}
+          </Typography>
           {parsedData.filter(row => row.Status === "Finished" || row.Status === "Done").length >
             0 && (
             <Typography variant="body2" sx={{ mt: 1, color: "primary.main", fontWeight: "medium" }}>
@@ -520,17 +549,27 @@ const OrdersImporter = () => {
               {parsedData.filter(row => row.Status === "Finished" || row.Status === "Done").length}{" "}
               finished orders will be automatically archived
             </Typography>
+          )}{" "}
+          {parsedData.filter(row => row.Status === "Removed").length > 0 && (
+            <Typography variant="body2" sx={{ mt: 1, color: "error.main", fontWeight: "medium" }}>
+              Note: {parsedData.filter(row => row.Status === "Removed").length} orders will be
+              marked as removed with the current date as removal date
+            </Typography>
+          )}
+          {detectRemovedOrders && (
+            <Typography variant="body2" sx={{ mt: 1, color: "warning.main", fontWeight: "medium" }}>
+              Auto-detection is enabled: Any orders in the system that are not in this import file
+              will be automatically marked as Removed
+            </Typography>
           )}
         </Box>
       </Box>
-
       {importError && (
         <Alert severity="error" sx={{ mb: 3 }}>
           <AlertTitle>Import Failed</AlertTitle>
           {importError}
         </Alert>
       )}
-
       <Box sx={{ display: "flex", justifyContent: "space-between" }}>
         <Button onClick={() => setActiveStep(1)} disabled={isLoading}>
           Back
@@ -552,13 +591,19 @@ const OrdersImporter = () => {
       <CheckCircleIcon color="success" sx={{ fontSize: 64, mb: 2 }} />
       <Typography variant="h5" gutterBottom>
         Import Completed Successfully
-      </Typography>
+      </Typography>{" "}
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Orders have been imported into the system. Any duplicate order numbers were updated with the
         new information.
         {importResults &&
           importResults.archived > 0 &&
           ` ${importResults.archived} orders with "Finished" or "Done" status were automatically archived.`}
+        {importResults &&
+          importResults.removed > 0 &&
+          ` ${importResults.removed} orders were marked as removed.`}
+        {importResults &&
+          importResults.autoRemoved > 0 &&
+          ` ${importResults.autoRemoved} orders not found in the import file were automatically marked as removed.`}
       </Typography>
       <Box sx={{ display: "flex", justifyContent: "center", gap: 2 }}>
         <Button variant="outlined" onClick={handleReset} startIcon={<RestartIcon />}>
@@ -566,7 +611,7 @@ const OrdersImporter = () => {
         </Button>
         <Button variant="contained" onClick={() => (window.location.href = "/orders")}>
           Go to Orders
-        </Button>
+        </Button>{" "}
         {importResults && importResults.archived > 0 && (
           <Button
             variant="outlined"
@@ -574,6 +619,15 @@ const OrdersImporter = () => {
             onClick={() => (window.location.href = "/orders/archived")}
           >
             View Archived Orders
+          </Button>
+        )}{" "}
+        {importResults && (importResults.removed > 0 || importResults.autoRemoved > 0) && (
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => (window.location.href = "/removed-orders")}
+          >
+            View Removed Orders
           </Button>
         )}
       </Box>

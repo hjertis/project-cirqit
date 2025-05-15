@@ -10,9 +10,6 @@ const ContentWrapper = ({ children, ...props }: ContentWrapperProps) => {
     <Box
       sx={{
         width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        flexGrow: 1,
         ...props.sx,
       }}
       {...props}

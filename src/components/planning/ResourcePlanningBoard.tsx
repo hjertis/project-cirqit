@@ -10,6 +10,7 @@ import {
   useTheme,
   Menu,
   MenuItem,
+  TextField,
 } from "@mui/material";
 import {
   ArrowBackIosNew as PrevIcon,
@@ -206,9 +207,11 @@ const getOrderBackgroundColor = (status?: string, isDragging?: boolean, theme?: 
 function PlanningSortableItem({
   order,
   onClick,
+  isHighlighted,
 }: {
   order: PlanningOrder;
   onClick: (id: string) => void;
+  isHighlighted?: boolean;
 }) {
   const theme = useTheme();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -220,13 +223,16 @@ function PlanningSortableItem({
     opacity: isDragging ? 0.8 : 1,
     cursor: isDragging ? "grabbing" : "grab",
     borderLeft: `4px solid ${getPriorityColor(order.priority)}`,
-    backgroundColor: getOrderBackgroundColor(order.status, isDragging, theme),
+    backgroundColor: isHighlighted
+      ? "#FFEB3B" // Yellow highlight color when matching search
+      : getOrderBackgroundColor(order.status, isDragging, theme),
     fontSize: "0.75rem",
     marginBottom: 4,
     padding: 8,
     boxShadow: isDragging ? theme.shadows[3] : theme.shadows[1],
     overflow: "hidden",
     position: "relative",
+    width: "100%",
   };
 
   const pointerDownRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -298,6 +304,7 @@ const PlanningDroppableCell = ({
         gap: 0.5,
         minHeight: "100px",
         transition: "background 0.2s",
+        overflow: "visible", // Ensure order items can overflow if needed
       }}
       id={id}
     >
@@ -318,6 +325,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
   const planningBoardRef = React.useRef<HTMLDivElement>(null);
   const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [exportLoading, setExportLoading] = React.useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const visibleWeeks = useMemo(
     () =>
@@ -394,6 +402,23 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
 
   const handleGoToToday = () => {
     setCurrentWeekStart(dayjs().startOf("isoWeek").toDate());
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+  const highlightedOrders = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    return planningOrders.filter(
+      order =>
+        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.partNo && order.partNo.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [searchTerm, planningOrders]);
+
+  const isOrderHighlighted = (orderId: string) => {
+    return highlightedOrders.some(order => order.id === orderId);
   };
 
   const getLoadColor = (load: number, capacity: number): string => {
@@ -516,9 +541,27 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
   if (error) {
     return <Alert severity="error">{String(error)}</Alert>;
   }
-
   return (
-    <Paper sx={{ p: 2, display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+    <Paper
+      sx={{
+        p: 2,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        width: "100%",
+      }}
+    >
+      {/* Search Bar */}
+      <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between" }}>
+        <TextField
+          label="Search Orders"
+          variant="outlined"
+          size="small"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          sx={{ width: "300px" }}
+        />
+      </Box>
       {/* Controls section */}
       <Box sx={{ mb: 2 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -554,7 +597,6 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
           </Box>
         </Box>
       </Box>
-
       <Menu
         anchorEl={exportMenuAnchor}
         open={Boolean(exportMenuAnchor)}
@@ -565,8 +607,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
           Export as PDF
           {exportLoading && <CircularProgress size={20} sx={{ ml: 1 }} />}
         </MenuItem>
-      </Menu>
-
+      </Menu>{" "}
       {/* Main content */}
       <DndContext
         sensors={sensors}
@@ -577,8 +618,11 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
           ref={planningBoardRef}
           sx={{
             flexGrow: 1,
-            overflowX: "auto",
-            minHeight: 0, // Important! This allows a flex item to shrink below its content size
+            minHeight: 0,
+            overflow: "auto",
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <Box
@@ -696,6 +740,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                       items={cellOrders.map(o => String(o.id))}
                       strategy={verticalListSortingStrategy}
                     >
+                      {" "}
                       <PlanningDroppableCell
                         id={droppableId}
                         backgroundColor={getLoadBackgroundColor(currentLoad, weeklyCapacity)}
@@ -724,6 +769,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                               key={order.id}
                               order={order}
                               onClick={handleViewOrder}
+                              isHighlighted={isOrderHighlighted(order.id)}
                             />
                           ))
                         ) : (
@@ -788,6 +834,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                     items={unassignedOrders.map(o => String(o.id))}
                     strategy={verticalListSortingStrategy}
                   >
+                    {" "}
                     <PlanningDroppableCell
                       id={droppableId}
                       backgroundColor={getLoadBackgroundColor(0, 0)}
@@ -798,6 +845,7 @@ const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderCl
                             key={order.id}
                             order={order}
                             onClick={handleViewOrder}
+                            isHighlighted={isOrderHighlighted(order.id)}
                           />
                         ))
                       ) : (

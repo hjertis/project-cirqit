@@ -80,6 +80,7 @@ interface FirebaseOrder {
   notes?: string;
   updated?: Timestamp;
   state?: string;
+  removedDate?: Timestamp;
 }
 
 interface Process {
@@ -116,6 +117,7 @@ const getStatusColor = (status: string) => {
       return "success";
     case "Delayed":
     case "Not Started":
+    case "Removed":
       return "error";
     default:
       return "default";
@@ -147,6 +149,7 @@ const OrderDetailsDialog = ({
     isLoading: loading,
     isError: isOrderError,
     error: orderError,
+    refetch,
   } = useQuery({
     queryKey: ["order-details-dialog", orderId, open],
     queryFn: async () => {
@@ -206,12 +209,11 @@ const OrderDetailsDialog = ({
   const handleEdit = () => {
     setEditDialogOpen(true);
   };
-
   const handleOrderUpdated = () => {
     setEditDialogOpen(false);
 
     if (orderId) {
-      fetchOrderDetails();
+      refetch();
     }
   };
 
@@ -345,11 +347,24 @@ const OrderDetailsDialog = ({
                       <Typography variant="body2" color="text.secondary">
                         Description:
                       </Typography>
-                    </Grid>
+                    </Grid>{" "}
                     <Grid item xs={8}>
                       <Typography variant="body2">{order.description}</Typography>
                     </Grid>
-
+                    {order.status === "Removed" && order.removedDate && (
+                      <>
+                        <Grid item xs={4}>
+                          <Typography variant="body2" color="text.secondary">
+                            Removed Date:
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                          <Typography variant="body2" color="error">
+                            {order.removedDate.toDate().toLocaleDateString()}
+                          </Typography>
+                        </Grid>
+                      </>
+                    )}
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
                         Part Number:
@@ -358,7 +373,6 @@ const OrderDetailsDialog = ({
                     <Grid item xs={8}>
                       <Typography variant="body2">{order.partNo}</Typography>
                     </Grid>
-
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
                         Quantity:
@@ -367,7 +381,6 @@ const OrderDetailsDialog = ({
                     <Grid item xs={8}>
                       <Typography variant="body2">{order.quantity}</Typography>
                     </Grid>
-
                     <Grid item xs={4}>
                       <Typography variant="body2" color="text.secondary">
                         Priority:
@@ -376,7 +389,6 @@ const OrderDetailsDialog = ({
                     <Grid item xs={8}>
                       <Typography variant="body2">{order.priority || "Medium"}</Typography>
                     </Grid>
-
                     {order.customer && (
                       <>
                         <Grid item xs={4}>
