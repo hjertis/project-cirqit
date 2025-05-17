@@ -45,8 +45,7 @@ import {
   Archive as ArchiveIcon,
   CalendarToday as CalendarTodayIcon,
 } from "@mui/icons-material";
-import { Link as RouterLink } from "react-router-dom";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
 import EditOrderDialog from "../components/orders/EditOrderDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
@@ -76,7 +75,7 @@ function TabPanel(props: TabPanelProps) {
     </div>
   );
 }
-
+console.log("OrdersPage component loaded");
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Open":

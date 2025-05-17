@@ -68,9 +68,9 @@ export const useOrders = (initialFilter?: OrderFilter, initialLimit = 50) => {
     refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
-  const updateFilter = (newFilter: OrderFilter) => {
+  const updateFilter = useCallback(newFilter => {
     setFilter(newFilter);
-  };
+  }, []);
 
   const updateLimit = (newLimit: number) => {
     setItemLimit(newLimit);

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Box,
   Button,
@@ -57,7 +57,17 @@ interface ValidationResult {
   data: OrderCsvRow[];
 }
 
-const steps = ["Upload CSV", "Validate Data", "Import Orders"];
+const steps = ["Upload CSV", "Map Columns", "Validate Data", "Import Orders"];
+
+const requiredFields = [
+  { key: "No", label: "Order Number" },
+  { key: "Description", label: "Description" },
+  { key: "SourceNo", label: "Part Number" },
+  { key: "Quantity", label: "Quantity" },
+  { key: "StartingDateTime", label: "Start Date" },
+  { key: "EndingDateTime", label: "End Date" },
+  { key: "Status", label: "Status" },
+];
 
 const OrdersImporter = () => {
   const [activeStep, setActiveStep] = useState(0);
@@ -74,6 +84,7 @@ const OrdersImporter = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<any>(null);
   const [detectRemovedOrders, setDetectRemovedOrders] = useState<boolean>(true);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,11 +102,11 @@ const OrdersImporter = () => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: header => header.replace(/[^a-zA-Z0-9_]/g, "_").trim(),
       complete: results => {
         setIsLoading(false);
         const data = results.data as OrderCsvRow[];
         setParsedData(data);
-        validateData(data);
       },
       error: error => {
         setIsLoading(false);
@@ -104,47 +115,87 @@ const OrdersImporter = () => {
     });
   };
 
+  // Helper to strip time from date-time strings, trim whitespace, remove trailing non-date chars, and convert 2-digit years to 4-digit
+  const getDateOnly = (value: string) => {
+    if (!value) return "";
+    let datePart = value.split(/[ T]/)[0].trim();
+    datePart = datePart.replace(/[^0-9\/-]/g, "");
+    // Convert 2-digit year to 4-digit (assume 20xx)
+    const match = datePart.match(/^(\d{2})[-/](\d{2})[-/](\d{2})$/);
+    if (match) {
+      return `${match[1]}-${match[2]}-20${match[3]}`;
+    }
+    return datePart;
+  };
+
   const validateData = (data: OrderCsvRow[]) => {
     setIsLoading(true);
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
 
-    const requiredFields = [
-      "No",
-      "Description",
-      "SourceNo",
-      "Quantity",
-      "StartingDateTime",
-      "EndingDateTime",
-      "Status",
-    ];
+    // Use columnMapping to get the actual CSV column for each required field
+    const mappedFields = requiredFields.map(field => ({
+      ...field,
+      csvColumn: columnMapping[field.key],
+    }));
+
     const firstRow = data[0] || {};
-    const missingFields = requiredFields.filter(field => !(field in firstRow));
+    const missingFields = mappedFields.filter(
+      field => !field.csvColumn || !(field.csvColumn in firstRow)
+    );
 
     if (missingFields.length > 0) {
       errors.push({
         row: 0,
         field: "header",
-        message: `Missing required columns: ${missingFields.join(", ")}`,
+        message: `Missing required columns: ${missingFields.map(f => f.label).join(", ")}`,
       });
-
       setValidationResult({
         valid: false,
         errors,
         warnings,
-        data,
+        data: [],
       });
       setIsLoading(false);
       return;
     }
 
-    data.forEach((row, index) => {
-      requiredFields.forEach(field => {
-        if (!row[field] && field !== "Notes" && field !== "State") {
+    // Build normalized data using mapping
+    const normalizedData = data.map(row => {
+      const obj: any = {};
+      mappedFields.forEach(field => {
+        let value = row[field.csvColumn] ?? "";
+        // For date fields, strip time part
+        if (["StartingDateTime", "EndingDateTime", "FinishedDate"].includes(field.key)) {
+          value = getDateOnly(String(value));
+        }
+        // For Quantity, strip all non-digit characters
+        if (field.key === "Quantity") {
+          value = String(value).replace(/[^0-9]/g, "");
+        }
+        obj[field.key] = value;
+      });
+      // Optional fields
+      obj.Notes = row[columnMapping["Notes"]] ?? row.Notes ?? "";
+      obj.State = row[columnMapping["State"]] ?? row.State ?? "";
+      obj.FinishedDate = getDateOnly(
+        String(row[columnMapping["FinishedDate"]] ?? row.FinishedDate ?? "")
+      );
+      return obj;
+    });
+
+    // Debugging output
+    console.log("[OrdersImporter] Normalized Data:", normalizedData);
+    console.log("[OrdersImporter] Validation Errors:", errors);
+    console.log("[OrdersImporter] Validation Warnings:", warnings);
+
+    normalizedData.forEach((row, index) => {
+      mappedFields.forEach(field => {
+        if (!row[field.key] && field.key !== "Notes" && field.key !== "State") {
           errors.push({
             row: index + 1,
-            field,
-            message: `Missing ${field}`,
+            field: field.key,
+            message: `Missing ${field.label}`,
           });
         }
       });
@@ -197,7 +248,6 @@ const OrdersImporter = () => {
             message: "Invalid date format. Supported formats are DD-MM-YYYY and DD/MM/YYYY",
           });
         }
-
         // Add warning if finished date is present but status isn't "Finished" or "Done"
         if (row.Status && row.Status !== "Finished" && row.Status !== "Done") {
           warnings.push({
@@ -216,7 +266,8 @@ const OrdersImporter = () => {
         });
       }
 
-      const duplicates = data.filter(r => r.No === row.No);
+      // Check for duplicates in normalized data
+      const duplicates = normalizedData.filter(r => r.No === row.No);
       if (duplicates.length > 1) {
         const isDuplicate = duplicates.findIndex(r => r.No === row.No) === index;
         if (isDuplicate) {
@@ -229,29 +280,39 @@ const OrdersImporter = () => {
       }
     });
 
-    setValidationResult({
+    const result = {
       valid: errors.length === 0,
       errors,
       warnings,
-      data,
-    });
+      data: normalizedData,
+    };
+    console.log("[OrdersImporter] Validation Result:", result);
+    setValidationResult(result);
     setIsLoading(false);
   };
 
   const isValidDate = (dateString: string): boolean => {
-    const formats = ["DD-MM-YYYY", "DD/MM/YYYY"];
+    // Accept both 2-digit and 4-digit years
+    const formats = ["DD-MM-YYYY", "DD/MM/YYYY", "DD-MM-YY", "DD/MM/YY"];
     return formats.some(format => {
-      const parts = dateString.split(format.includes("/") ? "/" : "-");
+      let parts;
+      if (format.includes("/")) {
+        parts = dateString.split("/");
+      } else {
+        parts = dateString.split("-");
+      }
       if (parts.length !== 3) return false;
-
       const day = parseInt(parts[0], 10);
       const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-
+      let year = parseInt(parts[2], 10);
+      if (parts[2].length === 2) {
+        year = 2000 + year;
+      }
       const date = new Date(year, month, day);
       return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day;
     });
   };
+
   const handleImport = async () => {
     if (validationResult.data.length === 0) {
       console.log("No data to import");
@@ -269,21 +330,15 @@ const OrdersImporter = () => {
         detectRemovedOrders
       );
 
-      if (importResults.errors > 0) {
-        const errorMessage = importResults.errorMessages[0];
-        setImportError(`Some orders could not be imported. ${errorMessage}`);
-      }
-
-      if (importResults.created > 0 || importResults.updated > 0 || importResults.autoRemoved > 0) {
-        setImportSuccess(true);
-        setImportResults(importResults);
-        setActiveStep(3);
-      }
+      setImportSuccess(true);
+      setImportResults(importResults);
+      setActiveStep(3);
     } catch (error) {
       console.error("Error importing orders:", error);
       setImportError(
         `Error importing orders: ${error instanceof Error ? error.message : String(error)}`
       );
+      setActiveStep(3); // Show completion step even on error
     } finally {
       setIsLoading(false);
     }
@@ -312,6 +367,64 @@ const OrdersImporter = () => {
       fileInputRef.current.click();
     }
   };
+
+  // Extract CSV headers from first row
+  const csvHeaders = parsedData.length > 0 ? Object.keys(parsedData[0]) : [];
+
+  // Render column mapping step
+  const renderMappingStep = () => (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h6" gutterBottom>
+        Map CSV Columns
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 2 }}>
+        Please map each required field to a column in your CSV file.
+      </Typography>
+      {requiredFields.map(field => (
+        <Box key={field.key} sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            {field.label}
+          </Typography>
+          <select
+            value={columnMapping[field.key] || ""}
+            onChange={e =>
+              setColumnMapping(mapping => ({
+                ...mapping,
+                [field.key]: e.target.value,
+              }))
+            }
+            style={{ minWidth: 200, padding: 8 }}
+          >
+            <option value="">-- Select column --</option>
+            {csvHeaders.map(header => (
+              <option key={header} value={header}>
+                {header}
+              </option>
+            ))}
+          </select>
+        </Box>
+      ))}
+      <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
+        <Button onClick={handleReset} startIcon={<DeleteIcon />}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => validateData(parsedData)}
+          disabled={requiredFields.some(f => !columnMapping[f.key])}
+        >
+          Continue
+        </Button>
+      </Box>
+    </Box>
+  );
+
+  // Advance to validation step only after validation passes
+  useEffect(() => {
+    if (activeStep === 1 && validationResult.valid) {
+      setActiveStep(2);
+    }
+  }, [validationResult.valid, activeStep]);
 
   const renderUploadStep = () => (
     <Box sx={{ p: 3, textAlign: "center" }}>
@@ -420,47 +533,17 @@ const OrdersImporter = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Order #</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Part No</TableCell>
-                  <TableCell>Quantity</TableCell>
-                  <TableCell>Start Date</TableCell>
-                  <TableCell>End Date</TableCell>
-                  <TableCell>Finished Date</TableCell>
-                  <TableCell>Status</TableCell>
+                  {requiredFields.map(field => (
+                    <TableCell key={field.key}>{field.label}</TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {parsedData.slice(0, 5).map((row, index) => (
                   <TableRow key={index}>
-                    <TableCell>{row.No}</TableCell>
-                    <TableCell>{row.Description}</TableCell>
-                    <TableCell>{row.SourceNo}</TableCell>
-                    <TableCell>{row.Quantity}</TableCell>
-                    <TableCell>{row.StartingDateTime}</TableCell>
-                    <TableCell>{row.EndingDateTime}</TableCell>
-                    <TableCell>{row.FinishedDate || "-"}</TableCell>
-                    <TableCell>
-                      {" "}
-                      <Chip
-                        label={row.Status}
-                        size="small"
-                        color={
-                          row.Status === "Released"
-                            ? "primary"
-                            : row.Status === "In Progress"
-                              ? "secondary"
-                              : row.Status === "Finished"
-                                ? "success"
-                                : row.Status === "Planned"
-                                  ? "info"
-                                  : row.Status === "Removed"
-                                    ? "error"
-                                    : "default"
-                        }
-                        variant="outlined"
-                      />
-                    </TableCell>
+                    {requiredFields.map(field => (
+                      <TableCell key={field.key}>{row[columnMapping[field.key]] || "-"}</TableCell>
+                    ))}
                   </TableRow>
                 ))}
               </TableBody>
@@ -480,7 +563,7 @@ const OrdersImporter = () => {
             </Button>
             <Button
               variant="contained"
-              onClick={() => setActiveStep(2)}
+              onClick={() => setActiveStep(3)}
               disabled={!validationResult.valid}
             >
               Continue
@@ -492,7 +575,7 @@ const OrdersImporter = () => {
   );
 
   const renderImportStep = () => (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, position: "relative" }}>
       <Typography variant="h6" gutterBottom>
         Import Orders
       </Typography>{" "}
@@ -583,6 +666,26 @@ const OrdersImporter = () => {
           {isLoading ? "Importing..." : "Import Orders"}
         </Button>
       </Box>
+      {isLoading && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            bgcolor: "rgba(255,255,255,0.7)",
+            zIndex: 10,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <CircularProgress sx={{ mb: 2 }} />
+          <Typography variant="body1">Importing orders, please wait...</Typography>
+        </Box>
+      )}
     </Box>
   );
 
@@ -651,9 +754,10 @@ const OrdersImporter = () => {
       <Divider />
 
       {activeStep === 0 && renderUploadStep()}
-      {activeStep === 1 && renderValidationStep()}
-      {activeStep === 2 && renderImportStep()}
-      {activeStep === 3 && renderCompletionStep()}
+      {activeStep === 1 && renderMappingStep()}
+      {activeStep === 2 && renderValidationStep()}
+      {activeStep === 3 && renderImportStep()}
+      {activeStep === 4 && renderCompletionStep()}
     </Paper>
   );
 };
