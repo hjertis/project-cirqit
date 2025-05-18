@@ -11,12 +11,16 @@ const OrderDetailsPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
 
+  // Detect if viewing an archived order (e.g., /orders/archived/:id or ?archived=1)
+  // This example uses a query param, but you can adapt to your routing as needed
+  const isArchived = new URLSearchParams(window.location.search).get("archived") === "1";
+
   useEffect(() => {
     setLoading(false);
   }, [id]);
 
   const handleClose = () => {
-    navigate("/orders");
+    navigate(isArchived ? "/orders/archived" : "/orders");
   };
 
   if (loading) {
@@ -35,8 +39,12 @@ const OrderDetailsPage = () => {
             <Link component={RouterLink} to="/" color="inherit">
               Dashboard
             </Link>
-            <Link component={RouterLink} to="/orders" color="inherit">
-              Orders
+            <Link
+              component={RouterLink}
+              to={isArchived ? "/orders/archived" : "/orders"}
+              color="inherit"
+            >
+              {isArchived ? "Archived Orders" : "Orders"}
             </Link>
             <Typography color="text.primary">{id}</Typography>
           </Breadcrumbs>
@@ -47,6 +55,7 @@ const OrderDetailsPage = () => {
           onClose={handleClose}
           orderId={id || null}
           fullPage={true}
+          isArchived={isArchived}
         />
       </Box>
     </ContentWrapper>

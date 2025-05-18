@@ -15,7 +15,6 @@ import ForgotPassword from "../pages/auth/ForgotPassword";
 import ProfilePage from "../pages/ProfilePage";
 import ProtectedRoute from "./ProtectedRoute";
 import TimeDashboardPage from "../pages/TimeDashboardPage";
-import ResourceCalendarPage from "../pages/ResourceCalendarPage";
 import ResourceManagementPage from "../pages/ResourceManagementPage";
 import FaultParetoChart from "../components/dashboard/FaultParetoChart";
 import ResourceBoardPage from "../pages/ResourceBoardPage";
@@ -29,6 +28,7 @@ import FaultTrackingPage from "../pages/FaultTrackingPage.tsx";
 import FaultReportsPage from "../pages/FaultReportsPage.tsx";
 import ProductsPage from "../pages/ProductsPage.tsx";
 import MigrateProcessDurationsToHoursPage from "../pages/admin/migrateProcessDurationsToHours.tsx";
+import TasksPage from "../pages/TasksPage.tsx";
 
 const AppRoutes = () => {
   return (
@@ -52,7 +52,6 @@ const AppRoutes = () => {
         <Route path="/orders/import" element={<ImportOrdersPage />} />
         <Route path="/orders/planning" element={<OrderPlanningPage />} />
         <Route path="/removed-orders" element={<RemovedOrdersPage />} />
-        <Route path="/orders/calendar" element={<ResourceCalendarPage />} />
         <Route path="/orders/resource-board" element={<ResourceBoardPage />} />
         <Route path="/orders/:id/print" element={<PrintOrderPage />} />
         <Route path="/orders/archived" element={<ArchivedOrdersPage />} />
@@ -70,6 +69,7 @@ const AppRoutes = () => {
         <Route path="/faults" element={<div>Faults Page</div>} />
         <Route path="/fault-tracking" element={<FaultTrackingPage />} />
         <Route path="/fault-report" element={<FaultReportsPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
         <Route
           path="/admin/migrate-orders"
           element={

@@ -101,6 +101,7 @@ interface OrderDetailsDialogProps {
   onClose: () => void;
   orderId: string | null;
   fullPage?: boolean;
+  isArchived?: boolean;
 }
 
 const getStatusColor = (status: string) => {
@@ -129,6 +130,7 @@ const OrderDetailsDialog = ({
   onClose,
   orderId,
   fullPage = false,
+  isArchived = false,
 }: OrderDetailsDialogProps) => {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -554,26 +556,34 @@ const OrderDetailsDialog = ({
           <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrintOrder}>
             Print Work Order
           </Button>
-          <Button
-            color="secondary"
-            variant="outlined"
-            onClick={handleArchiveOrder}
-            disabled={isArchiving || order.status !== "Finished"}
-            startIcon={isArchiving ? <CircularProgress size={20} /> : <ArchiveIcon />}
-            sx={{ ml: 1 }}
-          >
-            {isArchiving ? "Archiving..." : "Archive Order"}
-          </Button>
-          <Button
-            color="secondary"
-            variant="outlined"
-            onClick={handleRestoreOrder}
-            disabled={isArchiving}
-            startIcon={isArchiving ? <CircularProgress size={20} /> : <UnarchiveIcon />}
-            sx={{ ml: 1 }}
-          >
-            {isArchiving ? "Restoring..." : "Restore Order"}
-          </Button>
+          {/* Archive button: only show if not archived and not removed, and status is Finished/Done/Completed */}
+          {!isArchived &&
+            order.status !== "Removed" &&
+            ["Finished", "Done", "Completed"].includes(order.status) && (
+              <Button
+                color="secondary"
+                variant="outlined"
+                onClick={handleArchiveOrder}
+                disabled={isArchiving}
+                startIcon={isArchiving ? <CircularProgress size={20} /> : <ArchiveIcon />}
+                sx={{ ml: 1 }}
+              >
+                {isArchiving ? "Archiving..." : "Archive Order"}
+              </Button>
+            )}
+          {/* Restore button: only show if archived */}
+          {isArchived && (
+            <Button
+              color="secondary"
+              variant="outlined"
+              onClick={handleRestoreOrder}
+              disabled={isArchiving}
+              startIcon={isArchiving ? <CircularProgress size={20} /> : <UnarchiveIcon />}
+              sx={{ ml: 1 }}
+            >
+              {isArchiving ? "Restoring..." : "Restore Order"}
+            </Button>
+          )}
         </DialogActions>
         <Snackbar
           open={!!archiveResult}

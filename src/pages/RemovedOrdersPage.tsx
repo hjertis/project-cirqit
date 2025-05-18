@@ -44,6 +44,8 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case "Removed":
       return "error";
+    case "Done":
+      return "success";
     default:
       return "default";
   }
@@ -65,7 +67,7 @@ const RemovedOrdersPage = () => {
     text: string;
   } | null>(null);
 
-  const filter: OrderFilter = { status: ["Removed"] };
+  const filter: OrderFilter = { status: ["Removed", "Done"] };
   const { orders, loading, error, refreshOrders, formatDate } = useOrders(filter, 1000);
 
   const filteredOrders = orders.filter(order => {
@@ -172,6 +174,29 @@ const RemovedOrdersPage = () => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
     setOrderBy(property);
+  };
+
+  const handleMarkAsRemoved = async (orderId: string) => {
+    try {
+      setIsProcessing(true);
+      const orderRef = doc(db, "orders", orderId);
+      await updateDoc(orderRef, {
+        status: "Removed",
+        removedDate: new Date(),
+      });
+      setStatusMessage({
+        type: "success",
+        text: `Order ${orderId} marked as Removed`,
+      });
+      refreshOrders();
+    } catch (err) {
+      setStatusMessage({
+        type: "error",
+        text: `Failed to mark as Removed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const sortedOrders = React.useMemo(() => {
@@ -288,7 +313,7 @@ const RemovedOrdersPage = () => {
               size="small"
               sx={{ width: { xs: "100%", sm: "300px" } }}
             />
-            <Chip label="Status: Removed" color="error" />
+            <Chip label="Status: Removed or Done" color="error" />
           </Box>
         </Paper>
 
@@ -445,6 +470,17 @@ const RemovedOrdersPage = () => {
                           <RestoreIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      {order.status === "Done" && (
+                        <Tooltip title="Mark as Removed">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleMarkAsRemoved(order.id)}
+                          >
+                            <DeleteForeverIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="More">
                         <IconButton size="small" onClick={e => handleMenuOpen(e, order.id)}>
                           <MoreVertIcon fontSize="small" />

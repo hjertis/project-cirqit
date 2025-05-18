@@ -29,6 +29,9 @@ import {
   CalendarToday as CalendarTodayIcon,
   ViewKanban as ViewKanbanIcon,
   Error as ErrorIcon,
+  Assignment as AssignmentIcon,
+  Archive as ArchiveIcon,
+  ErrorOutline as ErrorOutlineIcon,
 } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 
@@ -74,6 +77,8 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
         { text: "Resource Calendar", icon: <CalendarTodayIcon />, path: "/orders/calendar" },
         { text: "Resource Board", icon: <ViewKanbanIcon />, path: "/orders/resource-board" },
         { text: "Kanban Board", icon: <ViewKanbanIcon />, path: "/kanban" },
+        { text: "Archived Orders", icon: <ArchiveIcon />, path: "/orders/archived" },
+        { text: "View Removed Orders", icon: <ErrorOutlineIcon />, path: "/removed-orders" },
       ],
     },
     {
@@ -113,6 +118,11 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
       text: "Time Tracking",
       icon: <AccessTimeIcon />,
       path: "/time",
+    },
+    {
+      text: "Tasks",
+      icon: <AssignmentIcon />,
+      path: "/tasks",
     },
     {
       text: "Resources",
@@ -178,7 +188,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                           pl: 4,
                           backgroundColor:
                             location.pathname === child.path
-                              ? theme.palette.primary.lighter
+                              ? theme.palette.primary.light
                               : "transparent",
                           color:
                             location.pathname === child.path
@@ -217,9 +227,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
                   selected={location.pathname === item.path}
                   sx={{
                     backgroundColor:
-                      location.pathname === item.path
-                        ? theme.palette.primary.lighter
-                        : "transparent",
+                      location.pathname === item.path ? theme.palette.primary.light : "transparent",
                     color: location.pathname === item.path ? theme.palette.primary.main : "inherit",
                     fontWeight: location.pathname === item.path ? "bold" : "normal",
                     "&:hover": {
@@ -254,7 +262,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
             selected={location.pathname === "/settings"}
             sx={{
               backgroundColor:
-                location.pathname === "/settings" ? theme.palette.primary.lighter : "transparent",
+                location.pathname === "/settings" ? theme.palette.primary.light : "transparent",
               color: location.pathname === "/settings" ? theme.palette.primary.main : "inherit",
               fontWeight: location.pathname === "/settings" ? "bold" : "normal",
               "&:hover": {

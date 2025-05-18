@@ -18,6 +18,7 @@ export interface FirebaseOrder {
   updated?: Timestamp;
   state?: string;
   removedDate?: Timestamp;
+  assignedResourceId?: string | null;
 }
 
 export interface OrderFilter {

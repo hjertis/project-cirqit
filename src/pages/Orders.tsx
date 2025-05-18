@@ -42,11 +42,9 @@ import {
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
   Refresh as RefreshIcon,
-  Archive as ArchiveIcon,
-  CalendarToday as CalendarTodayIcon,
 } from "@mui/icons-material";
-import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
-import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
+import { useNavigate, useLocation } from "react-router-dom";
+// import ImportOrdersDialog from "../components/orders/ImportOrdersDialog";
 import EditOrderDialog from "../components/orders/EditOrderDialog";
 import useOrders, { OrderFilter } from "../hooks/useOrders";
 import { doc, collection, query, where, getDocs, writeBatch, Timestamp } from "firebase/firestore";
@@ -99,7 +97,6 @@ const OrdersPage = () => {
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -175,14 +172,6 @@ const OrdersPage = () => {
       (order.customer && order.customer.toLowerCase().includes(searchLower))
     );
   });
-
-  const openImportDialog = () => {
-    setImportDialogOpen(true);
-  };
-
-  const closeImportDialog = () => {
-    setImportDialogOpen(false);
-  };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -366,68 +355,39 @@ const OrdersPage = () => {
           <Typography variant="h4" component="h1">
             Orders
           </Typography>
-          <Box>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleNewOrder}
+              sx={{ minWidth: 120 }}
+            >
+              New Order
+            </Button>
             <Button
               variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={handleRefresh}
-              sx={{ mr: 2 }}
+              startIcon={<CloudUploadIcon />}
+              onClick={handleImportClick}
+              sx={{ minWidth: 110 }}
             >
-              Refresh
+              Import
             </Button>
             <Button
               variant="outlined"
               startIcon={<GetAppIcon />}
               onClick={handleExport}
               disabled={isExporting}
-              sx={{ mr: 2 }}
+              sx={{ minWidth: 110 }}
             >
               {isExporting ? "Exporting..." : "Export"}
             </Button>
             <Button
-              component={RouterLink}
-              to="/orders/archived"
               variant="outlined"
-              startIcon={<ArchiveIcon />}
-              sx={{ mr: 2 }}
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              sx={{ minWidth: 110 }}
             >
-              Archived Orders
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/orders/calendar"
-              variant="outlined"
-              startIcon={<CalendarTodayIcon />}
-              sx={{ mr: 2 }}
-            >
-              Resource Calendar
-            </Button>{" "}
-            <Button
-              variant="outlined"
-              startIcon={<CloudUploadIcon />}
-              onClick={handleImportClick}
-              sx={{ mr: 2 }}
-            >
-              Import
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<CloudUploadIcon />}
-              onClick={openImportDialog}
-              sx={{ mr: 2 }}
-            >
-              Quick Import
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleNewOrder}
-              sx={{ mr: 2 }}
-            >
-              New Order
-            </Button>{" "}
-            <Button variant="outlined" color="error" component={RouterLink} to="/removed-orders">
-              View Removed Orders
+              Refresh
             </Button>
           </Box>
         </Box>
@@ -502,8 +462,6 @@ const OrdersPage = () => {
             {renderOrdersTable()}
           </TabPanel>
         </Paper>
-
-        <ImportOrdersDialog open={importDialogOpen} onClose={closeImportDialog} />
 
         <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
           <MenuItem
@@ -591,7 +549,7 @@ const OrdersPage = () => {
           <Alert
             severity="error"
             action={
-              <Button color="inherit" size="small" onClick={refreshOrders}>
+              <Button color="inherit" size="small" onClick={() => refreshOrders()}>
                 Retry
               </Button>
             }
