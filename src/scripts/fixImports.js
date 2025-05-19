@@ -14,8 +14,6 @@ const duplicateImportRegex = /import \{ formatDateForStorage \} from "..\/..\/ut
 
 // First check if we have the problem
 if (content.includes("\\n")) {
-  console.log("Found escaped newline in import statement, fixing...");
-
   // Replace the problematic imports with a single import
   content = content.replace(
     badImportRegex,
@@ -42,8 +40,6 @@ if (content.includes("\\n")) {
   const allDateUtilsImports = content.match(dateUtilsImportRegex) || [];
 
   if (allDateUtilsImports.length > 1) {
-    console.log("Found multiple dateUtils imports, combining them...");
-
     // Get all imported functions
     const importedFunctions = [];
     allDateUtilsImports.forEach(importStmt => {
@@ -76,5 +72,3 @@ content = content.replace(/\n\s*\n\s*\n/g, "\n\n");
 
 // Write the updated content back to the file
 fs.writeFileSync(filePath, content, "utf8");
-
-console.log("Fixed import statements in TasksPanel.tsx");

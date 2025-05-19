@@ -23,6 +23,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import ProcessTemplateDialog from "../components/products/ProcessTemplateDialog";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Product, ProcessTemplate } from "../types";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 interface ProductCount {
   partNo: string;
@@ -51,6 +53,17 @@ const fetchProducts = async (): Promise<ProductCount[]> => {
     .sort((a, b) => b.count - a.count);
 };
 
+// Fetch all products from the 'products' collection to check for processTemplates
+const fetchProductsWithTemplates = async (): Promise<Record<string, boolean>> => {
+  const productsSnapshot = await getDocs(collection(db, "products"));
+  const result: Record<string, boolean> = {};
+  productsSnapshot.forEach(doc => {
+    const data = doc.data();
+    result[data.partNo] = Array.isArray(data.processTemplates) && data.processTemplates.length > 0;
+  });
+  return result;
+};
+
 const ProductsPage = () => {
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [orderBy, setOrderBy] = useState<"partNo" | "count" | "description">("count");
@@ -77,6 +90,12 @@ const ProductsPage = () => {
   } = useQuery({
     queryKey: ["products"],
     queryFn: fetchProducts,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const { data: productsWithTemplates = {}, isLoading: loadingTemplates } = useQuery({
+    queryKey: ["productsWithTemplates"],
+    queryFn: fetchProductsWithTemplates,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -152,7 +171,7 @@ const ProductsPage = () => {
           Products
         </Typography>
       </Box>
-      {loading ? (
+      {loading || loadingTemplates ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
           <CircularProgress />
         </Box>
@@ -200,6 +219,7 @@ const ProductsPage = () => {
                         Order Count
                       </TableSortLabel>
                     </TableCell>
+                    <TableCell align="center">Has Process Templates</TableCell>
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -211,6 +231,13 @@ const ProductsPage = () => {
                         <TableCell>{product.partNo}</TableCell>
                         <TableCell>{product.description}</TableCell>
                         <TableCell align="right">{product.count}</TableCell>
+                        <TableCell align="center">
+                          {productsWithTemplates[product.partNo] ? (
+                            <CheckCircleIcon color="success" titleAccess="Has process templates" />
+                          ) : (
+                            <CancelIcon color="disabled" titleAccess="No process templates" />
+                          )}
+                        </TableCell>
                         <TableCell align="center">
                           <IconButton
                             aria-label="Edit Processes"

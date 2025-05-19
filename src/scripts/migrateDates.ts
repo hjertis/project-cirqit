@@ -20,11 +20,9 @@ async function migratePlannedWeekStartDates() {
         await updateDoc(doc(db, "orders", orderDoc.id), {
           plannedWeekStartDate: monday,
         });
-        console.log(`Order ${orderDoc.id} updated to ${monday}`);
       }
     }
   }
-  console.log("Migration complete.");
 }
 
 migratePlannedWeekStartDates();

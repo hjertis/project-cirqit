@@ -19,13 +19,9 @@ async function fixInvalidOrderResources() {
       await updateDoc(doc(db, "orders", orderDoc.id), {
         assignedResourceId: null,
       });
-      console.log(
-        `Order ${orderDoc.id} had invalid assignedResourceId (${assignedResourceId}) and was fixed.`
-      );
       fixedCount++;
     }
   }
-  console.log(`Done. Fixed ${fixedCount} orders.`);
 }
 
 fixInvalidOrderResources().catch(e => {

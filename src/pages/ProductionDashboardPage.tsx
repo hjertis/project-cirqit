@@ -11,12 +11,6 @@ import {
   Breadcrumbs,
   Link,
   Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   MenuItem,
   Select,
@@ -46,8 +40,6 @@ import {
 import ContentWrapper from "../components/layout/ContentWrapper";
 import {
   BarChart,
-  Bar,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -56,7 +48,6 @@ import {
   CartesianGrid,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
   Scatter,
   ScatterChart,
   Tooltip as RechartsTooltip,
@@ -139,14 +130,6 @@ const ProductionDashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [omittedPartNumbers, setOmittedPartNumbers] = useState<string[]>([
-    "900100099-05",
-    "900100013-06",
-    "900100014-04",
-    "900100155-01",
-    "900100156-01",
-    "900100157-01",
-  ]);
 
   const dashboardRef = useRef<HTMLDivElement>(null);
 
@@ -165,121 +148,112 @@ const ProductionDashboardPage = () => {
   const [exportLoading, setExportLoading] = useState(false);
 
   // Define processOrderData first, as other callbacks depend on it
-  const processOrderData = useCallback(
-    (orderData: Order[]) => {
-      const monthlyData: { [key: string]: number } = {};
-      const today = new Date();
-      orderData.forEach(order => {
-        const startDate = safeConvertToDate(order.start);
-        if (startDate) {
-          const yearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1)
-            .toString()
-            .padStart(2, "0")}`;
-          monthlyData[yearMonth] = (monthlyData[yearMonth] || 0) + (order.quantity || 0);
-        }
+  const processOrderData = useCallback((orderData: Order[]) => {
+    const monthlyData: { [key: string]: number } = {};
+    const today = new Date();
+    orderData.forEach(order => {
+      const startDate = safeConvertToDate(order.start);
+      if (startDate) {
+        const yearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}`;
+        monthlyData[yearMonth] = (monthlyData[yearMonth] || 0) + (order.quantity || 0);
+      }
+    });
+    const monthlyChartData: MonthlyProductionData[] = Object.keys(monthlyData)
+      .sort()
+      .map(month => {
+        const [year, monthNum] = month.split("-");
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        return {
+          month: `${monthNames[parseInt(monthNum) - 1]} ${year}`,
+          quantity: monthlyData[month],
+          isPast: new Date(parseInt(year), parseInt(monthNum) - 1) < today,
+        };
       });
-      const monthlyChartData: MonthlyProductionData[] = Object.keys(monthlyData)
-        .sort()
-        .map(month => {
-          const [year, monthNum] = month.split("-");
-          const monthNames = [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-          ];
+    setProductionByMonth(monthlyChartData);
+
+    const productsByPartNo: {
+      [key: string]: { count: number; totalQuantity: number; description: string };
+    } = {};
+    orderData.forEach(order => {
+      const partNo = order.partNo || "Unknown";
+      if (!productsByPartNo[partNo]) {
+        productsByPartNo[partNo] = {
+          count: 0,
+          totalQuantity: 0,
+          description: order.description || partNo,
+        };
+      }
+      productsByPartNo[partNo].count += 1;
+      productsByPartNo[partNo].totalQuantity += order.quantity || 0;
+    });
+    // Filter out omitted part numbers when creating topProductsData
+    const topProductsData: ProductData[] = Object.keys(productsByPartNo)
+      .map(partNo => ({
+        partNo,
+        ...productsByPartNo[partNo],
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 15);
+    setTopProducts(topProductsData);
+
+    const statusCounts: { [key: string]: number } = {};
+    orderData.forEach(order => {
+      const status = order.status || "Unknown";
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    const statusData: StatusDistributionData[] = Object.keys(statusCounts).map(status => ({
+      status,
+      count: statusCounts[status],
+    }));
+    setStatusDistribution(statusData);
+
+    const efficiencyItems: EfficiencyData[] = orderData
+      .filter(
+        order =>
+          (order.status === "Finished" || order.status === "Done") && order.start && order.end
+      )
+      .map(order => {
+        const plannedEnd = safeConvertToDate(order.end);
+
+        // Prioritize finishedDate if available, then updated, then fallback to planned end
+        let actualEnd = safeConvertToDate(order.finishedDate) || safeConvertToDate(order.updated);
+        if (!actualEnd) {
+          actualEnd = plannedEnd;
+        }
+
+        if (plannedEnd && actualEnd) {
+          const diff = (actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24);
           return {
-            month: `${monthNames[parseInt(monthNum) - 1]} ${year}`,
-            quantity: monthlyData[month],
-            isPast: new Date(parseInt(year), parseInt(monthNum) - 1) < today,
-          };
-        });
-      setProductionByMonth(monthlyChartData);
-
-      const productsByPartNo: {
-        [key: string]: { count: number; totalQuantity: number; description: string };
-      } = {};
-      orderData.forEach(order => {
-        const partNo = order.partNo || "Unknown";
-        if (!productsByPartNo[partNo]) {
-          productsByPartNo[partNo] = {
-            count: 0,
-            totalQuantity: 0,
-            description: order.description || partNo,
+            order: order.orderNumber || order.id,
+            description:
+              (order.description || "").substring(0, 25) +
+              (order.description && order.description.length > 25 ? "..." : ""),
+            plannedEnd: formatDate(plannedEnd),
+            actualEnd: formatDate(actualEnd),
+            difference: diff,
+            onTime: diff <= 0,
           };
         }
-        productsByPartNo[partNo].count += 1;
-        productsByPartNo[partNo].totalQuantity += order.quantity || 0;
-      });
-      // Filter out omitted part numbers when creating topProductsData
-      const topProductsData: ProductData[] = Object.keys(productsByPartNo)
-        .filter(
-          partNo =>
-            !omittedPartNumbers.some(omitted =>
-              partNo.toLowerCase().includes(omitted.toLowerCase())
-            )
-        )
-        .map(partNo => ({
-          partNo,
-          ...productsByPartNo[partNo],
-        }))
-        .sort((a, b) => b.totalQuantity - a.totalQuantity)
-        .slice(0, 15);
-      setTopProducts(topProductsData);
-
-      const statusCounts: { [key: string]: number } = {};
-      orderData.forEach(order => {
-        const status = order.status || "Unknown";
-        statusCounts[status] = (statusCounts[status] || 0) + 1;
-      });
-      const statusData: StatusDistributionData[] = Object.keys(statusCounts).map(status => ({
-        status,
-        count: statusCounts[status],
-      }));
-      setStatusDistribution(statusData);
-
-      const efficiencyItems: EfficiencyData[] = orderData
-        .filter(
-          order =>
-            (order.status === "Finished" || order.status === "Done") && order.start && order.end
-        )
-        .map(order => {
-          const plannedEnd = safeConvertToDate(order.end);
-
-          // Prioritize finishedDate if available, then updated, then fallback to planned end
-          let actualEnd = safeConvertToDate(order.finishedDate) || safeConvertToDate(order.updated);
-          if (!actualEnd) {
-            actualEnd = plannedEnd;
-          }
-
-          if (plannedEnd && actualEnd) {
-            const diff = (actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24);
-            return {
-              order: order.orderNumber || order.id,
-              description:
-                (order.description || "").substring(0, 25) +
-                (order.description && order.description.length > 25 ? "..." : ""),
-              plannedEnd: formatDate(plannedEnd),
-              actualEnd: formatDate(actualEnd),
-              difference: diff,
-              onTime: diff <= 0,
-            };
-          }
-          return null;
-        })
-        .filter((item): item is EfficiencyData => item !== null);
-      setEfficiencyData(efficiencyItems);
-    },
-    [omittedPartNumbers]
-  ); // Add omittedPartNumbers as dependency
+        return null;
+      })
+      .filter((item): item is EfficiencyData => item !== null);
+    setEfficiencyData(efficiencyItems);
+  }, []); // Add omittedPartNumbers as dependency
 
   // Define loadSampleData, depends on processOrderData
   const loadSampleData = useCallback(() => {
@@ -317,7 +291,6 @@ const ProductionDashboardPage = () => {
           isArchived: true,
         } as Order);
       });
-      console.log(`Loaded ${allOrders.length} orders from Firebase`);
       setOrders(allOrders);
       const statuses = [...new Set(allOrders.map(order => order.status))].filter(Boolean);
       setAvailableStatuses(statuses);

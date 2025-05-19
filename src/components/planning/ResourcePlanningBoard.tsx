@@ -35,8 +35,7 @@ import dayjs from "dayjs";
 import weekOfYear from "dayjs/plugin/weekOfYear";
 import isoWeek from "dayjs/plugin/isoWeek";
 import isBetween from "dayjs/plugin/isBetween";
-import { getResources, Resource } from "../../services/resourceService";
-import OrderDetailsDialog from "../orders/OrderDetailsDialog";
+import { getResources } from "../../services/resourceService";
 import {
   collection,
   query,
@@ -318,7 +317,6 @@ interface ResourcePlanningBoardProps {
 }
 
 const ResourcePlanningBoard: React.FC<ResourcePlanningBoardProps> = ({ onOrderClick }) => {
-  console.log("ResourcePlanningBoard: render/mount");
   const theme = useTheme();
   const [currentWeekStart, setCurrentWeekStart] = useState(dayjs().startOf("isoWeek").toDate());
   const queryClient = useQueryClient();

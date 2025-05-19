@@ -11,7 +11,6 @@ import {
   TextField,
   Grid,
   MenuItem,
-  Divider,
   FormControl,
   InputLabel,
   Select,
@@ -27,6 +26,8 @@ import {
 } from "@mui/icons-material";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 import { ProcessTemplate } from "../../types";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../config/firebase";
 
 interface ProcessTemplateDialogProps {
   open: boolean;
@@ -52,13 +53,17 @@ const ProcessTemplateDialog = ({
   product,
 }: ProcessTemplateDialogProps) => {
   const [templates, setTemplates] = useState<ProcessTemplate[]>(processTemplates || []);
+  const [availableProducts, setAvailableProducts] = useState<
+    { partNo: string; description: string; processTemplates: ProcessTemplate[] }[]
+  >([]);
+  const [copyFrom, setCopyFrom] = useState<string>("");
 
   const handleAdd = () => {
     const nextSeq = templates.length > 0 ? Math.max(...templates.map(t => t.sequence)) + 1 : 1;
     setTemplates([...templates, { ...initialProcess, sequence: nextSeq }]);
   };
 
-  const handleChange = (idx: number, field: keyof ProcessTemplate, value: any) => {
+  const handleChange = (idx: number, field: keyof ProcessTemplate, value: string | number) => {
     const updated = templates.map((t, i) => (i === idx ? { ...t, [field]: value } : t));
     setTemplates(updated);
   };
@@ -79,6 +84,37 @@ const ProcessTemplateDialog = ({
     if (open) setTemplates(processTemplates || []);
   }, [open, processTemplates]);
 
+  // Fetch products with processTemplates for copy option
+  React.useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const snapshot = await getDocs(collection(db, "products"));
+      const products: {
+        partNo: string;
+        description: string;
+        processTemplates: ProcessTemplate[];
+      }[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (Array.isArray(data.processTemplates) && data.processTemplates.length > 0) {
+          products.push({
+            partNo: data.partNo,
+            description: data.description,
+            processTemplates: data.processTemplates,
+          });
+        }
+      });
+      setAvailableProducts(products);
+    })();
+  }, [open]);
+
+  const handleCopyTemplates = () => {
+    const selected = availableProducts.find(p => p.partNo === copyFrom);
+    if (selected) {
+      setTemplates(selected.processTemplates.map((t, i) => ({ ...t, sequence: i + 1 })));
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -92,6 +128,35 @@ const ProcessTemplateDialog = ({
         </Box>
       </DialogTitle>
       <DialogContent dividers>
+        {/* Copy from another product */}
+        {availableProducts.length > 0 && (
+          <Box sx={{ mb: 2, display: "flex", gap: 2, alignItems: "center" }}>
+            <FormControl sx={{ minWidth: 220 }} size="small">
+              <InputLabel>Copy from product</InputLabel>
+              <Select
+                value={copyFrom}
+                label="Copy from product"
+                onChange={e => setCopyFrom(e.target.value)}
+              >
+                {availableProducts
+                  .filter(p => !product || p.partNo !== product.partNo)
+                  .map(p => (
+                    <MenuItem key={p.partNo} value={p.partNo}>
+                      {p.partNo} - {p.description}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={!copyFrom}
+              onClick={handleCopyTemplates}
+            >
+              Copy Templates
+            </Button>
+          </Box>
+        )}
         {loading ? (
           <Box
             sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 120 }}

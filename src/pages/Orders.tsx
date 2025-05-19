@@ -73,7 +73,6 @@ function TabPanel(props: TabPanelProps) {
     </div>
   );
 }
-console.log("OrdersPage component loaded");
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Open":
@@ -98,7 +97,7 @@ const OrdersPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -204,7 +203,7 @@ const OrdersPage = () => {
     navigate("/orders/import");
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (newPage: number) => {
     setPage(newPage);
   };
 

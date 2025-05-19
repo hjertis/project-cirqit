@@ -33,7 +33,6 @@ function matchStandardProcessName(name: string): string | null {
 }
 
 async function standardizeOrderProcessNames() {
-  console.log("Starting order process name standardization...");
   const ordersRef = collection(db, "orders");
   const querySnapshot = await getDocs(ordersRef);
   let totalProcessed = 0;
@@ -66,28 +65,18 @@ async function standardizeOrderProcessNames() {
     totalProcessed++;
     if (operationsInBatch >= BATCH_SIZE) {
       await batch.commit();
-      console.log(`Committed batch of ${operationsInBatch} updates...`);
       batch = writeBatch(db);
       operationsInBatch = 0;
-    }
-    if (totalProcessed % 100 === 0) {
-      console.log(`Checked ${totalProcessed}/${querySnapshot.size} orders...`);
     }
   }
 
   if (operationsInBatch > 0) {
     await batch.commit();
-    console.log(`Committed final batch of ${operationsInBatch} updates...`);
   }
-
-  console.log(`\n--- Standardization Complete ---`);
-  console.log(`Total orders checked: ${totalProcessed}`);
-  console.log(`Total orders updated: ${totalUpdated}`);
 }
 
 standardizeOrderProcessNames()
   .then(() => {
-    console.log("Script finished.");
     process.exit(0);
   })
   .catch(error => {

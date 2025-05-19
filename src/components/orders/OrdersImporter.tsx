@@ -16,7 +16,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Divider,
   Checkbox,
   FormControlLabel,
@@ -80,7 +79,6 @@ const OrdersImporter = () => {
     data: [],
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [importSuccess, setImportSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<any>(null);
   const [detectRemovedOrders, setDetectRemovedOrders] = useState<boolean>(true);
@@ -184,11 +182,6 @@ const OrdersImporter = () => {
       return obj;
     });
 
-    // Debugging output
-    console.log("[OrdersImporter] Normalized Data:", normalizedData);
-    console.log("[OrdersImporter] Validation Errors:", errors);
-    console.log("[OrdersImporter] Validation Warnings:", warnings);
-
     normalizedData.forEach((row, index) => {
       mappedFields.forEach(field => {
         if (!row[field.key] && field.key !== "Notes" && field.key !== "State") {
@@ -286,7 +279,6 @@ const OrdersImporter = () => {
       warnings,
       data: normalizedData,
     };
-    console.log("[OrdersImporter] Validation Result:", result);
     setValidationResult(result);
     setIsLoading(false);
   };
@@ -330,7 +322,6 @@ const OrdersImporter = () => {
         detectRemovedOrders
       );
 
-      setImportSuccess(true);
       setImportResults(importResults);
       setActiveStep(3);
     } catch (error) {
@@ -353,7 +344,6 @@ const OrdersImporter = () => {
       warnings: [],
       data: [],
     });
-    setImportSuccess(false);
     setImportError(null);
     setActiveStep(0);
 

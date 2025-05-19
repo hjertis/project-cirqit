@@ -15,5 +15,3 @@ content = content.replace(
 
 // Write the updated content back to the file
 fs.writeFileSync(filePath, content, "utf8");
-
-console.log("Fixed date formatting in TasksPanel.tsx");

@@ -26,7 +26,7 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
-import { collection, Timestamp, doc, setDoc } from "firebase/firestore";
+import { collection, Timestamp, doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
@@ -125,6 +125,33 @@ const CreateOrder = () => {
     fetchResources();
   }, []);
 
+  // Fetch processTemplates from product if partNo changes and processes are empty
+  useEffect(() => {
+    const fetchProductTemplates = async () => {
+      if (formData.partNo && formData.processes.length === 0) {
+        const productDoc = await getDoc(doc(db, "products", formData.partNo));
+        if (productDoc.exists()) {
+          const productData = productDoc.data();
+          if (
+            productData &&
+            Array.isArray(productData.processTemplates) &&
+            productData.processTemplates.length > 0
+          ) {
+            setFormData(prev => ({
+              ...prev,
+              processes: productData.processTemplates.map((p: ProcessTemplate, idx: number) => ({
+                ...p,
+                sequence: p.sequence ?? idx + 1,
+              })),
+            }));
+          }
+        }
+      }
+    };
+    fetchProductTemplates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.partNo]);
+
   const handleChange =
     (field: keyof OrderFormData) =>
     (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
@@ -159,7 +186,12 @@ const CreateOrder = () => {
     });
   };
 
-  const handleProcessChange = (index: number, field: keyof ProcessTemplate, value: any) => {
+  // Fix type for handleProcessChange
+  const handleProcessChange = (
+    index: number,
+    field: keyof ProcessTemplate,
+    value: string | number
+  ) => {
     const updatedProcesses = [...formData.processes];
     updatedProcesses[index] = {
       ...updatedProcesses[index],
@@ -386,7 +418,7 @@ const CreateOrder = () => {
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={formData.status}
-                  onChange={handleChange("status") as any}
+                  onChange={e => handleChange("status")(e)}
                   label="Status"
                 >
                   {statusOptions.map(option => (
@@ -440,7 +472,7 @@ const CreateOrder = () => {
                 <InputLabel>Priority</InputLabel>
                 <Select
                   value={formData.priority}
-                  onChange={handleChange("priority") as any}
+                  onChange={e => handleChange("priority")(e)}
                   label="Priority"
                 >
                   {priorityOptions.map(option => (
@@ -467,7 +499,7 @@ const CreateOrder = () => {
                 <Select
                   labelId="resource-select-label"
                   value={formData.assignedResourceId || ""}
-                  onChange={handleChange("assignedResourceId") as any}
+                  onChange={e => handleChange("assignedResourceId")(e)}
                   label="Assigned Resource (Optional)"
                   disabled={loadingResources}
                 >

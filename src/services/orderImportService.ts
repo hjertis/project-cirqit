@@ -16,6 +16,7 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import { archiveOrder } from "./orderService";
 import { STANDARD_PROCESS_NAMES } from "../constants/constants.ts";
+import { DEFAULT_PRODUCT_PROCESSES } from "../constants/defaultProcessTemplate";
 
 dayjs.extend(customParseFormat);
 
@@ -89,7 +90,13 @@ export const importOrder = async (order: OrderImportData) => {
 
     await setDoc(docRef, workOrder);
 
-    await generateProcesses(workOrderId, order.State || "REGULAR", startDate, order.Description);
+    await generateProcesses(
+      workOrderId,
+      order.State || "REGULAR",
+      startDate,
+      order.Description,
+      order.SourceNo
+    );
     if (isFinishedOrder) {
       await archiveOrder(workOrderId);
       return { created: true, updated: false, archived: true };
@@ -245,52 +252,41 @@ const generateProcesses = async (
   workOrderId: string,
   state: string,
   startDate: Date,
-  productName?: string
+  productName?: string,
+  partNo?: string
 ) => {
   const batch = writeBatch(db);
-  let processTypes = [...STANDARD_PROCESS_NAMES];
 
-  if (
-    productName &&
-    washKeywords.some(keyword => productName.toUpperCase().includes(keyword.toUpperCase()))
-  ) {
-    const hmtIndex = processTypes.indexOf("HMT");
-    if (hmtIndex !== -1 && !processTypes.includes("Wash")) {
-      processTypes = [
-        ...processTypes.slice(0, hmtIndex + 1),
-        "Wash",
-        ...processTypes.slice(hmtIndex + 1),
-      ];
+  // 1. Try to get product processTemplates
+  let processTemplates: any[] = [];
+  if (partNo) {
+    const productDoc = await getDoc(doc(db, "products", partNo));
+    if (productDoc.exists()) {
+      const productData = productDoc.data();
+      if (productData && Array.isArray(productData.processTemplates)) {
+        processTemplates = productData.processTemplates;
+      }
     }
   }
 
-  const durations: Record<string, number> = {
-    Setup: 1,
-    SMT: state === "URGENT" ? 2 : 3,
-    Inspection: 1,
-    "Repair/Rework": 1,
-    HMT: 1,
-    Wash: 1,
-    Cut: 1,
-    Test: 1,
-    Delivery: 1,
-  };
+  // 2. Fallback to default
+  if (processTemplates.length === 0) {
+    processTemplates = DEFAULT_PRODUCT_PROCESSES;
+  }
 
+  // 3. Create process entries for this order
   let currentDate = new Date(startDate);
-
-  processTypes.forEach((processType, index) => {
+  processTemplates.forEach((template, index) => {
     const processRef = doc(collection(db, "processes"));
-    const durationDays = durations[processType as keyof typeof durations] ?? 1;
-
+    const durationDays = template.durationDays ?? 1;
     const endDate = new Date(currentDate);
     endDate.setDate(endDate.getDate() + durationDays);
 
     batch.set(processRef, {
+      ...template,
       workOrderId,
       processId: processRef.id,
-      type: processType,
-      name: `${processType} - WO-${workOrderId}`,
-      sequence: index + 1,
+      sequence: template.sequence ?? index + 1,
       status: index === 0 ? "Pending" : "Not Started",
       startDate: Timestamp.fromDate(currentDate),
       endDate: Timestamp.fromDate(endDate),

@@ -72,7 +72,7 @@ const CompactProcessesTable = ({
             </TableCell>
             <TableCell sx={{ width: "20%" }}>Process</TableCell>
             <TableCell sx={{ width: "20%" }}>Date Range</TableCell>
-            <TableCell sx={{ width: "12%" }}>Resource</TableCell>
+            {/* <TableCell sx={{ width: "12%" }}>Resource</TableCell> */}
             <TableCell sx={{ width: "26%" }}>Progress</TableCell>
             <TableCell sx={{ width: "10%" }}>Duration (hours)</TableCell>
             <TableCell sx={{ width: "18%" }}>Notes</TableCell>
@@ -99,7 +99,7 @@ const CompactProcessesTable = ({
                 >
                   {process.name}
                 </Typography>
-                <Typography
+                {/* <Typography
                   variant="caption"
                   color="text.secondary"
                   sx={{
@@ -109,7 +109,7 @@ const CompactProcessesTable = ({
                   }}
                 >
                   {process.type}
-                </Typography>
+                </Typography> */}
               </TableCell>
               <TableCell sx={{ p: 0.5, whiteSpace: "nowrap" }}>
                 <Typography
@@ -124,9 +124,9 @@ const CompactProcessesTable = ({
                   {formatDate(process.endDate)}
                 </Typography>
               </TableCell>
-              <TableCell sx={{ p: 0.5 }}>
+              {/* <TableCell sx={{ p: 0.5 }}>
                 <Typography variant="caption">{process.assignedResource || "—"}</Typography>
-              </TableCell>
+              </TableCell> */}
               <TableCell sx={{ p: 0.5 }}>
                 <Box className="progress-section" sx={{ width: "100%" }}>
                   <Box

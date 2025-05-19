@@ -61,7 +61,6 @@ export const useTasks = (userId: string) => {
           console.warn("Task with missing/invalid fields:", docSnap.id, data);
         }
       });
-      console.log("Fetched tasks:", tasks);
       return tasks;
     } catch (err) {
       console.error("Error fetching tasks:", err);

@@ -43,7 +43,8 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../../config/firebase";
-import { getResources, Resource } from "../../services/resourceService";
+import { getResources } from "../../services/resourceService";
+import { SelectChangeEvent } from "@mui/material";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
 
 interface OrderFormData {
@@ -90,8 +91,6 @@ interface EditOrderDialogProps {
   onOrderUpdated?: () => void;
 }
 
-const processTypes = STANDARD_PROCESS_NAMES;
-
 const statusOptions = ["Open", "Released", "In Progress", "Delayed", "Done", "Finished"];
 const priorityOptions = ["Low", "Medium", "High", "Critical"];
 const processStatusOptions = ["Not Started", "Pending", "In Progress", "Completed", "Delayed"];
@@ -112,10 +111,6 @@ const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
-};
-
-const calculateDuration = (startDate: Date, endDate: Date): number => {
-  return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const initialFormData: OrderFormData = {
@@ -142,6 +137,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [productProcessTemplates, setProductProcessTemplates] = useState<ProcessTemplate[]>([]);
 
   // Fetch order and processes
   const {
@@ -215,6 +211,38 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     }
   }, [orderDataBundle, open, orderId]);
 
+  // Fetch product processTemplates when partNo changes
+  useEffect(() => {
+    const fetchProductTemplates = async () => {
+      if (formData.partNo) {
+        const productDoc = await getDoc(doc(db, "products", formData.partNo));
+        if (productDoc.exists()) {
+          const productData = productDoc.data();
+          if (
+            productData &&
+            Array.isArray(productData.processTemplates) &&
+            productData.processTemplates.length > 0
+          ) {
+            setProductProcessTemplates(
+              productData.processTemplates.map((p: ProcessTemplate, idx: number) => ({
+                ...p,
+                sequence: p.sequence ?? idx + 1,
+                status: "Not Started",
+              }))
+            );
+          } else {
+            setProductProcessTemplates([]);
+          }
+        } else {
+          setProductProcessTemplates([]);
+        }
+      } else {
+        setProductProcessTemplates([]);
+      }
+    };
+    fetchProductTemplates();
+  }, [formData.partNo]);
+
   const handleChange =
     (field: keyof OrderFormData) =>
     (event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
@@ -231,6 +259,19 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         });
       }
     };
+
+  const handleSelectChange = (field: keyof OrderFormData) => (event: SelectChangeEvent<string>) => {
+    setFormData({
+      ...formData,
+      [field]: event.target.value,
+    });
+    if (validationErrors[field]) {
+      setValidationErrors({
+        ...validationErrors,
+        [field]: "",
+      });
+    }
+  };
 
   const handleAddProcess = () => {
     const newSequence =
@@ -250,7 +291,11 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     });
   };
 
-  const handleProcessChange = (index: number, field: keyof ProcessTemplate, value: any) => {
+  const handleProcessChange = (
+    index: number,
+    field: keyof ProcessTemplate,
+    value: string | number
+  ) => {
     const updatedProcesses = [...formData.processes];
     updatedProcesses[index] = {
       ...updatedProcesses[index],
@@ -307,7 +352,8 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
       errors.endDate = "End date must be after start date";
     }
 
-    if (formData.processes.length === 0) {
+    // Only require processes if neither order-specific nor product processTemplates exist
+    if (formData.processes.length === 0 && productProcessTemplates.length === 0) {
       errors.processes = "At least one process is required";
     }
 
@@ -316,6 +362,18 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
   };
 
   const handleSave = async () => {
+    // If no order-specific processes, but product processTemplates exist, copy them in before saving
+    let processesToSave = formData.processes;
+    if (processesToSave.length === 0 && productProcessTemplates.length > 0) {
+      processesToSave = productProcessTemplates.map((p, idx) => ({
+        name: p.name,
+        duration: p.duration,
+        sequence: p.sequence ?? idx + 1,
+        status: p.status || "Not Started",
+      }));
+      setFormData(prev => ({ ...prev, processes: processesToSave }));
+    }
+
     if (!validateForm() || !orderId) {
       return;
     }
@@ -333,7 +391,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         assignedResourceName = assignedResource ? assignedResource.name : "";
       }
 
-      const orderData = {
+      const orderData: any = {
         orderNumber: formData.orderNumber,
         description: formData.description,
         partNo: formData.partNo,
@@ -348,21 +406,36 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         assignedResourceId: formData.assignedResourceId || null,
         assignedResourceName: assignedResourceName || null,
       };
+      // Set finishedDate if status is Finished or Done
+      if (formData.status === "Finished" || formData.status === "Done") {
+        orderData.finishedDate = Timestamp.fromDate(new Date());
+      } else {
+        orderData.finishedDate = null;
+      }
 
-      await updateDoc(doc(db, "orders", orderId), orderData);
+      // Archive if status is Finished
+      if (formData.status === "Finished") {
+        // Copy to archivedOrders
+        await setDoc(doc(db, "archivedOrders", orderId), orderData);
+        // Delete from orders
+        await deleteDoc(doc(db, "orders", orderId));
+      } else {
+        // Just update in orders
+        await updateDoc(doc(db, "orders", orderId), orderData);
+      }
 
       const existingProcessIds = originalProcesses.map(p => p.id);
-      const currentProcessIds = formData.processes.filter(p => p.id).map(p => p.id) as string[];
+      const currentProcessIds = processesToSave.filter(p => p.id).map(p => p.id) as string[];
 
       const processesToDelete = existingProcessIds.filter(id => !currentProcessIds.includes(id));
       for (const processId of processesToDelete) {
         await deleteDoc(doc(db, "processes", processId));
       }
 
-      for (const process of formData.processes) {
+      for (const process of processesToSave) {
         const processStartDate = new Date(startDate);
         if (process.sequence > 1) {
-          const previousProcesses = formData.processes.filter(p => p.sequence < process.sequence);
+          const previousProcesses = processesToSave.filter(p => p.sequence < process.sequence);
           const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
           processStartDate.setHours(startDate.getHours() + totalPreviousDuration);
         }
@@ -406,7 +479,6 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         onClose();
       }, 1000);
     } catch (err) {
-      console.error("Error updating order:", err);
       setError(`Failed to update order: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
@@ -476,7 +548,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                   <InputLabel>Status</InputLabel>
                   <Select
                     value={formData.status}
-                    onChange={handleChange("status") as any}
+                    onChange={handleSelectChange("status")}
                     label="Status"
                   >
                     {statusOptions.map(option => (
@@ -530,7 +602,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                   <InputLabel>Priority</InputLabel>
                   <Select
                     value={formData.priority}
-                    onChange={handleChange("priority") as any}
+                    onChange={handleSelectChange("priority")}
                     label="Priority"
                   >
                     {priorityOptions.map(option => (
@@ -557,7 +629,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                   <Select
                     labelId="resource-select-label"
                     value={formData.assignedResourceId || ""}
-                    onChange={handleChange("assignedResourceId") as any}
+                    onChange={handleSelectChange("assignedResourceId")}
                     label="Assigned Resource"
                     disabled={loadingResources || saving}
                   >
@@ -614,14 +686,16 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                   sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
                   <Typography variant="h6">Production Processes</Typography>
-                  <Button
-                    startIcon={<AddIcon />}
-                    onClick={handleAddProcess}
-                    variant="outlined"
-                    size="small"
-                  >
-                    Add Process
-                  </Button>
+                  {formData.processes.length > 0 && (
+                    <Button
+                      startIcon={<AddIcon />}
+                      onClick={handleAddProcess}
+                      variant="outlined"
+                      size="small"
+                    >
+                      Add Process
+                    </Button>
+                  )}
                 </Box>
                 <Divider sx={{ mt: 1, mb: 2 }} />
                 {validationErrors.processes && (
@@ -629,84 +703,144 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                 )}
               </Grid>
 
-              {formData.processes.map((process, index) => (
-                <Grid item xs={12} key={index}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sx={{ mb: 1 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
+              {/* Show order-specific processes if present */}
+              {formData.processes.length > 0 ? (
+                formData.processes.map((process, index) => (
+                  <Grid item xs={12} key={index}>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sx={{ mb: 1 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Chip
+                                label={`Step ${process.sequence}`}
+                                color="primary"
+                                size="small"
+                              />
+                              {process.id && (
+                                <Chip label="Existing" size="small" variant="outlined" />
+                              )}
+                            </Box>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleRemoveProcess(index)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                          <FormControl fullWidth>
+                            <InputLabel>Process Name</InputLabel>
+                            <Select
+                              value={process.name}
+                              onChange={e => handleProcessChange(index, "name", e.target.value)}
+                              label="Process Name"
+                            >
+                              {STANDARD_PROCESS_NAMES.map(name => (
+                                <MenuItem key={name} value={name}>
+                                  {name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+
+                        <Grid item xs={12} md={3}>
+                          <TextField
+                            fullWidth
+                            type="number"
+                            label="Duration (hours)"
+                            value={process.duration}
+                            onChange={e =>
+                              handleProcessChange(index, "duration", Number(e.target.value))
+                            }
+                            InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
+                          />
+                        </Grid>
+
+                        <Grid item xs={12} md={3}>
+                          <FormControl fullWidth>
+                            <InputLabel>Status</InputLabel>
+                            <Select
+                              value={process.status || "Not Started"}
+                              onChange={e => handleProcessChange(index, "status", e.target.value)}
+                              label="Status"
+                            >
+                              {processStatusOptions.map(status => (
+                                <MenuItem key={status} value={status}>
+                                  {status}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  </Grid>
+                ))
+              ) : productProcessTemplates.length > 0 ? (
+                // Show product processTemplates as read-only if no order-specific processes
+                productProcessTemplates.map((process, index) => (
+                  <Grid item xs={12} key={index}>
+                    <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f5f5f5" }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sx={{ mb: 1 }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                             <Chip label={`Step ${process.sequence}`} color="primary" size="small" />
-                            {process.id && (
-                              <Chip label="Existing" size="small" variant="outlined" />
-                            )}
+                            <Chip
+                              label="Product Template"
+                              size="small"
+                              variant="outlined"
+                              color="info"
+                            />
                           </Box>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleRemoveProcess(index)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Box>
-                      </Grid>
-
-                      <Grid item xs={12} md={6}>
-                        <FormControl fullWidth>
-                          <InputLabel>Process Name</InputLabel>
-                          <Select
-                            value={process.name}
-                            onChange={e => handleProcessChange(index, "name", e.target.value)}
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <TextField
+                            fullWidth
                             label="Process Name"
-                          >
-                            {STANDARD_PROCESS_NAMES.map(name => (
-                              <MenuItem key={name} value={name}>
-                                {name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-
-                      <Grid item xs={12} md={3}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="Duration (hours)"
-                          value={process.duration}
-                          onChange={e =>
-                            handleProcessChange(index, "duration", Number(e.target.value))
-                          }
-                          InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12} md={3}>
-                        <FormControl fullWidth>
-                          <InputLabel>Status</InputLabel>
-                          <Select
-                            value={process.status || "Not Started"}
-                            onChange={e => handleProcessChange(index, "status", e.target.value)}
+                            value={process.name}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          <TextField
+                            fullWidth
+                            label="Duration (hours)"
+                            value={process.duration}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          <TextField
+                            fullWidth
                             label="Status"
-                          >
-                            {processStatusOptions.map(status => (
-                              <MenuItem key={status} value={status}>
-                                {status}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
+                            value={process.status || "Not Started"}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
                       </Grid>
-                    </Grid>
-                  </Paper>
+                    </Paper>
+                  </Grid>
+                ))
+              ) : (
+                // Show message if neither order-specific nor product processTemplates exist
+                <Grid item xs={12}>
+                  <Alert severity="info">
+                    No production processes found for this order or product. Please create a process
+                    template for this product in the Products page first.
+                  </Alert>
                 </Grid>
-              ))}
+              )}
 
               <Grid item xs={12} sx={{ mt: 2 }}>
                 <Typography variant="h6">Additional Notes</Typography>

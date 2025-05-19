@@ -58,7 +58,7 @@ const CompactSignatureSection = ({ isPrintMode = false }: CompactSignatureSectio
               display: "block",
             }}
           >
-            Approved By:
+            Tested By:
           </Typography>
           <Box
             className="signature-box"

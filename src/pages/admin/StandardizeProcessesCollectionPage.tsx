@@ -38,10 +38,6 @@ const StandardizeProcessesCollectionPage: React.FC = () => {
         const newName = mapToStandard(processData.name);
         const newType = mapToStandard(processData.type);
 
-        console.log(
-          `Doc: ${processDoc.id}, name: "${processData.name}" -> "${newName}", type: "${processData.type}" -> "${newType}"`
-        );
-
         if (processData.name !== newName || processData.type !== newType) {
           const docRef = doc(db, "processes", processDoc.id);
           batch.update(docRef, { name: newName, type: newType });

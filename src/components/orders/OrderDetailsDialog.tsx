@@ -41,8 +41,8 @@ import { db } from "../../config/firebase";
 import { archiveOrder, restoreOrder } from "../../services/orderService";
 import OrderTimeTracking from "./OrderTimeTracking";
 import PrintableWorkOrder from "./PrintableWorkOrder";
-
 import EditOrderDialog from "./EditOrderDialog";
+import { DEFAULT_PRODUCT_PROCESSES } from "../../constants/defaultProcessTemplate";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -159,15 +159,46 @@ const OrderDetailsDialog = ({
       const orderDoc = await getDoc(doc(db, "orders", orderId));
       if (!orderDoc.exists()) throw new Error("Order not found");
       const orderData = { id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder;
+      // 1. Try order-specific processes
       const processesQuery = query(
         collection(db, "processes"),
         where("workOrderId", "==", orderId)
       );
       const processesSnapshot = await getDocs(processesQuery);
-      const processesData: Process[] = [];
+      let processesData: Process[] = [];
       processesSnapshot.forEach(doc => {
         processesData.push({ id: doc.id, ...doc.data() } as Process);
       });
+      // 2. If none, try product master data
+      if (processesData.length === 0 && orderData.partNo) {
+        const productDoc = await getDoc(doc(db, "products", orderData.partNo));
+        if (productDoc.exists()) {
+          const productData = productDoc.data();
+          if (productData && Array.isArray(productData.processTemplates)) {
+            processesData = productData.processTemplates.map((p: any, idx: number) => ({
+              ...p,
+              sequence: p.sequence ?? idx + 1,
+              status: "Not Started",
+              assignedResource: null,
+              progress: 0,
+              id: `product-${idx}`,
+              workOrderId: orderData.id,
+              startDate: Timestamp.fromDate(new Date()),
+              endDate: Timestamp.fromDate(new Date()),
+            }));
+          }
+        }
+      }
+      // 3. If still none, use default template
+      if (processesData.length === 0) {
+        processesData = DEFAULT_PRODUCT_PROCESSES.map((p, idx) => ({
+          ...p,
+          id: `default-${idx}`,
+          workOrderId: orderData.id,
+          startDate: Timestamp.fromDate(new Date()),
+          endDate: Timestamp.fromDate(new Date()),
+        }));
+      }
       processesData.sort((a, b) => a.sequence - b.sequence);
       return { order: orderData, processes: processesData };
     },
@@ -216,15 +247,6 @@ const OrderDetailsDialog = ({
 
     if (orderId) {
       refetch();
-    }
-  };
-
-  const handleViewFull = () => {
-    if (fullPage) {
-      handleEdit();
-    } else if (order) {
-      navigate(`/orders/${order.id}`);
-      onClose();
     }
   };
 
@@ -483,10 +505,10 @@ const OrderDetailsDialog = ({
                 <TableHead>
                   <TableRow>
                     <TableCell>Sequence</TableCell>
-                    <TableCell>Type</TableCell>
+                    {/* <TableCell>Type</TableCell> */}
                     <TableCell>Name</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell>Resource</TableCell>
+                    {/* <TableCell>Resource</TableCell> */}
                     <TableCell align="right">Progress</TableCell>
                   </TableRow>
                 </TableHead>
@@ -495,7 +517,7 @@ const OrderDetailsDialog = ({
                     processes.map(process => (
                       <TableRow key={process.id} hover>
                         <TableCell>{process.sequence}</TableCell>
-                        <TableCell>{process.type}</TableCell>
+                        {/* <TableCell>{process.type}</TableCell> */}
                         <TableCell>{process.name}</TableCell>
                         <TableCell>
                           <Chip
@@ -505,7 +527,7 @@ const OrderDetailsDialog = ({
                             variant="outlined"
                           />
                         </TableCell>
-                        <TableCell>{process.assignedResource || "Not assigned"}</TableCell>
+                        {/* <TableCell>{process.assignedResource || "Not assigned"}</TableCell> */}
                         <TableCell align="right">{process.progress}%</TableCell>
                       </TableRow>
                     ))
