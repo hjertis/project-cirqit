@@ -16,6 +16,9 @@ import { Timestamp, collection, addDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import useOrders from "../../hooks/useOrders";
 import Autocomplete from "@mui/material/Autocomplete";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import { IconButton, List, ListItem, ListItemText, ListItemSecondaryAction } from "@mui/material";
 
 const faultTypes = [
   { value: "scrap", label: "Scrap" },
@@ -42,6 +45,19 @@ const ORDER_KEY = "lastFaultOrderId";
 const PART_KEY = "lastFaultPartNumber";
 const TYPE_KEY = "lastFaultType";
 const SERIAL_KEY = "lastFaultSerialNumber";
+const PENDING_KEY = "pendingFaults";
+
+type PendingFault = {
+  orderId: string;
+  partNumber: string;
+  faultType: string;
+  orderProductPartNumber?: string;
+  addDate: string;
+  updated: string;
+  refPoint?: string;
+  serialNumber?: string;
+  description?: string;
+};
 
 interface LogFaultFormProps {
   initialOrderId?: string;
@@ -52,20 +68,33 @@ interface LogFaultFormProps {
 
 const LogFaultForm = ({ initialOrderId = "", initialPartNumber = "" }: LogFaultFormProps = {}) => {
   const { orders, loading: ordersLoading, error: ordersError } = useOrders({}, 1000);
-  const [orderId, setOrderId] = useState(
-    () => initialOrderId || localStorage.getItem(ORDER_KEY) || ""
+  const [orderId, setOrderId] = useState(() =>
+    initialOrderId !== undefined && initialOrderId !== null && initialOrderId !== ""
+      ? initialOrderId
+      : localStorage.getItem(ORDER_KEY) || ""
   );
-  const [orderPartNo, setOrderPartNo] = useState("");
-  const [partNumber, setPartNumber] = useState(
-    () => initialPartNumber || localStorage.getItem(PART_KEY) || ""
+  const [orderPartNo, setOrderPartNo] = useState(() =>
+    initialPartNumber !== undefined && initialPartNumber !== null && initialPartNumber !== ""
+      ? initialPartNumber
+      : ""
   );
+  const [partNumber, setPartNumber] = useState(() => localStorage.getItem(PART_KEY) || "");
   const [faultType, setFaultType] = useState(() => localStorage.getItem(TYPE_KEY) || "");
   const [refPoint, setRefPoint] = useState("");
   const [serialNumber, setSerialNumber] = useState(() => localStorage.getItem(SERIAL_KEY) || "");
   const [description, setDescription] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [pendingFaults, setPendingFaults] = useState<PendingFault[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [batchSuccess, setBatchSuccess] = useState(false);
   const orderInputRef = useRef<HTMLInputElement>(null);
 
   const inProgressOrders = orders.filter(o => o.status === "In Progress");
@@ -76,12 +105,23 @@ const LogFaultForm = ({ initialOrderId = "", initialPartNumber = "" }: LogFaultF
     partNo: order.partNo,
   }));
 
+  // Ensure the current orderId is always present in orderOptions for Autocomplete
+  const currentOrderOption =
+    orderId && !orderOptions.some(opt => opt.id === orderId)
+      ? [{ id: orderId, label: orderId, orderNumber: orderId, partNo: orderPartNo }]
+      : [];
+  const allOrderOptions = [...currentOrderOption, ...orderOptions];
+
   useEffect(() => {
+    // Only update orderPartNo if the selected order changes and it's not the initial mount with initialPartNumber
     const found = inProgressOrders.find(o => o.id === orderId);
-    setOrderPartNo(found ? found.partNo || "" : "");
+    if (found) {
+      setOrderPartNo(found.partNo || "");
+    }
   }, [orderId, inProgressOrders]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Add or update a fault in the pending list
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess(false);
@@ -89,48 +129,97 @@ const LogFaultForm = ({ initialOrderId = "", initialPartNumber = "" }: LogFaultF
       setError("Order, Part Number, and Fault Type are required.");
       return;
     }
-    setSubmitting(true);
-    try {
-      const faultData: Record<string, any> = {
-        orderId,
-        partNumber,
-        faultType,
-        orderProductPartNumber: orderPartNo,
-        addDate: Timestamp.now(),
-        updated: Timestamp.now(),
-      };
-      if (refPoint) faultData.refPoint = refPoint;
-      if (serialNumber) faultData.serialNumber = serialNumber;
-      if (description) faultData.description = description;
-      await addDoc(collection(db, "faults"), faultData);
-      setSuccess(true);
-
-      localStorage.setItem(ORDER_KEY, orderId);
-      localStorage.setItem(PART_KEY, partNumber);
-      localStorage.setItem(TYPE_KEY, faultType);
-
-      if (serialNumber && !isNaN(Number(serialNumber))) {
-        const nextSerial = String(Number(serialNumber) + 1);
-        localStorage.setItem(SERIAL_KEY, nextSerial);
-        setSerialNumber(nextSerial);
-      } else {
-        localStorage.setItem(SERIAL_KEY, serialNumber);
+    const faultData: PendingFault = {
+      orderId,
+      partNumber,
+      faultType,
+      orderProductPartNumber: orderPartNo,
+      addDate: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      refPoint,
+      serialNumber,
+      description,
+    };
+    // Remove empty fields (type-safe)
+    (Object.keys(faultData) as (keyof PendingFault)[]).forEach(k => {
+      if (faultData[k] === "" || faultData[k] === undefined) {
+        delete faultData[k];
       }
+    });
 
-      setOrderId(localStorage.getItem(ORDER_KEY) || "");
-      setPartNumber(localStorage.getItem(PART_KEY) || "");
-      setFaultType(localStorage.getItem(TYPE_KEY) || "");
-      setRefPoint("");
-      setDescription("");
+    const newPending = [...pendingFaults];
+    if (editIndex !== null) {
+      newPending[editIndex] = faultData;
+      setEditIndex(null);
+    } else {
+      newPending.push(faultData);
+    }
+    setPendingFaults(newPending);
+    localStorage.setItem(PENDING_KEY, JSON.stringify(newPending));
 
-      setTimeout(() => {
-        orderInputRef.current?.focus();
-      }, 0);
+    localStorage.setItem(ORDER_KEY, orderId);
+    localStorage.setItem(PART_KEY, partNumber);
+    localStorage.setItem(TYPE_KEY, faultType);
+    if (serialNumber && !isNaN(Number(serialNumber))) {
+      const next = Number(serialNumber) + 1;
+      const nextSerial = String(next).padStart(5, "0");
+      localStorage.setItem(SERIAL_KEY, nextSerial);
+      setSerialNumber(nextSerial);
+    } else {
+      localStorage.setItem(SERIAL_KEY, serialNumber);
+    }
+
+    setOrderId(localStorage.getItem(ORDER_KEY) || "");
+    setPartNumber(localStorage.getItem(PART_KEY) || "");
+    setFaultType(localStorage.getItem(TYPE_KEY) || "");
+    setRefPoint("");
+    setDescription("");
+    setSuccess(true);
+
+    setTimeout(() => {
+      orderInputRef.current?.focus();
+    }, 0);
+  };
+
+  // Remove a fault from the pending list
+  const handleRemove = (idx: number) => {
+    const newPending = pendingFaults.filter((_, i) => i !== idx);
+    setPendingFaults(newPending);
+    localStorage.setItem(PENDING_KEY, JSON.stringify(newPending));
+  };
+
+  // Edit a fault (load into form)
+  const handleEdit = (idx: number) => {
+    const f = pendingFaults[idx];
+    setOrderId(f.orderId || "");
+    setPartNumber(f.partNumber || "");
+    setFaultType(f.faultType || "");
+    setRefPoint(f.refPoint || "");
+    setSerialNumber(f.serialNumber || "");
+    setDescription(f.description || "");
+    setEditIndex(idx);
+  };
+
+  // Submit all faults to Firestore
+  const handleSubmitAll = async () => {
+    setBatchSubmitting(true);
+    setBatchSuccess(false);
+    setError("");
+    try {
+      for (const fault of pendingFaults) {
+        await addDoc(collection(db, "faults"), {
+          ...fault,
+          addDate: Timestamp.now(),
+          updated: Timestamp.now(),
+        });
+      }
+      setPendingFaults([]);
+      localStorage.removeItem(PENDING_KEY);
+      setBatchSuccess(true);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      setError("Failed to log fault: " + errorMsg);
+      setError("Failed to submit batch: " + (err instanceof Error ? err.message : String(err)));
     } finally {
-      setSubmitting(false);
+      setBatchSubmitting(false);
     }
   };
 
@@ -140,15 +229,17 @@ const LogFaultForm = ({ initialOrderId = "", initialPartNumber = "" }: LogFaultF
         Log Fault / Rework
       </Typography>
       {ordersError && <Alert severity="error">{ordersError}</Alert>}
-      {success && <Alert severity="success">Fault logged successfully!</Alert>}
+      {success && <Alert severity="success">Fault added to batch!</Alert>}
+      {batchSuccess && <Alert severity="success">All faults submitted!</Alert>}
       {error && <Alert severity="error">{error}</Alert>}
+
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
           <Autocomplete
             freeSolo
-            options={orderOptions}
+            options={allOrderOptions}
             getOptionLabel={option => (typeof option === "string" ? option : option.label)}
-            value={orderOptions.find(opt => opt.id === orderId) || null}
+            value={allOrderOptions.find(opt => opt.id === orderId) || null}
             onChange={(_e, newValue) => {
               if (typeof newValue === "string") {
                 setOrderId(newValue);
@@ -238,11 +329,46 @@ const LogFaultForm = ({ initialOrderId = "", initialPartNumber = "" }: LogFaultF
           />
         </Grid>
         <Grid item xs={12}>
-          <Button type="submit" variant="contained" color="primary" disabled={submitting} fullWidth>
-            {submitting ? <CircularProgress size={24} /> : "Log Fault"}
+          <Button type="submit" variant="contained" color="primary" disabled={false} fullWidth>
+            Log Fault
           </Button>
         </Grid>
       </Grid>
+
+      {/* Pending Faults List at the bottom */}
+      {pendingFaults.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle1">Pending Faults:</Typography>
+          <List dense>
+            {pendingFaults.map((fault, idx) => (
+              <ListItem key={idx} sx={{ bgcolor: "#f5f5f5", mb: 1, borderRadius: 1 }}>
+                <ListItemText
+                  primary={`${fault.orderId} | ${fault.partNumber} | ${fault.faultType}`}
+                  secondary={fault.description}
+                />
+                <ListItemSecondaryAction>
+                  <IconButton edge="end" aria-label="edit" onClick={() => handleEdit(idx)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton edge="end" aria-label="delete" onClick={() => handleRemove(idx)}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              </ListItem>
+            ))}
+          </List>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleSubmitAll}
+            disabled={batchSubmitting}
+            fullWidth
+            sx={{ mt: 1 }}
+          >
+            {batchSubmitting ? <CircularProgress size={24} /> : "Submit All to Firestore"}
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 };
