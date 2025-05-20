@@ -31,6 +31,7 @@ import {
   Stop as StopIcon,
   Pause as PauseIcon,
   Person as PersonIcon,
+  Edit as EditIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -40,11 +41,13 @@ import {
   pauseTimeEntry,
   resumeTimeEntry,
   calculateTotalTimeForUser,
+  updateTimeEntry,
   TimeEntry,
 } from "../services/timeTrackingService";
 import { formatDuration, formatDateTime, formatDurationHumanReadable } from "../utils/helpers";
 import ContentWrapper from "../components/layout/ContentWrapper";
 import dayjs from "dayjs";
+import EditTimeEntryDialog from "../components/time/EditTimeEntryDialog";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -84,6 +87,10 @@ const TimeDashboardPage = () => {
   );
   const [endDate, setEndDate] = useState<string>(dayjs().format("YYYY-MM-DD"));
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserTimeEntries = async () => {
@@ -160,6 +167,36 @@ const TimeDashboardPage = () => {
       setError("Failed to resume time entry");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleOpenEditDialog = (entry: TimeEntry) => {
+    setEditEntry(entry);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditTimeEntry = async (updates: Partial<TimeEntry>) => {
+    if (!editEntry) return;
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      // Calculate duration if both start and end are present
+      if (updates.startTime && updates.endTime) {
+        const start = updates.startTime.toDate();
+        const end = updates.endTime.toDate();
+        updates.duration = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+      }
+      // Use updateTimeEntry service
+      const updated = await updateTimeEntry(editEntry.id!, updates);
+      setUserTimeEntries(prevEntries =>
+        prevEntries.map(e => (e.id === updated.id ? { ...e, ...updates } : e))
+      );
+      setEditDialogOpen(false);
+      setEditEntry(null);
+    } catch {
+      setEditError("Failed to update time entry");
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -358,7 +395,18 @@ const TimeDashboardPage = () => {
                         </TableCell>
                         <TableCell>
                           {entry.status === "completed"
-                            ? formatDuration(entry.duration || 0)
+                            ? formatDuration(
+                                entry.endTime && entry.startTime
+                                  ? Math.max(
+                                      0,
+                                      Math.floor(
+                                        (entry.endTime.toDate().getTime() -
+                                          entry.startTime.toDate().getTime()) /
+                                          1000
+                                      )
+                                    )
+                                  : 0
+                              )
                             : entry.status === "active"
                               ? "In progress"
                               : "Paused"}
@@ -380,53 +428,64 @@ const TimeDashboardPage = () => {
                           {entry.notes || "-"}
                         </TableCell>
                         <TableCell>
-                          {entry.status === "active" ? (
-                            <>
-                              <Tooltip title="Pause">
-                                <IconButton
-                                  size="small"
-                                  color="warning"
-                                  onClick={() => handlePauseTimeEntry(entry.id!)}
-                                  disabled={actionLoading}
-                                >
-                                  <PauseIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Stop">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleStopTimeEntry(entry.id!)}
-                                  disabled={actionLoading}
-                                >
-                                  <StopIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          ) : entry.status === "paused" ? (
-                            <>
-                              <Tooltip title="Resume">
-                                <IconButton
-                                  size="small"
-                                  color="success"
-                                  onClick={() => handleResumeTimeEntry(entry.id!)}
-                                  disabled={actionLoading}
-                                >
-                                  <PlayIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Stop">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleStopTimeEntry(entry.id!)}
-                                  disabled={actionLoading}
-                                >
-                                  <StopIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          ) : null}
+                          {entry.status === "active" && (
+                            <Tooltip title="Pause">
+                              <IconButton
+                                size="small"
+                                color="warning"
+                                onClick={() => handlePauseTimeEntry(entry.id!)}
+                                disabled={actionLoading}
+                              >
+                                <PauseIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {entry.status === "active" && (
+                            <Tooltip title="Stop">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleStopTimeEntry(entry.id!)}
+                                disabled={actionLoading}
+                              >
+                                <StopIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {entry.status === "paused" && (
+                            <Tooltip title="Resume">
+                              <IconButton
+                                size="small"
+                                color="success"
+                                onClick={() => handleResumeTimeEntry(entry.id!)}
+                                disabled={actionLoading}
+                              >
+                                <PlayIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {entry.status === "paused" && (
+                            <Tooltip title="Stop">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleStopTimeEntry(entry.id!)}
+                                disabled={actionLoading}
+                              >
+                                <StopIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Edit">
+                            <IconButton
+                              size="small"
+                              color="info"
+                              onClick={() => handleOpenEditDialog(entry)}
+                              sx={{ ml: 0.5 }}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -490,53 +549,36 @@ const TimeDashboardPage = () => {
                             {entry.notes || "-"}
                           </TableCell>
                           <TableCell>
-                            {entry.status === "active" ? (
-                              <>
-                                <Tooltip title="Pause">
-                                  <IconButton
-                                    size="small"
-                                    color="warning"
-                                    onClick={() => handlePauseTimeEntry(entry.id!)}
-                                    disabled={actionLoading}
-                                  >
-                                    <PauseIcon />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Stop">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleStopTimeEntry(entry.id!)}
-                                    disabled={actionLoading}
-                                  >
-                                    <StopIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              </>
-                            ) : (
-                              <>
-                                <Tooltip title="Resume">
-                                  <IconButton
-                                    size="small"
-                                    color="success"
-                                    onClick={() => handleResumeTimeEntry(entry.id!)}
-                                    disabled={actionLoading}
-                                  >
-                                    <PlayIcon />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Stop">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleStopTimeEntry(entry.id!)}
-                                    disabled={actionLoading}
-                                  >
-                                    <StopIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              </>
-                            )}
+                            <Tooltip title="Pause">
+                              <IconButton
+                                size="small"
+                                color="warning"
+                                onClick={() => handlePauseTimeEntry(entry.id!)}
+                                disabled={actionLoading}
+                              >
+                                <PauseIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Stop">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleStopTimeEntry(entry.id!)}
+                                disabled={actionLoading}
+                              >
+                                <StopIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Edit">
+                              <IconButton
+                                size="small"
+                                color="info"
+                                onClick={() => handleOpenEditDialog(entry)}
+                                sx={{ ml: 0.5 }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -622,6 +664,16 @@ const TimeDashboardPage = () => {
             </TabPanel>
           )}
         </Paper>
+
+        <EditTimeEntryDialog
+          open={editDialogOpen}
+          entry={editEntry}
+          loading={editLoading}
+          error={editError}
+          onClose={() => setEditDialogOpen(false)}
+          onSave={handleEditTimeEntry}
+          processes={[]}
+        />
       </Box>
     </ContentWrapper>
   );

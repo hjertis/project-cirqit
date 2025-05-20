@@ -112,6 +112,7 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
           icon: <ReportsIcon />,
           path: "/reports/production-dashboard",
         },
+        { text: "Label Print Report", icon: <ReportsIcon />, path: "/report/label-print" },
       ],
     },
     {

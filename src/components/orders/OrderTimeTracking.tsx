@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import TimeEntryWidget from "../time/TimeEntryWidget";
 import TimeEntriesList from "../time/TimeEntriesList";
-import { calculateTotalTimeForOrder } from "../../services/timeTrackingService";
+import { getTimeEntriesForOrder } from "../../services/timeTrackingService";
 import { formatDuration, formatDurationHumanReadable } from "../../utils/helpers";
 
 interface OrderTimeTrackingProps {
@@ -30,7 +30,21 @@ const OrderTimeTracking = ({ orderId, orderNumber, processes = [] }: OrderTimeTr
     const fetchTotalTime = async () => {
       try {
         setLoading(true);
-        const total = await calculateTotalTimeForOrder(orderId);
+        // Fetch all entries for this order
+        const entries = await getTimeEntriesForOrder(orderId);
+        // Sum durations based on start/end times for completed entries
+        let total = 0;
+        entries.forEach(entry => {
+          if (entry.status === "completed" && entry.startTime && entry.endTime) {
+            const duration = Math.max(
+              0,
+              Math.floor(
+                (entry.endTime.toDate().getTime() - entry.startTime.toDate().getTime()) / 1000
+              )
+            );
+            total += duration;
+          }
+        });
         setTotalTime(total);
       } catch (err) {
         console.error("Error calculating total time:", err);

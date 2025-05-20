@@ -29,6 +29,7 @@ import FaultReportsPage from "../pages/FaultReportsPage.tsx";
 import ProductsPage from "../pages/ProductsPage.tsx";
 import MigrateProcessDurationsToHoursPage from "../pages/admin/migrateProcessDurationsToHours.tsx";
 import TasksPage from "../pages/TasksPage.tsx";
+import LabelPrintReport from "../components/reports/LabelPrintReport.tsx";
 
 const AppRoutes = () => {
   return (
@@ -63,6 +64,7 @@ const AppRoutes = () => {
         <Route path="/reports" element={<div>Reports Page</div>} />
         <Route path="/reports/fault-analysis" element={<FaultParetoChart />} />
         <Route path="/reports/production-dashboard" element={<ProductionDashboardPage />} />
+        <Route path="/report/label-print" element={<LabelPrintReport />} />
         <Route path="/time" element={<TimeDashboardPage />} />
         <Route path="/resources" element={<ResourceManagementPage />} />
         <Route path="/kanban" element={<KanbanPage />} />

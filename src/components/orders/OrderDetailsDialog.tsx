@@ -43,6 +43,7 @@ import OrderTimeTracking from "./OrderTimeTracking";
 import PrintableWorkOrder from "./PrintableWorkOrder";
 import EditOrderDialog from "./EditOrderDialog";
 import LogFaultDialog from "../faults/LogFaultDialog";
+import LabelPrintDialog from "./LabelPrintDialog";
 import { DEFAULT_PRODUCT_PROCESSES } from "../../constants/defaultProcessTemplate";
 
 interface TabPanelProps {
@@ -146,6 +147,7 @@ const OrderDetailsDialog = ({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [logFaultOpen, setLogFaultOpen] = useState(false);
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
 
   // React Query for order and processes
   const {
@@ -587,6 +589,9 @@ const OrderDetailsDialog = ({
           <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrintOrder}>
             Print Work Order
           </Button>
+          <Button variant="outlined" onClick={() => setLabelDialogOpen(true)}>
+            Print Label
+          </Button>
           {/* Archive button: only show if not archived and not removed, and status is Finished/Done/Completed */}
           {!isArchived &&
             order.status !== "Removed" &&
@@ -642,6 +647,11 @@ const OrderDetailsDialog = ({
           onClose={handleCloseLogFault}
           initialOrderId={order?.id}
           initialPartNumber={order?.partNo}
+        />
+        <LabelPrintDialog
+          open={labelDialogOpen}
+          onClose={() => setLabelDialogOpen(false)}
+          partNumber={order?.partNo || ""}
         />
       </>
     );

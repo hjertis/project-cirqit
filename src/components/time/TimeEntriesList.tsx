@@ -12,19 +12,21 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Divider,
   Tooltip,
   IconButton,
 } from "@mui/material";
 import {
   AccessTime as TimeIcon,
-  Delete as DeleteIcon,
   Edit as EditIcon,
   Person as PersonIcon,
-  MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
-import { getTimeEntriesForOrder, TimeEntry } from "../../services/timeTrackingService";
+import {
+  getTimeEntriesForOrder,
+  TimeEntry,
+  updateTimeEntry,
+} from "../../services/timeTrackingService";
 import { formatDuration, formatDurationHumanReadable, formatDateTime } from "../../utils/helpers";
+import EditTimeEntryDialog from "./EditTimeEntryDialog";
 
 interface TimeEntriesListProps {
   orderId: string;
@@ -37,6 +39,11 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
   const [error, setError] = useState<string | null>(null);
   const [totalDuration, setTotalDuration] = useState<number>(0);
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchTimeEntries = async () => {
       try {
@@ -44,10 +51,17 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
         const entries = await getTimeEntriesForOrder(orderId);
         setTimeEntries(entries);
 
+        // Calculate total duration from start/end times, not stored duration
         let total = 0;
         entries.forEach(entry => {
-          if (entry.status === "completed" && entry.duration) {
-            total += entry.duration;
+          if (entry.endTime) {
+            const duration = Math.max(
+              0,
+              Math.floor(
+                (entry.endTime.toDate().getTime() - entry.startTime.toDate().getTime()) / 1000
+              )
+            );
+            total += duration;
           }
         });
         setTotalDuration(total);
@@ -72,6 +86,63 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
         return "default";
       default:
         return "default";
+    }
+  };
+
+  const handleOpenEditDialog = (entry: TimeEntry) => {
+    setEditEntry(entry);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditTimeEntry = async (updates: Partial<TimeEntry>) => {
+    if (!editEntry) return;
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      // Calculate duration if both start and end are present
+      if (updates.startTime && updates.endTime) {
+        const start = updates.startTime.toDate();
+        const end = updates.endTime.toDate();
+        updates.duration = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+      }
+      await updateTimeEntry(editEntry.id!, updates);
+      setTimeEntries(prevEntries => {
+        const updatedEntries = prevEntries.map(entry => {
+          if (entry.id === editEntry.id) {
+            return {
+              ...entry,
+              ...updates,
+              startTime: updates.startTime || entry.startTime,
+              endTime: updates.endTime !== undefined ? updates.endTime : entry.endTime,
+              processId: updates.processId !== undefined ? updates.processId : entry.processId,
+              notes: updates.notes !== undefined ? updates.notes : entry.notes,
+              duration: updates.duration !== undefined ? updates.duration : entry.duration,
+            };
+          }
+          return entry;
+        });
+        // Recalculate total duration
+        let total = 0;
+        updatedEntries.forEach(entry => {
+          if (entry.endTime) {
+            const duration = Math.max(
+              0,
+              Math.floor(
+                (entry.endTime.toDate().getTime() - entry.startTime.toDate().getTime()) / 1000
+              )
+            );
+            total += duration;
+          }
+        });
+        setTotalDuration(total);
+        return updatedEntries;
+      });
+      setEditDialogOpen(false);
+      setEditEntry(null);
+    } catch {
+      setEditError("Failed to update time entry");
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -121,9 +192,9 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
               <TableCell>Start Time</TableCell>
               <TableCell>End Time</TableCell>
               <TableCell>Duration</TableCell>
-              <TableCell>Process</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Notes</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -142,13 +213,21 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
                   {entry.endTime ? formatDateTime(entry.endTime.toDate()) : "-"}
                 </TableCell>
                 <TableCell>
-                  {entry.status === "completed"
-                    ? formatDuration(entry.duration || 0)
+                  {entry.endTime
+                    ? formatDuration(
+                        Math.max(
+                          0,
+                          Math.floor(
+                            (entry.endTime.toDate().getTime() -
+                              entry.startTime.toDate().getTime()) /
+                              1000
+                          )
+                        )
+                      )
                     : entry.status === "active"
                       ? "In progress"
                       : "Paused"}
                 </TableCell>
-                <TableCell>{entry.processId || "General"}</TableCell>
                 <TableCell>
                   <Chip
                     label={entry.status.toUpperCase()}
@@ -159,11 +238,31 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
                 <TableCell sx={{ maxWidth: 200, overflowWrap: "break-word" }}>
                   {entry.notes || "-"}
                 </TableCell>
+                <TableCell>
+                  <Tooltip title="Edit">
+                    <IconButton
+                      size="small"
+                      color="info"
+                      onClick={() => handleOpenEditDialog(entry)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+
+      <EditTimeEntryDialog
+        open={editDialogOpen}
+        entry={editEntry}
+        loading={editLoading}
+        error={editError}
+        onClose={() => setEditDialogOpen(false)}
+        onSave={handleEditTimeEntry}
+      />
     </Paper>
   );
 };

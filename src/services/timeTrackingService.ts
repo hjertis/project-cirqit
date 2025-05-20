@@ -128,7 +128,11 @@ export const startTimeEntry = async (
   };
 };
 
-export const stopTimeEntry = async (timeEntryId: string, notes?: string): Promise<TimeEntry> => {
+export const stopTimeEntry = async (
+  timeEntryId: string,
+  notes?: string,
+  customEndTime?: Date
+): Promise<TimeEntry> => {
   const timeEntryRef = doc(db, "timeEntries", timeEntryId);
   const timeEntryDoc = await getDoc(timeEntryRef);
 
@@ -142,7 +146,7 @@ export const stopTimeEntry = async (timeEntryId: string, notes?: string): Promis
     throw new Error("This time entry is already completed");
   }
 
-  const endTime = Timestamp.now();
+  const endTime = customEndTime ? Timestamp.fromDate(customEndTime) : Timestamp.now();
   const startTime = timeEntryData.startTime.toDate();
 
   let totalDuration = Math.floor((endTime.toDate().getTime() - startTime.getTime()) / 1000);
@@ -362,4 +366,25 @@ export const calculateTotalTimeForUser = async (
     console.error(`Error in calculateTotalTimeForUser for userId ${userId}:`, err);
     return 0;
   }
+};
+
+export const updateTimeEntry = async (
+  timeEntryId: string,
+  updates: Partial<TimeEntry>
+): Promise<TimeEntry> => {
+  const timeEntryRef = doc(db, "timeEntries", timeEntryId);
+  const timeEntryDoc = await getDoc(timeEntryRef);
+
+  if (!timeEntryDoc.exists()) {
+    throw new Error("Time entry not found");
+  }
+
+  updates.updatedAt = Timestamp.now();
+  await updateDoc(timeEntryRef, updates);
+
+  return {
+    id: timeEntryId,
+    ...timeEntryDoc.data(),
+    ...updates,
+  } as TimeEntry;
 };

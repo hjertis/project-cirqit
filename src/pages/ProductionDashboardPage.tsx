@@ -40,6 +40,7 @@ import {
 import ContentWrapper from "../components/layout/ContentWrapper";
 import {
   BarChart,
+  Bar,
   PieChart,
   Pie,
   Cell,

@@ -21,6 +21,7 @@ import {
   Person as PersonIcon,
   Add as AddIcon,
   Pause as PauseIcon,
+  Edit as EditIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -29,6 +30,8 @@ import {
   pauseTimeEntry,
   resumeTimeEntry,
   getActiveTimeEntry,
+  updateTimeEntry,
+  TimeEntry,
 } from "../../services/timeTrackingService";
 import { formatDuration } from "../../utils/helpers";
 import dayjs from "dayjs";
@@ -36,6 +39,8 @@ import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
+import { Timestamp } from "firebase/firestore";
+import EditTimeEntryDialog from "./EditTimeEntryDialog";
 
 interface TimeEntryWidgetProps {
   orderId: string;
@@ -56,11 +61,14 @@ const TimeEntryWidget = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeEntry, setActiveEntry] = useState<any | null>(null);
+  const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const [unclosedEntry, setUnclosedEntry] = useState<any | null>(null);
+  const [unclosedEntry, setUnclosedEntry] = useState<TimeEntry | null>(null);
   const [showUnclosedDialog, setShowUnclosedDialog] = useState(false);
   const [unclosedEndTime, setUnclosedEndTime] = useState<string>("16:00");
+
+  // Add state for edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchActiveEntry = async () => {
@@ -129,7 +137,7 @@ const TimeEntryWidget = ({
       const start = dayjs(unclosedEntry.startTime.toDate());
       const [h, m] = unclosedEndTime.split(":").map(Number);
       const end = start.hour(h).minute(m).second(0);
-      await stopTimeEntry(unclosedEntry.id, notes, end.toDate());
+      await stopTimeEntry(unclosedEntry.id!, notes, end.toDate());
       setUnclosedEntry(null);
       setShowUnclosedDialog(false);
       setSuccess("Previous day's time entry closed.");
@@ -178,7 +186,7 @@ const TimeEntryWidget = ({
       setIsLoading(true);
       setError(null);
 
-      await stopTimeEntry(activeEntry.id, notes);
+      await stopTimeEntry(activeEntry.id!, notes);
 
       setActiveEntry(null);
       setElapsedTime(0);
@@ -199,7 +207,7 @@ const TimeEntryWidget = ({
       setIsLoading(true);
       setError(null);
 
-      const updatedEntry = await pauseTimeEntry(activeEntry.id);
+      const updatedEntry = await pauseTimeEntry(activeEntry.id!);
 
       setActiveEntry(updatedEntry);
       setSuccess("Time tracking paused");
@@ -219,7 +227,7 @@ const TimeEntryWidget = ({
       setIsLoading(true);
       setError(null);
 
-      const updatedEntry = await resumeTimeEntry(activeEntry.id);
+      const updatedEntry = await resumeTimeEntry(activeEntry.id!);
 
       setActiveEntry(updatedEntry);
       setSuccess("Time tracking resumed");
@@ -227,6 +235,29 @@ const TimeEntryWidget = ({
     } catch (err) {
       console.error("Error resuming time entry:", err);
       setError("Failed to resume time tracking");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handler to open edit dialog
+  const handleOpenEditDialog = () => {
+    setEditDialogOpen(true);
+  };
+
+  // Handler for saving edit
+  const handleEditSave = async (updates: Partial<TimeEntry>) => {
+    if (!activeEntry) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const updated = await updateTimeEntry(activeEntry.id!, updates);
+      setActiveEntry(updated);
+      setSuccess("Time entry updated");
+      setEditDialogOpen(false);
+      if (onTimeEntryUpdated) onTimeEntryUpdated();
+    } catch {
+      setError("Failed to update time entry");
     } finally {
       setIsLoading(false);
     }
@@ -264,6 +295,7 @@ const TimeEntryWidget = ({
             bgcolor: "primary.main",
             color: "white",
             borderRadius: 1,
+            position: "relative", // allow absolute positioning
           }}
         >
           <Typography variant="h4" component="div" sx={{ textAlign: "center" }}>
@@ -275,6 +307,18 @@ const TimeEntryWidget = ({
             size="small"
             sx={{ ml: 2 }}
           />
+          {/* Edit button */}
+          <Button
+            variant="text"
+            color="inherit"
+            size="small"
+            startIcon={<EditIcon />}
+            sx={{ position: "absolute", top: 8, right: 8 }}
+            onClick={handleOpenEditDialog}
+            disabled={isLoading}
+          >
+            Edit
+          </Button>
         </Box>
       )}
 
@@ -410,6 +454,16 @@ const TimeEntryWidget = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Edit Time Entry Dialog */}
+      <EditTimeEntryDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        entry={activeEntry}
+        processes={processes}
+        onSave={handleEditSave}
+        loading={isLoading}
+      />
     </Paper>
   );
 };
