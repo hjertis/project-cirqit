@@ -16,7 +16,8 @@ export const SERIALIZED_LABEL_ZPL = (
   partNumber: string,
   startSerial: string,
   quantity: number,
-  yyww: string
+  yyww: string,
+  copies: number = 2 // Default to 2 for backward compatibility
 ) => `
 ^XA
 ^PW390
@@ -30,6 +31,6 @@ export const SERIALIZED_LABEL_ZPL = (
 ^FO120,70
 ^A0N,45,30
 ^FD^SN${yyww}${startSerial},1,Y^FS
-^PQ${quantity},0,1,Y
+^PQ${quantity},0,${copies},Y
 ^XZ
 `;

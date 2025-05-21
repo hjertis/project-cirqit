@@ -33,7 +33,8 @@ const LabelPrintDialog = ({
 }: LabelPrintDialogProps) => {
   const [startSerial, setStartSerial] = useState(defaultSerial || "0001");
   const [printerIp, setPrinterIp] = useState("10.8.19.212");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(1); //Default quantity to 1
+  const [copies, setCopies] = useState(2); // Default to 2 copies per label
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -70,7 +71,7 @@ const LabelPrintDialog = ({
       const yyww = getYYWW();
       const serialNum = await fetchAndUpdateSerial(yyww, quantity);
       const serialStr = serialNum.toString().padStart(startSerial.length, "0");
-      const zpl = SERIALIZED_LABEL_ZPL(partNumber, serialStr, quantity, yyww);
+      const zpl = SERIALIZED_LABEL_ZPL(partNumber, serialStr, quantity, yyww, copies);
       const res = await fetch(RUST_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,6 +125,15 @@ const LabelPrintDialog = ({
           margin="normal"
           inputProps={{ min: 1 }}
         />
+        <TextField
+          label="Copies"
+          type="number"
+          value={copies}
+          onChange={e => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
+          fullWidth
+          margin="normal"
+          inputProps={{ min: 1 }}
+        />
         <Box sx={{ mb: 1, mt: 2 }}>
           <Alert severity="info" sx={{ mb: 1, p: 1 }}>
             <strong>Work Order:</strong> {defaultSerial || "-"} <br />
@@ -131,7 +141,7 @@ const LabelPrintDialog = ({
           </Alert>
         </Box>
         <pre style={{ fontSize: 10, background: "#f5f5f5", padding: 8, borderRadius: 4 }}>
-          {SERIALIZED_LABEL_ZPL(partNumber, startSerial, quantity, getYYWW())}
+          {SERIALIZED_LABEL_ZPL(partNumber, startSerial, quantity, getYYWW(), copies)}
         </pre>
         <Box sx={{ mt: 1 }}>
           <Alert severity="info" sx={{ p: 1 }}>
