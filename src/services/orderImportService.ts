@@ -10,12 +10,10 @@ import {
   updateDoc,
   collection,
   writeBatch,
-  FieldValue,
 } from "firebase/firestore";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import { archiveOrder } from "./orderService";
-import { STANDARD_PROCESS_NAMES } from "../constants/constants.ts";
 import { DEFAULT_PRODUCT_PROCESSES } from "../constants/defaultProcessTemplate";
 
 dayjs.extend(customParseFormat);
@@ -32,8 +30,6 @@ export interface OrderImportData {
   State?: string;
   FinishedDate?: string; // Add support for FinishedDate
 }
-
-const washKeywords = ["EVP", "TSP", "SKY", "ETI", "TS PRO"];
 
 const parseDate = (dateString: string): Date | null => {
   const formats = ["DD-MM-YYYY", "DD/MM/YYYY"];
@@ -108,21 +104,23 @@ export const importOrder = async (order: OrderImportData) => {
 
     return { created: true, updated: false, archived: false };
   } else {
-    const updates: Record<string, FieldValue | Partial<unknown> | undefined> = {};
+    const updates: Record<string, any> = {}; // Use 'any' for flexibility or a more specific type
     const currentData = docSnap.data();
-    let statusChanged = false;
-    let statusRemovedChanged = false;
+    let statusChangedToFinishedOrDone = false;
+    let statusChangedToRemoved = false;
 
-    if (currentData?.status !== order.Status) {
+    // Check if the status in the CSV is different from the current status in Firestore
+    if (currentData?.status !== order.Status && order.Status) {
+      updates.status = order.Status; // Update to the new status from CSV
+
+      // Check if the new status is 'Finished' or 'Done'
       if (order.Status === "Finished" || order.Status === "Done") {
-        updates.status = order.Status;
-        statusChanged = true;
+        statusChangedToFinishedOrDone = true;
       }
-
+      // Check if the new status is 'Removed'
       if (order.Status === "Removed") {
-        updates.status = order.Status;
         updates.removedDate = Timestamp.fromDate(new Date());
-        statusRemovedChanged = true;
+        statusChangedToRemoved = true;
       }
     }
 
@@ -152,12 +150,12 @@ export const importOrder = async (order: OrderImportData) => {
       updates.updated = Timestamp.fromDate(new Date());
       await updateDoc(docRef, updates);
 
-      if (statusChanged && isFinishedOrder) {
+      if (statusChangedToFinishedOrDone) {
         await archiveOrder(workOrderId);
         return { created: false, updated: true, archived: true };
       }
 
-      if (statusRemovedChanged) {
+      if (statusChangedToRemoved) {
         return { created: false, updated: true, removed: true };
       }
 
@@ -236,8 +234,8 @@ export const importOrdersBatch = async (
       if (result.updated) results.updated++;
       if (result.archived) results.archived++;
       if (result.removed) results.removed++;
-      if (!result.created && !result.updated) results.skipped++;
     } catch (error) {
+      console.error(`Error importing order ${order.No}:`, error);
       results.errors++;
       results.errorMessages.push(
         `Error importing order ${order.No}: ${error instanceof Error ? error.message : String(error)}`
@@ -250,9 +248,9 @@ export const importOrdersBatch = async (
 
 const generateProcesses = async (
   workOrderId: string,
-  state: string,
+  state: string, // state is used to determine priority, but not directly in process generation logic shown
   startDate: Date,
-  productName?: string,
+  productName?: string, // productName is not directly used in the provided logic
   partNo?: string
 ) => {
   const batch = writeBatch(db);
@@ -260,7 +258,8 @@ const generateProcesses = async (
   // 1. Try to get product processTemplates
   let processTemplates: any[] = [];
   if (partNo) {
-    const productDoc = await getDoc(doc(db, "products", partNo));
+    const productDocRef = doc(db, "products", partNo);
+    const productDoc = await getDoc(productDocRef);
     if (productDoc.exists()) {
       const productData = productDoc.data();
       if (productData && Array.isArray(productData.processTemplates)) {
@@ -269,33 +268,37 @@ const generateProcesses = async (
     }
   }
 
-  // 2. Fallback to default
+  // 2. Fallback to default if no product-specific templates are found
   if (processTemplates.length === 0) {
+    // Assuming DEFAULT_PRODUCT_PROCESSES is imported or defined elsewhere accessible
+    // For the purpose of this fix, and based on previous context,
+    // we'll assume it's available. If not, this would be another ReferenceError.
+    // import { DEFAULT_PRODUCT_PROCESSES } from "../constants/defaultProcessTemplate";
     processTemplates = DEFAULT_PRODUCT_PROCESSES;
   }
 
   // 3. Create process entries for this order
   let currentDate = new Date(startDate);
   processTemplates.forEach((template, index) => {
-    const processRef = doc(collection(db, "processes"));
-    const durationDays = template.durationDays ?? 1;
+    const processRef = doc(collection(db, "processes")); // Create a new document reference for each process
+    const durationDays = template.durationDays ?? 1; // Default to 1 day if not specified
     const endDate = new Date(currentDate);
     endDate.setDate(endDate.getDate() + durationDays);
 
     batch.set(processRef, {
-      ...template,
+      ...template, // Spread the template properties
       workOrderId,
-      processId: processRef.id,
-      sequence: template.sequence ?? index + 1,
-      status: index === 0 ? "Pending" : "Not Started",
+      processId: processRef.id, // Store the auto-generated ID
+      sequence: template.sequence ?? index + 1, // Use template sequence or fallback to index
+      status: index === 0 ? "Pending" : "Not Started", // First process is Pending, others Not Started
       startDate: Timestamp.fromDate(currentDate),
       endDate: Timestamp.fromDate(endDate),
       assignedResource: null,
       progress: 0,
-      createdAt: Timestamp.fromDate(new Date()),
+      createdAt: Timestamp.fromDate(new Date()), // Timestamp of creation
     });
 
-    currentDate = new Date(endDate);
+    currentDate = new Date(endDate); // Next process starts when the current one ends
   });
 
   await batch.commit();

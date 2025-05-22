@@ -388,3 +388,21 @@ export const updateTimeEntry = async (
     ...updates,
   } as TimeEntry;
 };
+
+export const addTimeEntry = async (
+  entry: Omit<TimeEntry, "id" | "createdAt" | "updatedAt">
+): Promise<TimeEntry> => {
+  const timeEntriesRef = collection(db, "timeEntries");
+  const now = Timestamp.now();
+  const docRef = await addDoc(timeEntriesRef, {
+    ...entry,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return {
+    id: docRef.id,
+    ...entry,
+    createdAt: now,
+    updatedAt: now,
+  };
+};

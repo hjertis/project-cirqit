@@ -23,12 +23,14 @@ import {
   Paper,
   useTheme,
   useMediaQuery,
+  InputAdornment,
 } from "@mui/material";
 import {
   Close as CloseIcon,
   Save as SaveIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import {
   doc,
@@ -663,6 +665,13 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                   InputLabelProps={{
                     shrink: true,
                   }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <CalendarIcon color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
 
@@ -677,6 +686,13 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
                   helperText={validationErrors.endDate}
                   InputLabelProps={{
                     shrink: true,
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <CalendarIcon color="action" />
+                      </InputAdornment>
+                    ),
                   }}
                 />
               </Grid>

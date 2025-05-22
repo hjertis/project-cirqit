@@ -11,7 +11,9 @@ import {
   Select,
   MenuItem,
   Alert,
+  InputAdornment,
 } from "@mui/material";
+import { CalendarToday as CalendarIcon } from "@mui/icons-material";
 import dayjs from "dayjs";
 import { Timestamp } from "firebase/firestore";
 import { TimeEntry } from "../../services/timeTrackingService";
@@ -79,6 +81,13 @@ const EditTimeEntryDialog: React.FC<EditTimeEntryDialogProps> = ({
           fullWidth
           sx={{ mt: 2 }}
           InputLabelProps={{ shrink: true }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <CalendarIcon color="action" />
+              </InputAdornment>
+            ),
+          }}
         />
         <TextField
           label="End Time"
@@ -88,6 +97,13 @@ const EditTimeEntryDialog: React.FC<EditTimeEntryDialogProps> = ({
           fullWidth
           sx={{ mt: 2 }}
           InputLabelProps={{ shrink: true }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <CalendarIcon color="action" />
+              </InputAdornment>
+            ),
+          }}
         />
         <FormControl fullWidth sx={{ mt: 2 }}>
           <InputLabel id="edit-process-label">Process</InputLabel>

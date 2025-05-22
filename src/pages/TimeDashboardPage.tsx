@@ -32,6 +32,7 @@ import {
   Pause as PauseIcon,
   Person as PersonIcon,
   Edit as EditIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -42,12 +43,16 @@ import {
   resumeTimeEntry,
   calculateTotalTimeForUser,
   updateTimeEntry,
+  addTimeEntry,
   TimeEntry,
 } from "../services/timeTrackingService";
 import { formatDuration, formatDateTime, formatDurationHumanReadable } from "../utils/helpers";
 import ContentWrapper from "../components/layout/ContentWrapper";
 import dayjs from "dayjs";
 import EditTimeEntryDialog from "../components/time/EditTimeEntryDialog";
+import AddTimeEntryDialog from "../components/time/AddTimeEntryDialog";
+import { Timestamp } from "firebase/firestore";
+import OrderTimeLookup from "../components/time/OrderTimeLookup";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -66,7 +71,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`time-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 2 }}>{children}</Box>}
     </div>
   );
 }
@@ -91,6 +96,9 @@ const TimeDashboardPage = () => {
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserTimeEntries = async () => {
@@ -200,6 +208,41 @@ const TimeDashboardPage = () => {
     }
   };
 
+  const handleAddTimeEntry = async (entry: {
+    orderNumber: string;
+    startTime: string;
+    endTime: string;
+    notes: string;
+  }) => {
+    if (!currentUser) return;
+    setAddLoading(true);
+    setAddError(null);
+    try {
+      await addTimeEntry({
+        userId: currentUser.uid,
+        orderNumber: entry.orderNumber,
+        orderId: "", // If you have an orderId, set it here, otherwise leave blank or fetch as needed
+        startTime: Timestamp.fromDate(dayjs(entry.startTime).toDate()),
+        endTime: Timestamp.fromDate(dayjs(entry.endTime).toDate()),
+        notes: entry.notes,
+        status: "completed",
+        duration: Math.max(
+          0,
+          Math.floor(
+            (new Date(entry.endTime).getTime() - new Date(entry.startTime).getTime()) / 1000
+          )
+        ),
+      });
+      setAddDialogOpen(false);
+      handleRefresh();
+    } catch (error) {
+      console.error("Failed to add time entry:", error);
+      setAddError("Failed to add time entry");
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
   const filteredTimeEntries = userTimeEntries.filter(entry => {
     if (!searchTerm) return true;
 
@@ -217,14 +260,25 @@ const TimeDashboardPage = () => {
           <Typography variant="h4" component="h1">
             Time Dashboard
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
+          <Box>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => setAddDialogOpen(true)}
+              sx={{ mr: 2 }}
+            >
+              Add Time Entry
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </Box>
         </Box>
 
         <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -303,6 +357,7 @@ const TimeDashboardPage = () => {
               <Tab label="My Time Entries" />
               <Tab label="Active Sessions" />
               {currentUser?.email?.includes("admin") && <Tab label="All Users" />}
+              <Tab label="Order Time Lookup" />
             </Tabs>
           </Box>
 
@@ -335,6 +390,13 @@ const TimeDashboardPage = () => {
                       InputLabelProps={{
                         shrink: true,
                       }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <CalendarIcon color="action" />
+                          </InputAdornment>
+                        ),
+                      }}
                     />
 
                     <TextField
@@ -344,6 +406,13 @@ const TimeDashboardPage = () => {
                       onChange={e => setEndDate(e.target.value)}
                       InputLabelProps={{
                         shrink: true,
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <CalendarIcon color="action" />
+                          </InputAdornment>
+                        ),
                       }}
                     />
 
@@ -663,16 +732,27 @@ const TimeDashboardPage = () => {
               )}
             </TabPanel>
           )}
+
+          <TabPanel value={tabValue} index={currentUser?.email?.includes("admin") ? 3 : 2}>
+            <OrderTimeLookup userTimeEntries={userTimeEntries} />
+          </TabPanel>
         </Paper>
 
         <EditTimeEntryDialog
           open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
           entry={editEntry}
+          onSave={handleEditTimeEntry}
           loading={editLoading}
           error={editError}
-          onClose={() => setEditDialogOpen(false)}
-          onSave={handleEditTimeEntry}
-          processes={[]}
+        />
+
+        <AddTimeEntryDialog
+          open={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+          onSave={handleAddTimeEntry}
+          loading={addLoading}
+          error={addError}
         />
       </Box>
     </ContentWrapper>

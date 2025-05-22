@@ -160,26 +160,50 @@ const OrdersImporter = () => {
 
     // Build normalized data using mapping
     const normalizedData = data.map(row => {
-      const obj: any = {};
+      const obj: any = {}; // Consider using a typed object OrderCsvRow
       mappedFields.forEach(field => {
         let value = row[field.csvColumn] ?? "";
-        // For date fields, strip time part
         if (["StartingDateTime", "EndingDateTime", "FinishedDate"].includes(field.key)) {
           value = getDateOnly(String(value));
         }
-        // For Quantity, strip all non-digit characters
         if (field.key === "Quantity") {
           value = String(value).replace(/[^0-9]/g, "");
         }
+        // Normalize Order Number (No) to uppercase and trim
+        if (field.key === "No") {
+          value = String(value).toUpperCase().trim();
+        }
         obj[field.key] = value;
       });
-      // Optional fields
-      obj.Notes = row[columnMapping["Notes"]] ?? row.Notes ?? "";
-      obj.State = row[columnMapping["State"]] ?? row.State ?? "";
-      obj.FinishedDate = getDateOnly(
-        String(row[columnMapping["FinishedDate"]] ?? row.FinishedDate ?? "")
-      );
-      return obj;
+      // Handle optional fields
+      const notesCsvColumn = columnMapping["Notes"];
+      if (notesCsvColumn && row[notesCsvColumn] !== undefined) {
+        obj.Notes = row[notesCsvColumn];
+      } else if (row.Notes !== undefined) {
+        obj.Notes = row.Notes;
+      } else {
+        obj.Notes = "";
+      }
+
+      const stateCsvColumn = columnMapping["State"];
+      if (stateCsvColumn && row[stateCsvColumn] !== undefined) {
+        obj.State = row[stateCsvColumn];
+      } else if (row.State !== undefined) {
+        obj.State = row.State;
+      } else {
+        obj.State = "";
+      }
+
+      const finishedDateCsvColumn = columnMapping["FinishedDate"];
+      if (finishedDateCsvColumn && row[finishedDateCsvColumn] !== undefined) {
+        obj.FinishedDate = getDateOnly(String(row[finishedDateCsvColumn]));
+      } else if (row.FinishedDate !== undefined) {
+        obj.FinishedDate = getDateOnly(String(row.FinishedDate));
+      } else if (obj.FinishedDate === undefined) {
+        obj.FinishedDate = "";
+      }
+
+      return obj as OrderCsvRow;
     });
 
     normalizedData.forEach((row, index) => {
@@ -323,13 +347,13 @@ const OrdersImporter = () => {
       );
 
       setImportResults(importResults);
-      setActiveStep(3);
+      setActiveStep(4);
     } catch (error) {
       console.error("Error importing orders:", error);
       setImportError(
         `Error importing orders: ${error instanceof Error ? error.message : String(error)}`
       );
-      setActiveStep(3); // Show completion step even on error
+      setActiveStep(4); // Show completion step even on error
     } finally {
       setIsLoading(false);
     }

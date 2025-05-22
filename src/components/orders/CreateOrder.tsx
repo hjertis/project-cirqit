@@ -19,6 +19,7 @@ import {
   IconButton,
   Tooltip,
   Chip,
+  InputAdornment,
 } from "@mui/material";
 import {
   Save as SaveIcon,
@@ -30,6 +31,7 @@ import { collection, Timestamp, doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { getResources, Resource } from "../../services/resourceService";
 import { STANDARD_PROCESS_NAMES } from "../../constants/constants";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
 interface OrderFormData {
   orderNumber: string;
@@ -532,6 +534,13 @@ const CreateOrder = () => {
                 InputLabelProps={{
                   shrink: true,
                 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <CalendarTodayIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
 
@@ -546,6 +555,13 @@ const CreateOrder = () => {
                 helperText={validationErrors.endDate}
                 InputLabelProps={{
                   shrink: true,
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <CalendarTodayIcon color="action" />
+                    </InputAdornment>
+                  ),
                 }}
               />
             </Grid>

@@ -732,9 +732,9 @@ const ProductionDashboardPage = () => {
                     InputLabelProps={{ shrink: true }}
                     sx={{ mb: 3 }}
                     InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <DateRangeIcon />
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <CalendarIcon color="action" />
                         </InputAdornment>
                       ),
                     }}
@@ -748,9 +748,9 @@ const ProductionDashboardPage = () => {
                     InputLabelProps={{ shrink: true }}
                     sx={{ mb: 3 }}
                     InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <DateRangeIcon />
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <CalendarIcon color="action" />
                         </InputAdornment>
                       ),
                     }}
