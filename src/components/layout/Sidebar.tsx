@@ -74,7 +74,6 @@ const Sidebar = ({ open, toggleDrawer }: SidebarProps) => {
         { text: "All Orders", icon: <OrdersIcon />, path: "/orders" },
         { text: "Create Order", icon: <OrdersIcon />, path: "/orders/create" },
         { text: "Planning", icon: <OrdersIcon />, path: "/orders/planning" },
-        { text: "Resource Calendar", icon: <CalendarTodayIcon />, path: "/orders/calendar" },
         { text: "Resource Board", icon: <ViewKanbanIcon />, path: "/orders/resource-board" },
         { text: "Kanban Board", icon: <ViewKanbanIcon />, path: "/kanban" },
         { text: "Archived Orders", icon: <ArchiveIcon />, path: "/orders/archived" },

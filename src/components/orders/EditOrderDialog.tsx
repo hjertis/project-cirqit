@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, QueryKey } from "@tanstack/react-query";
 import {
   Dialog,
   DialogTitle,
@@ -12,25 +12,21 @@ import {
   TextField,
   Grid,
   MenuItem,
-  Divider,
   Alert,
   FormControl,
   FormHelperText,
   InputLabel,
   Select,
   CircularProgress,
-  Chip,
   Paper,
   useTheme,
   useMediaQuery,
-  InputAdornment,
 } from "@mui/material";
 import {
   Close as CloseIcon,
   Save as SaveIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-  CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import {
   doc,
@@ -132,6 +128,7 @@ const initialFormData: OrderFormData = {
 const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDialogProps) => {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("md"));
+  const queryClient = useQueryClient(); // Already initialized
 
   const [formData, setFormData] = useState<OrderFormData>(initialFormData);
   const [originalProcesses, setOriginalProcesses] = useState<FirebaseProcess[]>([]);
@@ -377,6 +374,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     }
 
     if (!validateForm() || !orderId) {
+      // orderId is confirmed to be a string here for DB ops
       return;
     }
 
@@ -393,7 +391,7 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         assignedResourceName = assignedResource ? assignedResource.name : "";
       }
 
-      const orderData: any = {
+      const orderDataForFirestore: Record<string, any> = {
         orderNumber: formData.orderNumber,
         description: formData.description,
         partNo: formData.partNo,
@@ -408,22 +406,21 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         assignedResourceId: formData.assignedResourceId || null,
         assignedResourceName: assignedResourceName || null,
       };
-      // Set finishedDate if status is Finished or Done
+
       if (formData.status === "Finished" || formData.status === "Done") {
-        orderData.finishedDate = Timestamp.fromDate(new Date());
+        orderDataForFirestore.finishedDate = Timestamp.fromDate(new Date());
       } else {
-        orderData.finishedDate = null;
+        orderDataForFirestore.finishedDate = null;
       }
 
-      // Archive if status is Finished
       if (formData.status === "Finished") {
-        // Copy to archivedOrders
-        await setDoc(doc(db, "archivedOrders", orderId), orderData);
-        // Delete from orders
+        orderDataForFirestore.archivedAt = Timestamp.fromDate(new Date());
+        orderDataForFirestore.originalId = orderId;
+
+        await setDoc(doc(db, "archivedOrders", orderId), orderDataForFirestore);
         await deleteDoc(doc(db, "orders", orderId));
       } else {
-        // Just update in orders
-        await updateDoc(doc(db, "orders", orderId), orderData);
+        await updateDoc(doc(db, "orders", orderId), orderDataForFirestore);
       }
 
       const existingProcessIds = originalProcesses.map(p => p.id);
@@ -444,33 +441,48 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         const processEndDate = new Date(processStartDate);
         processEndDate.setHours(processEndDate.getHours() + process.duration);
 
+        const processData: Record<string, any> = {
+          workOrderId: orderId, // Use orderId for consistency
+          name: process.name,
+          sequence: process.sequence,
+          status: process.status || "Not Started",
+          startDate: Timestamp.fromDate(processStartDate),
+          endDate: Timestamp.fromDate(processEndDate),
+          updated: Timestamp.fromDate(new Date()),
+        };
+
         if (process.id) {
           const processRef = doc(db, "processes", process.id);
-          await updateDoc(processRef, {
-            workOrderId: formData.orderNumber,
-            name: process.name,
-            sequence: process.sequence,
-            status: process.status || "Not Started",
-            startDate: Timestamp.fromDate(processStartDate),
-            endDate: Timestamp.fromDate(processEndDate),
-            updated: Timestamp.fromDate(new Date()),
-          });
+          await updateDoc(processRef, processData);
         } else {
           const processRef = doc(collection(db, "processes"));
-          await setDoc(processRef, {
-            workOrderId: formData.orderNumber,
-            processId: processRef.id,
-            name: process.name,
-            sequence: process.sequence,
-            status: process.status || "Not Started",
-            startDate: Timestamp.fromDate(processStartDate),
-            endDate: Timestamp.fromDate(processEndDate),
-            assignedResource: null,
-            progress: 0,
-            createdAt: Timestamp.fromDate(new Date()),
-          });
+          processData.processId = processRef.id; // Set the ID for new processes
+          processData.assignedResource = null;
+          processData.progress = 0;
+          processData.createdAt = Timestamp.fromDate(new Date());
+          await setDoc(processRef, processData);
         }
       }
+
+      // Invalidate queries after all DB operations are successful
+      const queriesToInvalidate: QueryKey[] = [];
+
+      if (formData.status === "Finished") {
+        queriesToInvalidate.push(["orders"]);
+        queriesToInvalidate.push(["archivedOrders"]);
+      } else {
+        queriesToInvalidate.push(["orders"]);
+      }
+
+      // Always invalidate the specific order details and the dialog's own data query
+      queriesToInvalidate.push(["order", orderId]);
+      queriesToInvalidate.push(["order-edit-dialog", orderId]);
+      // Invalidate processes linked to this order
+      queriesToInvalidate.push(["processes", orderId]);
+
+      await Promise.all(
+        queriesToInvalidate.map(queryKey => queryClient.invalidateQueries({ queryKey }))
+      );
 
       setSuccess(true);
 
@@ -488,420 +500,270 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={!saving ? onClose : undefined}
-      fullScreen={fullScreen}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: {
-          height: fullScreen ? "100%" : "90vh",
-          maxHeight: "90vh",
-          display: "flex",
-          flexDirection: "column",
-        },
-      }}
-    >
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" fullScreen={fullScreen}>
       <DialogTitle>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="h6">Edit Order: {formData.orderNumber}</Typography>
-          <IconButton onClick={onClose} size="small" disabled={saving}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
+        Edit Order
+        <IconButton
+          edge="end"
+          color="inherit"
+          onClick={onClose}
+          aria-label="close"
+          size="large"
+          sx={{ position: "absolute", right: 12, top: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
-
-      <DialogContent dividers sx={{ padding: 0, overflow: "auto", flexGrow: 1 }}>
-        {loading ? (
-          <Box
-            sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : isOrderError && !formData.orderNumber ? (
-          <Box sx={{ p: 3 }}>
-            <Alert severity="error">
-              {orderError instanceof Error ? orderError.message : String(orderError)}
-            </Alert>
-          </Box>
-        ) : (
-          <Box sx={{ p: 2 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="h6">Basic Information</Typography>
-                <Divider sx={{ mt: 1, mb: 2 }} />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Order Number"
-                  value={formData.orderNumber}
-                  onChange={handleChange("orderNumber")}
-                  helperText={validationErrors.orderNumber}
-                  error={!!validationErrors.orderNumber}
-                  disabled
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth error={!!validationErrors.status}>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={formData.status}
-                    onChange={handleSelectChange("status")}
-                    label="Status"
-                  >
-                    {statusOptions.map(option => (
-                      <MenuItem key={option} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  value={formData.description}
-                  onChange={handleChange("description")}
-                  helperText={validationErrors.description}
-                  error={!!validationErrors.description}
-                  multiline
-                  rows={2}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="Part Number"
-                  value={formData.partNo}
-                  onChange={handleChange("partNo")}
-                  helperText={validationErrors.partNo}
-                  error={!!validationErrors.partNo}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Quantity"
-                  value={formData.quantity}
-                  onChange={handleChange("quantity")}
-                  helperText={validationErrors.quantity}
-                  error={!!validationErrors.quantity}
-                  InputProps={{ inputProps: { min: 1 } }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth error={!!validationErrors.priority}>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
-                    value={formData.priority}
-                    onChange={handleSelectChange("priority")}
-                    label="Priority"
-                  >
-                    {priorityOptions.map(option => (
-                      <MenuItem key={option} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Customer"
-                  value={formData.customer}
-                  onChange={handleChange("customer")}
-                  helperText="Optional"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel id="resource-select-label">Assigned Resource</InputLabel>
-                  <Select
-                    labelId="resource-select-label"
-                    value={formData.assignedResourceId || ""}
-                    onChange={handleSelectChange("assignedResourceId")}
-                    label="Assigned Resource"
-                    disabled={loadingResources || saving}
-                  >
-                    <MenuItem value="">
-                      <em>{loadingResources ? "Loading resources..." : "None"}</em>
-                    </MenuItem>
-                    {resources.map(resource => (
-                      <MenuItem key={resource.id} value={resource.id}>
-                        {resource.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <FormHelperText>Optional: Assign to a specific resource</FormHelperText>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sx={{ mt: 2 }}>
-                <Typography variant="h6">Schedule</Typography>
-                <Divider sx={{ mt: 1, mb: 2 }} />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Start Date"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={handleChange("startDate")}
-                  error={!!validationErrors.startDate}
-                  helperText={validationErrors.startDate}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <CalendarIcon color="action" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="End Date"
-                  type="date"
-                  value={formData.endDate}
-                  onChange={handleChange("endDate")}
-                  error={!!validationErrors.endDate}
-                  helperText={validationErrors.endDate}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <CalendarIcon color="action" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sx={{ mt: 2 }}>
-                <Box
-                  sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <Typography variant="h6">Production Processes</Typography>
-                  {formData.processes.length > 0 && (
-                    <Button
-                      startIcon={<AddIcon />}
-                      onClick={handleAddProcess}
-                      variant="outlined"
-                      size="small"
-                    >
-                      Add Process
-                    </Button>
-                  )}
-                </Box>
-                <Divider sx={{ mt: 1, mb: 2 }} />
-                {validationErrors.processes && (
-                  <FormHelperText error>{validationErrors.processes}</FormHelperText>
-                )}
-              </Grid>
-
-              {/* Show order-specific processes if present */}
-              {formData.processes.length > 0 ? (
-                formData.processes.map((process, index) => (
-                  <Grid item xs={12} key={index}>
-                    <Paper variant="outlined" sx={{ p: 2 }}>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sx={{ mb: 1 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <Chip
-                                label={`Step ${process.sequence}`}
-                                color="primary"
-                                size="small"
-                              />
-                              {process.id && (
-                                <Chip label="Existing" size="small" variant="outlined" />
-                              )}
-                            </Box>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveProcess(index)}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                        </Grid>
-
-                        <Grid item xs={12} md={6}>
-                          <FormControl fullWidth>
-                            <InputLabel>Process Name</InputLabel>
-                            <Select
-                              value={process.name}
-                              onChange={e => handleProcessChange(index, "name", e.target.value)}
-                              label="Process Name"
-                            >
-                              {STANDARD_PROCESS_NAMES.map(name => (
-                                <MenuItem key={name} value={name}>
-                                  {name}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-
-                        <Grid item xs={12} md={3}>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            label="Duration (hours)"
-                            value={process.duration}
-                            onChange={e =>
-                              handleProcessChange(index, "duration", Number(e.target.value))
-                            }
-                            InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
-                          />
-                        </Grid>
-
-                        <Grid item xs={12} md={3}>
-                          <FormControl fullWidth>
-                            <InputLabel>Status</InputLabel>
-                            <Select
-                              value={process.status || "Not Started"}
-                              onChange={e => handleProcessChange(index, "status", e.target.value)}
-                              label="Status"
-                            >
-                              {processStatusOptions.map(status => (
-                                <MenuItem key={status} value={status}>
-                                  {status}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  </Grid>
-                ))
-              ) : productProcessTemplates.length > 0 ? (
-                // Show product processTemplates as read-only if no order-specific processes
-                productProcessTemplates.map((process, index) => (
-                  <Grid item xs={12} key={index}>
-                    <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f5f5f5" }}>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sx={{ mb: 1 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Chip label={`Step ${process.sequence}`} color="primary" size="small" />
-                            <Chip
-                              label="Product Template"
-                              size="small"
-                              variant="outlined"
-                              color="info"
-                            />
-                          </Box>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <TextField
-                            fullWidth
-                            label="Process Name"
-                            value={process.name}
-                            InputProps={{ readOnly: true }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                          <TextField
-                            fullWidth
-                            label="Duration (hours)"
-                            value={process.duration}
-                            InputProps={{ readOnly: true }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                          <TextField
-                            fullWidth
-                            label="Status"
-                            value={process.status || "Not Started"}
-                            InputProps={{ readOnly: true }}
-                          />
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  </Grid>
-                ))
-              ) : (
-                // Show message if neither order-specific nor product processTemplates exist
-                <Grid item xs={12}>
-                  <Alert severity="info">
-                    No production processes found for this order or product. Please create a process
-                    template for this product in the Products page first.
-                  </Alert>
-                </Grid>
-              )}
-
-              <Grid item xs={12} sx={{ mt: 2 }}>
-                <Typography variant="h6">Additional Notes</Typography>
-                <Divider sx={{ mt: 1, mb: 2 }} />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Notes"
-                  value={formData.notes}
-                  onChange={handleChange("notes")}
-                  multiline
-                  rows={4}
-                  helperText="Optional"
-                />
-              </Grid>
-
-              {error && (
-                <Grid item xs={12}>
-                  <Alert severity="error">{error}</Alert>
-                </Grid>
-              )}
-
-              {success && (
-                <Grid item xs={12}>
-                  <Alert severity="success">Order updated successfully!</Alert>
-                </Grid>
-              )}
-            </Grid>
-          </Box>
+      <DialogContent dividers sx={{ px: 2 }}>
+        {error && (
+          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+            {error}
+          </Alert>
         )}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Order updated successfully!
+          </Alert>
+        )}
+        <Box component="form" noValidate autoComplete="off">
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Order Number"
+                variant="outlined"
+                fullWidth
+                value={formData.orderNumber}
+                onChange={handleChange("orderNumber")}
+                disabled
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Description"
+                variant="outlined"
+                fullWidth
+                value={formData.description}
+                onChange={handleChange("description")}
+                error={!!validationErrors.description}
+                helperText={validationErrors.description}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Part No."
+                variant="outlined"
+                fullWidth
+                value={formData.partNo}
+                onChange={handleChange("partNo")}
+                error={!!validationErrors.partNo}
+                helperText={validationErrors.partNo}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Quantity"
+                variant="outlined"
+                fullWidth
+                type="number"
+                value={formData.quantity}
+                onChange={handleChange("quantity")}
+                error={!!validationErrors.quantity}
+                helperText={validationErrors.quantity}
+                InputProps={{
+                  inputProps: { min: 1 },
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={formData.status}
+                  onChange={handleSelectChange("status")}
+                  label="Status"
+                >
+                  {statusOptions.map(option => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>{validationErrors.status}</FormHelperText>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Start Date"
+                variant="outlined"
+                fullWidth
+                type="date"
+                value={formData.startDate}
+                onChange={handleChange("startDate")}
+                error={!!validationErrors.startDate}
+                helperText={validationErrors.startDate}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="End Date"
+                variant="outlined"
+                fullWidth
+                type="date"
+                value={formData.endDate}
+                onChange={handleChange("endDate")}
+                error={!!validationErrors.endDate}
+                helperText={validationErrors.endDate}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Customer"
+                variant="outlined"
+                fullWidth
+                value={formData.customer}
+                onChange={handleChange("customer")}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel>Priority</InputLabel>
+                <Select
+                  value={formData.priority}
+                  onChange={handleSelectChange("priority")}
+                  label="Priority"
+                >
+                  {priorityOptions.map(option => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                label="Notes"
+                variant="outlined"
+                fullWidth
+                multiline
+                rows={4}
+                value={formData.notes}
+                onChange={handleChange("notes")}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" gutterBottom>
+                Processes
+              </Typography>
+              {formData.processes.map((process, index) => (
+                <Paper key={process.id || index} variant="outlined" sx={{ p: 1, mb: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="subtitle2" component="div">
+                      {`Step ${process.sequence}: ${process.name}`}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRemoveProcess(index)}
+                      aria-label={`Remove ${process.name || "step " + process.sequence}`}
+                      sx={{ color: "error.main" }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  <Grid container spacing={1}>
+                    <Grid item xs={12} sm={6} md={4}>
+                      <FormControl fullWidth variant="outlined">
+                        <InputLabel>Process Name</InputLabel>
+                        <Select
+                          value={process.name}
+                          onChange={e => handleProcessChange(index, "name", e.target.value)}
+                          label="Process Name"
+                          error={!!validationErrors.processes}
+                        >
+                          {STANDARD_PROCESS_NAMES.map(name => (
+                            <MenuItem key={name} value={name}>
+                              {name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        {validationErrors.processes && (
+                          <FormHelperText error>{validationErrors.processes}</FormHelperText>
+                        )}
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={6} sm={3} md={3}>
+                      <TextField
+                        label="Duration (hrs)"
+                        variant="outlined"
+                        fullWidth
+                        type="number"
+                        value={process.duration}
+                        onChange={e =>
+                          handleProcessChange(index, "duration", Number(e.target.value))
+                        }
+                        error={!!validationErrors.processes}
+                        helperText={validationErrors.processes}
+                        InputProps={{
+                          inputProps: { min: 1 },
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={6} sm={3} md={5}>
+                      <FormControl fullWidth variant="outlined">
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                          value={process.status}
+                          onChange={e => handleProcessChange(index, "status", e.target.value)}
+                          label="Status"
+                        >
+                          {processStatusOptions.map(option => (
+                            <MenuItem key={option} value={option}>
+                              {option}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              ))}
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleAddProcess}
+                sx={{ mt: 2 }}
+              >
+                Add Process
+              </Button>
+            </Grid>
+          </Grid>
+        </Box>
       </DialogContent>
-
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} disabled={saving}>
+      <DialogActions>
+        <Button onClick={onClose} color="primary">
           Cancel
         </Button>
         <Button
-          variant="contained"
           onClick={handleSave}
+          color="primary"
+          variant="contained"
+          disabled={saving}
           startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-          disabled={saving || loading}
         >
-          {saving ? "Saving..." : "Save Changes"}
+          Save
         </Button>
       </DialogActions>
     </Dialog>
