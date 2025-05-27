@@ -11,6 +11,7 @@ import {
   Timestamp,
   getDoc,
   QueryConstraint,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
@@ -239,22 +240,20 @@ export const resumeTimeEntry = async (timeEntryId: string): Promise<TimeEntry> =
   }
 
   const resumeTime = Timestamp.now();
-
   if (timeEntryData.pausedTime) {
     const pausedDuration = Math.floor(
       (resumeTime.toDate().getTime() - timeEntryData.pausedTime.toDate().getTime()) / 1000
     );
 
     const totalPausedDuration = (timeEntryData.pausedDuration || 0) + pausedDuration;
-
     const resumedTimes = timeEntryData.resumedTimes || [];
     resumedTimes.push(resumeTime);
-    const updates: Partial<TimeEntry> = {
-      pausedTime: undefined,
+    const updates = {
+      pausedTime: deleteField(),
       pausedDuration: totalPausedDuration,
       resumedTimes,
       paused: false,
-      status: "active",
+      status: "active" as const,
       updatedAt: Timestamp.now(),
     };
 
@@ -264,6 +263,7 @@ export const resumeTimeEntry = async (timeEntryId: string): Promise<TimeEntry> =
       id: timeEntryId,
       ...timeEntryData,
       ...updates,
+      pausedTime: undefined, // For the return object, set to undefined
     };
   } else {
     throw new Error("Cannot resume: no pause time recorded");
