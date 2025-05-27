@@ -1,7 +1,7 @@
 @media print {
   @page {
     size: A4;
-    margin: 20mm;
+    margin: 5mm 20mm 20mm 20mm;
   }
 
   html,
@@ -181,27 +181,10 @@
   .MuiTypography-caption {
     font-size: 8pt !important;
   }
-
   .MuiDivider-root {
     border-color: #000 !important;
     margin: 4px 0 !important;
     border-bottom-width: 1px !important;
-  }
-
-  .signature-box {
-    height: 40px !important;
-    border: 1px dashed #000 !important;
-    margin: 4px 0 !important;
-    page-break-inside: avoid !important;
-  }
-
-  .signature-label {
-    font-size: 9pt !important;
-    margin-top: 4px !important;
-  }
-
-  .quality-verification-section {
-    padding-left: 13px !important;
   }
 
   .notes-section {
@@ -214,8 +197,71 @@
 
   .process-table th,
   .process-table td {
-    font-size: 8.5pt !important;
-    padding: 3px !important;
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+    font-size: 8pt !important;
+    vertical-align: top !important;
+  }
+
+  .process-table th:nth-child(1) {
+    width: 10% !important;
+  }
+  .process-table th:nth-child(2) {
+    width: 30% !important;
+  }
+  .process-table th:nth-child(3) {
+    width: 35% !important;
+    vertical-align: bottom !important;
+  }
+  .process-table th:nth-child(4) {
+    width: 25% !important;
+  }
+
+  /* Progress column specific alignment */
+  .process-table td:nth-child(3) {
+    vertical-align: bottom !important;
+  }
+
+  .process-table td:nth-child(3) > div {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    min-height: 30px !important;
+    height: 100% !important;
+  }
+
+  /* Apply bottom alignment to all table cells */
+  .process-table td:nth-child(1),
+  .process-table td:nth-child(2),
+  .process-table td:nth-child(3) {
+    vertical-align: bottom !important;
+  }
+
+  /* Common styling for all content boxes in cells 1-3 */
+  .process-table td:nth-child(1) > div,
+  .process-table td:nth-child(2) > div,
+  .process-table td:nth-child(3) > div {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    min-height: 30px !important;
+    height: 100% !important;
+  }
+
+  /* Center alignment for sequence column */
+  .process-table td:nth-child(1) > div {
+    align-items: center !important;
+  }
+
+  /* Left alignment for process column */
+  .process-table td:nth-child(2) > div {
+    align-items: flex-start !important;
+  }
+
+  /* Center alignment for progress column */
+  .process-table td:nth-child(3) > div {
+    align-items: center !important;
   }
 
   .MuiCheckbox-root {
@@ -265,5 +311,52 @@
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Sign-off specific styles */
+  .operator-signoff {
+    text-align: center !important;
+  }
+
+  .operator-signoff .signoff-line {
+    border-bottom: 1px solid #000 !important;
+    min-height: 15px !important;
+    margin: 2px 0 !important;
+  }
+
+  .issues-section {
+    min-height: 80px !important;
+    border: 1px solid #000 !important;
+    padding: 6px !important;
+    margin-bottom: 8px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .issues-section .MuiBox-root {
+    border-bottom: 1px solid #000 !important;
+    min-height: 12px !important;
+    margin-bottom: 3px !important;
+  }
+
+  /* Remove border-bottom from the last line to avoid double line */
+  .issues-section .MuiBox-root:last-child {
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
+  }
+
+  .scrap-rework-section {
+    border: 1px solid #000 !important;
+    padding: 6px !important;
+    margin-bottom: 8px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .scrap-rework-section .MuiGrid-item {
+    padding: 2px !important;
+  }
+
+  .scrap-rework-section .MuiBox-root {
+    border-bottom: 1px solid #000 !important;
+    min-height: 20px !important;
   }
 }

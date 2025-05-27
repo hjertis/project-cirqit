@@ -10,6 +10,7 @@ import {
   limit,
   Timestamp,
   getDoc,
+  QueryConstraint,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
@@ -29,6 +30,7 @@ export interface TimeEntry {
   notes?: string;
   status: "active" | "paused" | "completed";
   paused?: boolean;
+  groupId?: string; // New field for grouping related entries
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -92,7 +94,8 @@ export const startTimeEntry = async (
   orderId: string,
   orderNumber: string,
   processId?: string,
-  notes?: string
+  notes?: string,
+  groupId?: string
 ): Promise<TimeEntry> => {
   const existingEntry = await getActiveTimeEntry(userId, orderId);
 
@@ -103,15 +106,12 @@ export const startTimeEntry = async (
   const userRef = doc(db, "users", userId);
   const userDoc = await getDoc(userRef);
   const userDisplayName = userDoc.exists() ? userDoc.data().displayName : null;
-
   const timeEntriesRef = collection(db, "timeEntries");
-
   const timeEntryData: Omit<TimeEntry, "id"> = {
     userId,
     userDisplayName,
     orderId,
     orderNumber,
-    processId: processId || null,
     startTime: Timestamp.now(),
     notes: notes || "",
     status: "active",
@@ -119,6 +119,16 @@ export const startTimeEntry = async (
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   };
+
+  // Only include processId if it has a value
+  if (processId) {
+    timeEntryData.processId = processId;
+  }
+
+  // Only include groupId if it has a value
+  if (groupId) {
+    timeEntryData.groupId = groupId;
+  }
 
   const docRef = await addDoc(timeEntriesRef, timeEntryData);
 
@@ -239,9 +249,8 @@ export const resumeTimeEntry = async (timeEntryId: string): Promise<TimeEntry> =
 
     const resumedTimes = timeEntryData.resumedTimes || [];
     resumedTimes.push(resumeTime);
-
     const updates: Partial<TimeEntry> = {
-      pausedTime: null,
+      pausedTime: undefined,
       pausedDuration: totalPausedDuration,
       resumedTimes,
       paused: false,
@@ -288,8 +297,7 @@ export const getTimeEntriesForOrder = async (orderId: string): Promise<TimeEntry
 
 export const getTimeEntriesForUser = async (
   userId: string,
-  limitCount = 50,
-  startAfter?: Timestamp
+  limitCount = 50
 ): Promise<TimeEntry[]> => {
   try {
     const timeEntriesRef = collection(db, "timeEntries");
@@ -405,4 +413,128 @@ export const addTimeEntry = async (
     createdAt: now,
     updatedAt: now,
   };
+};
+
+// Grouped Time Tracking Functions
+export const getGroupedTimeEntries = async (groupId: string): Promise<TimeEntry[]> => {
+  try {
+    console.log(`[DEBUG] Fetching grouped time entries for groupId: ${groupId}`);
+    const timeEntriesRef = collection(db, "timeEntries");
+    const q = query(timeEntriesRef, where("groupId", "==", groupId), orderBy("startTime", "desc"));
+
+    const querySnapshot = await getDocs(q);
+    const entries = querySnapshot.docs.map(
+      doc =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as TimeEntry
+    );
+
+    console.log(`[DEBUG] Found ${entries.length} entries for group ${groupId}`);
+    return entries;
+  } catch (error) {
+    console.error("Error fetching grouped time entries:", error);
+    return [];
+  }
+};
+
+export const stopGroupedTimeEntries = async (
+  groupId: string,
+  notes?: string
+): Promise<TimeEntry[]> => {
+  console.log(`[DEBUG] Stopping grouped time entries for groupId: ${groupId}`);
+  const groupedEntries = await getGroupedTimeEntries(groupId);
+  const activeEntries = groupedEntries.filter(
+    entry => entry.status === "active" || entry.status === "paused"
+  );
+
+  console.log(
+    `[DEBUG] Found ${activeEntries.length} active/paused entries to stop in group ${groupId}`
+  );
+  const stoppedEntries: TimeEntry[] = [];
+
+  for (const entry of activeEntries) {
+    console.log(`[DEBUG] Stopping entry ${entry.id} for order ${entry.orderNumber}`);
+    const stoppedEntry = await stopTimeEntry(entry.id!, notes);
+    stoppedEntries.push(stoppedEntry);
+  }
+
+  console.log(`[DEBUG] Successfully stopped ${stoppedEntries.length} entries for group ${groupId}`);
+  return stoppedEntries;
+};
+
+export const pauseGroupedTimeEntries = async (groupId: string): Promise<TimeEntry[]> => {
+  const groupedEntries = await getGroupedTimeEntries(groupId);
+  const activeEntries = groupedEntries.filter(entry => entry.status === "active");
+
+  const pausedEntries: TimeEntry[] = [];
+
+  for (const entry of activeEntries) {
+    const pausedEntry = await pauseTimeEntry(entry.id!);
+    pausedEntries.push(pausedEntry);
+  }
+
+  return pausedEntries;
+};
+
+export const resumeGroupedTimeEntries = async (groupId: string): Promise<TimeEntry[]> => {
+  const groupedEntries = await getGroupedTimeEntries(groupId);
+  const pausedEntries = groupedEntries.filter(entry => entry.status === "paused");
+
+  const resumedEntries: TimeEntry[] = [];
+
+  for (const entry of pausedEntries) {
+    const resumedEntry = await resumeTimeEntry(entry.id!);
+    resumedEntries.push(resumedEntry);
+  }
+
+  return resumedEntries;
+};
+
+export const getActiveGroupedTimeEntries = async (
+  userId: string
+): Promise<{ groupId: string; entries: TimeEntry[] }[]> => {
+  try {
+    const timeEntriesRef = collection(db, "timeEntries");
+    const q = query(
+      timeEntriesRef,
+      where("userId", "==", userId),
+      where("status", "in", ["active", "paused"]),
+      where("groupId", "!=", null)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const entries = querySnapshot.docs.map(
+      doc =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as TimeEntry
+    );
+
+    // Group entries by groupId
+    const groupedMap = new Map<string, TimeEntry[]>();
+    entries.forEach(entry => {
+      if (entry.groupId) {
+        if (!groupedMap.has(entry.groupId)) {
+          groupedMap.set(entry.groupId, []);
+        }
+        groupedMap.get(entry.groupId)!.push(entry);
+      }
+    });
+
+    return Array.from(groupedMap.entries()).map(([groupId, entries]) => ({
+      groupId,
+      entries: entries.sort((a, b) => b.startTime.toMillis() - a.startTime.toMillis()),
+    }));
+  } catch (error) {
+    console.error("Error fetching active grouped time entries:", error);
+    return [];
+  }
+};
+
+export const hasActiveGroupedTimeEntries = async (userId: string): Promise<boolean> => {
+  const activeGroups = await getActiveGroupedTimeEntries(userId);
+  return activeGroups.length > 0;
 };

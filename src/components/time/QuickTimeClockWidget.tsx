@@ -165,12 +165,11 @@ const QuickTimeClockWidget = () => {
     try {
       setLoading(true);
       setError(null);
-
       const entry = await startTimeEntry(
         currentUser.uid,
         orderNumber,
         orderNumber,
-        undefined,
+        undefined, // processId - optional parameter, handled by service
         notes
       );
 

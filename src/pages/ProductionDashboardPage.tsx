@@ -36,6 +36,7 @@ import {
   DateRange as DateRangeIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
+  CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import ContentWrapper from "../components/layout/ContentWrapper";
 import {

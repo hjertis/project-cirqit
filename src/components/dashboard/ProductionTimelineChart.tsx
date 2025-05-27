@@ -22,30 +22,53 @@ const ProductionTimelineChart = () => {
       ...ordersSnap.docs.map(doc => doc.data()),
       ...archivedSnap.docs.map(doc => doc.data()),
     ];
+
     // Group by month
     const monthMap = new Map();
     let ordersCount = allOrders.length;
     let activeOrdersCount = 0;
     let completedOrdersCount = 0;
     let totalVolume = 0;
+
     allOrders.forEach(order => {
       const date = order.start
         ? new Date(order.start.seconds ? order.start.seconds * 1000 : order.start)
         : null;
       if (!date || isNaN(date.getTime())) return;
+
       const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       if (!monthMap.has(month)) {
-        monthMap.set(month, { month, quantity: 0, isPast: date < new Date() });
+        monthMap.set(month, {
+          month,
+          plannedQuantity: 0,
+          completedQuantity: 0,
+          orderCount: 0,
+          isPast: date < new Date(),
+        });
       }
+
       const entry = monthMap.get(month);
-      entry.quantity += order.quantity || 0;
-      totalVolume += order.quantity || 0;
-      if (order.status === "Done" || order.status === "Finished") completedOrdersCount++;
-      else activeOrdersCount++;
+      const quantity = order.quantity || 0;
+
+      // All orders contribute to planned quantity and order count
+      entry.plannedQuantity += quantity;
+      entry.orderCount += 1;
+
+      // Only completed orders contribute to completed quantity
+      if (order.status === "Done" || order.status === "Finished") {
+        entry.completedQuantity += quantity;
+        completedOrdersCount++;
+      } else {
+        activeOrdersCount++;
+      }
+
+      totalVolume += quantity;
     });
+
     const productionByMonth = Array.from(monthMap.values()).sort((a, b) =>
       a.month.localeCompare(b.month)
     );
+
     return { productionByMonth, ordersCount, activeOrdersCount, completedOrdersCount, totalVolume };
   };
 
@@ -90,10 +113,21 @@ const ProductionTimelineChart = () => {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" angle={-45} textAnchor="end" height={60} />
             <YAxis />
-            <RechartsTooltip formatter={value => [`${value} units`, "Quantity"]} />
+            <RechartsTooltip
+              formatter={(value, name) => [
+                `${value} ${name.includes("Quantity") ? "units" : "orders"}`,
+                name,
+              ]}
+            />
             <Legend />
-            <Bar dataKey="quantity" fill="#8884d8" />
-            <Line type="monotone" dataKey="quantity" stroke="#ff7300" />
+            <Bar dataKey="plannedQuantity" fill="#8884d8" name="Planned Quantity" />
+            <Line
+              type="monotone"
+              dataKey="completedQuantity"
+              stroke="#ff7300"
+              name="Completed Quantity"
+              strokeWidth={3}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </Box>

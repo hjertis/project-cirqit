@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -7,20 +6,19 @@ import {
   Divider,
   Button,
   IconButton,
-  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from "@mui/material";
 import {
-  Print as PrintIcon,
   Close as CloseIcon,
   LocalPrintshopOutlined as PrintOutlinedIcon,
 } from "@mui/icons-material";
 import { Timestamp } from "firebase/firestore";
 import CompactProcessesTable from "./CompactProcessesTable";
-import CompactSignatureSection from "./CompactSignatureSection";
+import IssuesProblemsSection from "./IssuesProblemsSection";
+import ScrapReworkSection from "./ScrapReworkSection";
 import "../../styles/CompactPrintStyles.css";
 
 interface Process {
@@ -33,12 +31,28 @@ interface Process {
   endDate: Timestamp;
   assignedResource: string | null;
   progress: number;
+  duration?: number;
+}
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  description: string;
+  partNo: string;
+  quantity: number;
+  status: string;
+  start: Timestamp;
+  end: Timestamp;
+  customer?: string;
+  priority?: string;
+  notes?: string;
+  updated?: Timestamp;
 }
 
 interface OptimizedPrintableWorkOrderProps {
   open: boolean;
   onClose: () => void;
-  order: any;
+  order: Order;
   processes: Process[];
   printMode?: boolean;
 }
@@ -80,25 +94,8 @@ const OptimizedPrintableWorkOrder = ({
   processes,
   printMode = false,
 }: OptimizedPrintableWorkOrderProps) => {
-  const [processProgress, setProcessProgress] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    const initialProgress: Record<string, number> = {};
-    processes.forEach(process => {
-      initialProgress[process.id] = process.progress || 0;
-    });
-    setProcessProgress(initialProgress);
-  }, [processes]);
-
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleProgressChange = (processId: string, progress: number) => {
-    setProcessProgress(prev => ({
-      ...prev,
-      [processId]: progress,
-    }));
   };
 
   if (!order) {
@@ -115,16 +112,6 @@ const OptimizedPrintableWorkOrder = ({
         sx: { maxHeight: "90vh" },
       }}
     >
-      <DialogTitle
-        sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
-        className="no-print"
-      >
-        <Typography variant="h6">Print Work Order</Typography>
-        <IconButton onClick={onClose} size="small">
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-
       <DialogContent dividers sx={{ p: 1 }} className="print-content">
         <Box className="print-container" sx={{ maxWidth: "210mm", margin: "0 auto" }}>
           <Box
@@ -279,38 +266,16 @@ const OptimizedPrintableWorkOrder = ({
                 </Paper>
               </Grid>
             </Grid>
-
             <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 1, mb: 0.5 }}>
               Process Tracking
-            </Typography>
+            </Typography>{" "}
             <CompactProcessesTable
               processes={processes}
-              processProgress={processProgress}
-              onProgressChange={handleProgressChange}
               isPrintMode={printMode}
+              orderQuantity={order.quantity}
             />
-
-            <Box className="quality-verification-section">
-              <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 2, mb: 0.5 }}>
-                Quality Verification
-              </Typography>
-              <Box sx={{ width: "100%" }}>
-                <CompactSignatureSection isPrintMode={printMode} />
-              </Box>
-            </Box>
-
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold", mt: 2, mb: 0.5 }}>
-              Additional Notes
-            </Typography>
-            <Paper
-              variant="outlined"
-              sx={{ p: 1, minHeight: "40px", mb: 1 }}
-              className="notes-section"
-            >
-              <Typography variant="caption" color="text.secondary">
-                {order.notes || "No additional notes for this order."}
-              </Typography>
-            </Paper>
+            <IssuesProblemsSection />
+            <ScrapReworkSection orderQuantity={order.quantity} />
           </Box>
         </Box>
       </DialogContent>

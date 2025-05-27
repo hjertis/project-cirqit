@@ -51,6 +51,9 @@ import ContentWrapper from "../components/layout/ContentWrapper";
 import dayjs from "dayjs";
 import EditTimeEntryDialog from "../components/time/EditTimeEntryDialog";
 import AddTimeEntryDialog from "../components/time/AddTimeEntryDialog";
+import GroupedTimeTrackingWidget from "../components/time/GroupedTimeTrackingWidget";
+import GroupedTimeTrackingDemo from "../components/time/GroupedTimeTrackingDemo";
+import GroupedTimeEntriesSummary from "../components/time/GroupedTimeEntriesSummary";
 import { Timestamp } from "firebase/firestore";
 import OrderTimeLookup from "../components/time/OrderTimeLookup";
 
@@ -353,14 +356,15 @@ const TimeDashboardPage = () => {
 
         <Paper sx={{ mb: 3 }}>
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            {" "}
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="time tracking tabs">
               <Tab label="My Time Entries" />
+              <Tab label="Group Tracking" />
               <Tab label="Active Sessions" />
               {currentUser?.email?.includes("admin") && <Tab label="All Users" />}
               <Tab label="Order Time Lookup" />
             </Tabs>
           </Box>
-
           <TabPanel value={tabValue} index={0}>
             <Box sx={{ mb: 2 }}>
               <Grid container spacing={2} alignItems="center">
@@ -562,9 +566,15 @@ const TimeDashboardPage = () => {
                 </Table>
               </TableContainer>
             )}
-          </TabPanel>
-
+          </TabPanel>{" "}
           <TabPanel value={tabValue} index={1}>
+            <GroupedTimeTrackingDemo />
+            <Box sx={{ mb: 3 }}>
+              <GroupedTimeTrackingWidget onTimeEntryUpdated={handleRefresh} />
+            </Box>
+            <GroupedTimeEntriesSummary />
+          </TabPanel>
+          <TabPanel value={tabValue} index={2}>
             <Box sx={{ mb: 2 }}>
               <Typography variant="h6">Active Time Sessions</Typography>
               <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -655,10 +665,9 @@ const TimeDashboardPage = () => {
                 </Table>
               </TableContainer>
             )}
-          </TabPanel>
-
+          </TabPanel>{" "}
           {currentUser?.email?.includes("admin") && (
-            <TabPanel value={tabValue} index={2}>
+            <TabPanel value={tabValue} index={3}>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="h6">All Active Sessions</Typography>
                 <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -732,8 +741,7 @@ const TimeDashboardPage = () => {
               )}
             </TabPanel>
           )}
-
-          <TabPanel value={tabValue} index={currentUser?.email?.includes("admin") ? 3 : 2}>
+          <TabPanel value={tabValue} index={currentUser?.email?.includes("admin") ? 4 : 3}>
             <OrderTimeLookup userTimeEntries={userTimeEntries} />
           </TabPanel>
         </Paper>
