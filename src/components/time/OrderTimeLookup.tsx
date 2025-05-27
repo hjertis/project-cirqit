@@ -5,6 +5,8 @@ import {
   Grid,
   TextField,
   Button,
+  InputAdornment,
+  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -12,15 +14,12 @@ import {
   TableHead,
   TableRow,
   Chip,
-  CircularProgress,
   Alert,
-  InputAdornment,
-  Dialog,
-  MenuItem,
 } from "@mui/material";
 import { Search as SearchIcon } from "@mui/icons-material";
 import { TimeEntry } from "../../services/timeTrackingService";
 import { formatDuration, formatDateTime, formatDurationHumanReadable } from "../../utils/helpers";
+import OrderTimeEntriesDialog from "./OrderTimeEntriesDialog";
 
 interface OrderTimeLookupProps {
   userTimeEntries: TimeEntry[];
@@ -50,8 +49,6 @@ const OrderTimeLookup: React.FC<OrderTimeLookupProps> = ({ userTimeEntries }) =>
       setOrderLookupLoading(false);
     }
   };
-
-  console.log(userTimeEntries);
 
   return (
     <>
@@ -163,79 +160,19 @@ const OrderTimeLookup: React.FC<OrderTimeLookupProps> = ({ userTimeEntries }) =>
         )}
 
       {/* Order Lookup Dialog */}
-      <Dialog
+      <OrderTimeEntriesDialog
         open={orderLookupDialogOpen}
         onClose={() => {
           setOrderLookupDialogOpen(false);
-          setOrderLookupError(null); // Clear dialog-specific errors on close
+          setOrderLookupError(null);
         }}
-        maxWidth="md"
-        fullWidth
-      >
-        <Box sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Time Entries for Order: {orderLookupNumber}
-          </Typography>
-          {orderLookupLoading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-              <CircularProgress />
-            </Box>
-          ) : orderLookupError ? ( // Show error inside dialog if it occurred during dialog load
-            <Alert severity="error" onClose={() => setOrderLookupError(null)} sx={{ mb: 2 }}>
-              {orderLookupError}
-            </Alert>
-          ) : orderLookupEntries.length === 0 ? (
-            <Typography color="textSecondary">No time entries found for this order.</Typography>
-          ) : (
-            <>
-              <TableContainer sx={{ mb: 2 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Start Time</TableCell>
-                      <TableCell>End Time</TableCell>
-                      <TableCell>Duration</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Notes</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {orderLookupEntries.map(entry => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{formatDateTime(entry.startTime.toDate())}</TableCell>
-                        <TableCell>
-                          {entry.endTime ? formatDateTime(entry.endTime.toDate()) : "-"}
-                        </TableCell>
-                        <TableCell>{formatDuration(entry.duration || 0)}</TableCell>
-                        <TableCell>
-                          <Chip label={entry.status.toUpperCase()} size="small" />
-                        </TableCell>
-                        <TableCell sx={{ maxWidth: 200, overflowWrap: "break-word" }}>
-                          {entry.notes || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <Typography variant="subtitle1">
-                Total Time: {formatDurationHumanReadable(orderLookupTotal)}
-              </Typography>
-            </>
-          )}
-          <Box sx={{ mt: 2, textAlign: "right" }}>
-            <Button
-              onClick={() => {
-                setOrderLookupDialogOpen(false);
-                setOrderLookupError(null);
-              }}
-              variant="outlined"
-            >
-              Close
-            </Button>
-          </Box>
-        </Box>
-      </Dialog>
+        loading={orderLookupLoading}
+        error={orderLookupError}
+        entries={orderLookupEntries}
+        total={orderLookupTotal}
+        orderNumber={orderLookupNumber}
+        onErrorClose={() => setOrderLookupError(null)}
+      />
     </>
   );
 };

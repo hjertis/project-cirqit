@@ -110,8 +110,13 @@ export const importOrder = async (order: OrderImportData) => {
     let statusChangedToRemoved = false;
 
     // Check if the status in the CSV is different from the current status in Firestore
-    if (currentData?.status !== order.Status && order.Status) {
-      updates.status = order.Status; // Update to the new status from CSV
+    const FINAL_STATUSES = ["Finished", "Done"];
+    if (
+      currentData?.status !== order.Status &&
+      order.Status &&
+      FINAL_STATUSES.includes(order.Status)
+    ) {
+      updates.status = order.Status; // Only update if CSV status is Finished or Done
 
       // Check if the new status is 'Finished' or 'Done'
       if (order.Status === "Finished" || order.Status === "Done") {
@@ -185,6 +190,16 @@ export const importOrdersBatch = async (
   // Get all order numbers in the current import
   const importedOrderNumbers = new Set(orders.map(order => order.No));
 
+  // Fetch all finished (archived) orders to avoid re-importing them
+  const finishedOrdersSnapshot = await getDocs(collection(db, "archivedOrders"));
+  const finishedOrderNumbers = new Set<string>();
+  finishedOrdersSnapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.orderNumber) {
+      finishedOrderNumbers.add(data.orderNumber);
+    }
+  });
+
   // Process removal detection if enabled
   if (detectRemoved) {
     try {
@@ -228,6 +243,11 @@ export const importOrdersBatch = async (
 
   // Process each order in the import
   for (const order of orders) {
+    // Skip orders that are already finished/archived
+    if (finishedOrderNumbers.has(order.No)) {
+      results.skipped = (results.skipped || 0) + 1;
+      continue;
+    }
     try {
       const result = await importOrder(order);
       if (result.created) results.created++;
@@ -248,58 +268,34 @@ export const importOrdersBatch = async (
 
 const generateProcesses = async (
   workOrderId: string,
-  state: string, // state is used to determine priority, but not directly in process generation logic shown
+  state: string,
   startDate: Date,
-  productName?: string, // productName is not directly used in the provided logic
-  partNo?: string
+  description: string,
+  sourceNo: string
 ) => {
-  const batch = writeBatch(db);
+  const processTemplate = DEFAULT_PRODUCT_PROCESSES[state] || DEFAULT_PRODUCT_PROCESSES["REGULAR"];
 
-  // 1. Try to get product processTemplates
-  let processTemplates: any[] = [];
-  if (partNo) {
-    const productDocRef = doc(db, "products", partNo);
-    const productDoc = await getDoc(productDocRef);
-    if (productDoc.exists()) {
-      const productData = productDoc.data();
-      if (productData && Array.isArray(productData.processTemplates)) {
-        processTemplates = productData.processTemplates;
-      }
-    }
-  }
+  for (const [index, step] of processTemplate.entries()) {
+    const stepId = `${workOrderId}-step-${index + 1}`;
+    const stepDocRef = doc(db, "orderProcesses", stepId);
 
-  // 2. Fallback to default if no product-specific templates are found
-  if (processTemplates.length === 0) {
-    // Assuming DEFAULT_PRODUCT_PROCESSES is imported or defined elsewhere accessible
-    // For the purpose of this fix, and based on previous context,
-    // we'll assume it's available. If not, this would be another ReferenceError.
-    // import { DEFAULT_PRODUCT_PROCESSES } from "../constants/defaultProcessTemplate";
-    processTemplates = DEFAULT_PRODUCT_PROCESSES;
-  }
+    const startOffset = step.startOffset || 0;
+    const endOffset = step.endOffset || 0;
 
-  // 3. Create process entries for this order
-  let currentDate = new Date(startDate);
-  processTemplates.forEach((template, index) => {
-    const processRef = doc(collection(db, "processes")); // Create a new document reference for each process
-    const durationDays = template.durationDays ?? 1; // Default to 1 day if not specified
-    const endDate = new Date(currentDate);
-    endDate.setDate(endDate.getDate() + durationDays);
+    const stepStartDate = Timestamp.fromDate(
+      new Date(startDate.getTime() + startOffset * 60 * 1000)
+    );
+    const stepEndDate = Timestamp.fromDate(new Date(startDate.getTime() + endOffset * 60 * 1000));
 
-    batch.set(processRef, {
-      ...template, // Spread the template properties
-      workOrderId,
-      processId: processRef.id, // Store the auto-generated ID
-      sequence: template.sequence ?? index + 1, // Use template sequence or fallback to index
-      status: index === 0 ? "Pending" : "Not Started", // First process is Pending, others Not Started
-      startDate: Timestamp.fromDate(currentDate),
-      endDate: Timestamp.fromDate(endDate),
-      assignedResource: null,
-      progress: 0,
-      createdAt: Timestamp.fromDate(new Date()), // Timestamp of creation
+    await setDoc(stepDocRef, {
+      orderId: workOrderId,
+      stepId,
+      description: step.description,
+      start: stepStartDate,
+      end: stepEndDate,
+      status: "Pending",
+      created: Timestamp.fromDate(new Date()),
+      updated: Timestamp.fromDate(new Date()),
     });
-
-    currentDate = new Date(endDate); // Next process starts when the current one ends
-  });
-
-  await batch.commit();
+  }
 };

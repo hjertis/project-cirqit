@@ -111,6 +111,9 @@ const addDays = (date: Date, days: number): Date => {
   return result;
 };
 
+// Helper function to check for valid JavaScript Date objects
+const isValidJsDate = (d: any): d is Date => d instanceof Date && !isNaN(d.getTime());
+
 const initialFormData: OrderFormData = {
   orderNumber: "",
   description: "",
@@ -178,30 +181,104 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     if (orderDataBundle) {
       const { orderData, processesData } = orderDataBundle;
       setOriginalProcesses(processesData);
-      const processTemplates: ProcessTemplate[] = processesData.map(process => ({
-        id: process.id,
-        name: process.name,
-        duration:
-          (process.endDate.toDate().getTime() - process.startDate.toDate().getTime()) /
-          (1000 * 60 * 60),
-        sequence: process.sequence,
-        status: process.status,
-      }));
+
+      const processTemplates: ProcessTemplate[] = processesData.map(process => {
+        let duration = 0; // Default duration in hours
+        if (
+          process.startDate &&
+          typeof process.startDate.toDate === "function" &&
+          process.endDate &&
+          typeof process.endDate.toDate === "function"
+        ) {
+          const startDateMs = process.startDate.toDate().getTime();
+          const endDateMs = process.endDate.toDate().getTime();
+
+          if (endDateMs >= startDateMs) {
+            duration = (endDateMs - startDateMs) / (1000 * 60 * 60);
+          } else {
+            console.warn(
+              `Process (ID: ${process.id || "N/A"}, Name: ${process.name || "N/A"}, Sequence: ${
+                process.sequence || "N/A"
+              }) has endDate before startDate. Defaulting duration to 0.`,
+              { processDataReceived: process }
+            );
+            // duration remains 0
+          }
+        } else {
+          console.warn(
+            `Process (ID: ${process.id || "N/A"}, Name: ${process.name || "N/A"}, Sequence: ${
+              process.sequence || "N/A"
+            }) is missing valid startDate or endDate, or they are not Firebase Timestamps. Defaulting duration to 0.`,
+            { processDataReceived: process }
+          );
+          // duration remains 0
+        }
+
+        return {
+          id: process.id,
+          name: process.name,
+          duration: duration,
+          sequence: process.sequence,
+          status: process.status,
+        };
+      });
+
+      // Safely determine order start and end dates for the form
+      let formStartDate = formatDateForInput(new Date()); // Default to current date
+      if (orderData.start && typeof orderData.start.toDate === "function") {
+        try {
+          formStartDate = formatTimestampForInput(orderData.start);
+        } catch (e) {
+          console.warn(
+            `Order (ID: ${orderId || "N/A"}) failed to format orderData.start from Firestore, using default. Error: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+            { orderStartDataReceived: orderData.start }
+          );
+        }
+      } else {
+        console.warn(
+          `Order (ID: ${orderId || "N/A"}) orderData.start from Firestore is missing, invalid, or not a Firebase Timestamp, using default.`,
+          { orderStartDataReceived: orderData.start }
+        );
+      }
+
+      let formEndDate = formatDateForInput(addDays(new Date(), 14)); // Default to 14 days from now
+      if (orderData.end && typeof orderData.end.toDate === "function") {
+        try {
+          formEndDate = formatTimestampForInput(orderData.end);
+        } catch (e) {
+          console.warn(
+            `Order (ID: ${orderId || "N/A"}) failed to format orderData.end from Firestore, using default. Error: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+            { orderEndDataReceived: orderData.end }
+          );
+        }
+      } else {
+        console.warn(
+          `Order (ID: ${orderId || "N/A"}) orderData.end from Firestore is missing, invalid, or not a Firebase Timestamp, using default.`,
+          { orderEndDataReceived: orderData.end }
+        );
+      }
+
       setFormData({
         orderNumber: orderData.orderNumber || orderId,
         description: orderData.description || "",
         partNo: orderData.partNo || "",
         quantity: orderData.quantity || 1,
         status: orderData.status || "Open",
-        startDate: formatTimestampForInput(orderData.start),
-        endDate: formatTimestampForInput(orderData.end),
+        startDate: formStartDate, // Use safely determined start date
+        endDate: formEndDate, // Use safely determined end date
         customer: orderData.customer || "",
         priority: orderData.priority || "Medium",
         notes: orderData.notes || "",
         processes: processTemplates,
         assignedResourceId: orderData.assignedResourceId || "",
       });
-      setError(null);
+      // setError(null); // Clear general error only if no specific date errors were set above
+      // Or manage errors more granularly if you set them above.
+      // For now, let existing error state persist if set by date issues.
     } else if (!open) {
       setFormData(initialFormData);
       setOriginalProcesses([]);
@@ -382,8 +459,33 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
     setError(null);
 
     try {
-      const startDate = parseInputDate(formData.startDate);
-      const endDate = parseInputDate(formData.endDate);
+      const orderFormStartDateString = formData.startDate;
+      const orderFormEndDateString = formData.endDate;
+
+      const parsedOrderStartDate = parseInputDate(orderFormStartDateString);
+      const parsedOrderEndDate = parseInputDate(orderFormEndDateString);
+
+      if (!isValidJsDate(parsedOrderStartDate)) {
+        const errText = `Invalid Start Date for order after parsing: '${orderFormStartDateString}'. Please correct it.`;
+        console.error(errText, { rawFormData: formData });
+        setError(errText);
+        setSaving(false);
+        return;
+      }
+      if (!isValidJsDate(parsedOrderEndDate)) {
+        const errText = `Invalid End Date for order after parsing: '${orderFormEndDateString}'. Please correct it.`;
+        console.error(errText, { rawFormData: formData });
+        setError(errText);
+        setSaving(false);
+        return;
+      }
+      if (parsedOrderStartDate > parsedOrderEndDate) {
+        const errText = `Order Start Date cannot be after End Date. Start: '${orderFormStartDateString}', End: '${orderFormEndDateString}'.`;
+        console.error(errText, { rawFormData: formData });
+        setError(errText);
+        setSaving(false);
+        return;
+      }
 
       let assignedResourceName = "";
       if (formData.assignedResourceId) {
@@ -397,8 +499,8 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
         partNo: formData.partNo,
         quantity: Number(formData.quantity),
         status: formData.status,
-        start: Timestamp.fromDate(startDate),
-        end: Timestamp.fromDate(endDate),
+        start: Timestamp.fromDate(parsedOrderStartDate), // Use validated date
+        end: Timestamp.fromDate(parsedOrderEndDate), // Use validated date
         customer: formData.customer,
         priority: formData.priority,
         notes: formData.notes,
@@ -432,14 +534,54 @@ const EditOrderDialog = ({ open, onClose, orderId, onOrderUpdated }: EditOrderDi
       }
 
       for (const process of processesToSave) {
-        const processStartDate = new Date(startDate);
+        const processStartDate = new Date(parsedOrderStartDate); // Start with validated order start date
         if (process.sequence > 1) {
           const previousProcesses = processesToSave.filter(p => p.sequence < process.sequence);
-          const totalPreviousDuration = previousProcesses.reduce((sum, p) => sum + p.duration, 0);
-          processStartDate.setHours(startDate.getHours() + totalPreviousDuration);
+          const totalPreviousDuration = previousProcesses.reduce((sum, p) => {
+            const duration = typeof p.duration === "number" && !isNaN(p.duration) ? p.duration : 0;
+            return sum + duration;
+          }, 0);
+          processStartDate.setHours(parsedOrderStartDate.getHours() + totalPreviousDuration);
         }
         const processEndDate = new Date(processStartDate);
-        processEndDate.setHours(processEndDate.getHours() + process.duration);
+        const currentProcessDuration =
+          typeof process.duration === "number" && !isNaN(process.duration) ? process.duration : 0;
+        processEndDate.setHours(processEndDate.getHours() + currentProcessDuration);
+
+        if (!isValidJsDate(processStartDate)) {
+          const errText = `Invalid calculated start date for process '${process.name}' (Seq: ${process.sequence}).`;
+          console.error(errText, {
+            processDetails: process,
+            calculatedDate: processStartDate,
+            orderStartDate: parsedOrderStartDate,
+          });
+          setError(errText + " Please check process durations or order start date.");
+          setSaving(false);
+          return;
+        }
+        if (!isValidJsDate(processEndDate)) {
+          const errText = `Invalid calculated end date for process '${process.name}' (Seq: ${process.sequence}, Duration: ${process.duration}hrs).`;
+          console.error(errText, {
+            processDetails: process,
+            calculatedDate: processEndDate,
+            processCalcStartDate: processStartDate,
+          });
+          setError(errText + " Please check process durations.");
+          setSaving(false);
+          return;
+        }
+        if (processStartDate > processEndDate && currentProcessDuration > 0) {
+          // Allow 0 duration processes to have same start/end
+          const errText = `Calculated start date for process '${process.name}' (Seq: ${process.sequence}) is after its end date.`;
+          console.error(errText, {
+            processDetails: process,
+            calcStart: processStartDate,
+            calcEnd: processEndDate,
+          });
+          setError(errText + " Please check process durations.");
+          setSaving(false);
+          return;
+        }
 
         const processData: Record<string, any> = {
           workOrderId: orderId, // Use orderId for consistency

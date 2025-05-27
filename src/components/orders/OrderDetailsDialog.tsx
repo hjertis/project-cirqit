@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQuery as useTimeQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,9 @@ import PrintableWorkOrder from "./PrintableWorkOrder";
 import EditOrderDialog from "./EditOrderDialog";
 import LogFaultDialog from "../faults/LogFaultDialog";
 import LabelPrintDialog from "./LabelPrintDialog";
+import OrderTimeEntriesDialog from "../time/OrderTimeEntriesDialog";
 import { DEFAULT_PRODUCT_PROCESSES } from "../../constants/defaultProcessTemplate";
+import { TimeEntry } from "../../services/timeTrackingService";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -148,6 +150,7 @@ const OrderDetailsDialog = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [logFaultOpen, setLogFaultOpen] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [orderTimeDialogOpen, setOrderTimeDialogOpen] = useState(false);
 
   // React Query for order and processes
   const {
@@ -157,15 +160,16 @@ const OrderDetailsDialog = ({
     error: orderError,
     refetch,
   } = useQuery({
-    queryKey: ["order-details-dialog", orderId, open],
+    queryKey: ["order-details-dialog", orderId, open, isArchived],
     queryFn: async () => {
       if (!orderId || !open) throw new Error("Order ID is missing");
-      const orderDoc = await getDoc(doc(db, "orders", orderId));
+      // Fetch from correct collection based on isArchived
+      const orderDoc = await getDoc(doc(db, isArchived ? "archivedOrders" : "orders", orderId));
       if (!orderDoc.exists()) throw new Error("Order not found");
       const orderData = { id: orderDoc.id, ...orderDoc.data() } as FirebaseOrder;
       // 1. Try order-specific processes
       const processesQuery = query(
-        collection(db, "processes"),
+        collection(db, isArchived ? "archivedProcesses" : "processes"),
         where("workOrderId", "==", orderId)
       );
       const processesSnapshot = await getDocs(processesQuery);
@@ -208,6 +212,27 @@ const OrderDetailsDialog = ({
     },
     enabled: open && !!orderId,
   });
+
+  // Fetch all time entries for this order (using React Query for consistency)
+  const {
+    data: orderTimeEntries = [],
+    isLoading: orderTimeLoading,
+    isError: orderTimeError,
+    error: orderTimeErrorObj,
+  } = useTimeQuery({
+    queryKey: ["order-time-entries", order?.orderNumber],
+    queryFn: async () => {
+      if (!order?.orderNumber) return [];
+      // You may need to adjust this to your actual fetching logic
+      const snapshot = await getDocs(
+        query(collection(db, "timeEntries"), where("orderNumber", "==", order.orderNumber))
+      );
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TimeEntry[];
+    },
+    enabled: !!order?.orderNumber && orderTimeDialogOpen,
+  });
+
+  const orderTimeTotal = orderTimeEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
 
   useEffect(() => {
     if (orderDataBundle) {
@@ -592,6 +617,13 @@ const OrderDetailsDialog = ({
           <Button variant="outlined" onClick={() => setLabelDialogOpen(true)}>
             Print Label
           </Button>
+          <Button
+            variant="outlined"
+            onClick={() => setOrderTimeDialogOpen(true)}
+            startIcon={<AccessTimeIcon />}
+          >
+            Show All Time Entries
+          </Button>
           {/* Archive button: only show if not archived and not removed, and status is Finished/Done/Completed */}
           {!isArchived &&
             order.status !== "Removed" &&
@@ -652,6 +684,21 @@ const OrderDetailsDialog = ({
           open={labelDialogOpen}
           onClose={() => setLabelDialogOpen(false)}
           partNumber={order?.partNo || ""}
+        />
+        <OrderTimeEntriesDialog
+          open={orderTimeDialogOpen}
+          onClose={() => setOrderTimeDialogOpen(false)}
+          loading={orderTimeLoading}
+          error={
+            orderTimeError
+              ? orderTimeErrorObj instanceof Error
+                ? orderTimeErrorObj.message
+                : "Failed to load time entries"
+              : null
+          }
+          entries={orderTimeEntries}
+          total={orderTimeTotal}
+          orderNumber={order?.orderNumber || ""}
         />
       </>
     );
