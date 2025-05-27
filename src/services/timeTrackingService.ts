@@ -441,26 +441,22 @@ export const getGroupedTimeEntries = async (groupId: string): Promise<TimeEntry[
 
 export const stopGroupedTimeEntries = async (
   groupId: string,
-  notes?: string
+  notes?: string,
+  customEndTime?: Date // Add this parameter
 ): Promise<TimeEntry[]> => {
-  console.log(`[DEBUG] Stopping grouped time entries for groupId: ${groupId}`);
   const groupedEntries = await getGroupedTimeEntries(groupId);
   const activeEntries = groupedEntries.filter(
     entry => entry.status === "active" || entry.status === "paused"
   );
 
-  console.log(
-    `[DEBUG] Found ${activeEntries.length} active/paused entries to stop in group ${groupId}`
-  );
   const stoppedEntries: TimeEntry[] = [];
 
   for (const entry of activeEntries) {
-    console.log(`[DEBUG] Stopping entry ${entry.id} for order ${entry.orderNumber}`);
-    const stoppedEntry = await stopTimeEntry(entry.id!, notes);
+    // Pass the custom end time to stopTimeEntry
+    const stoppedEntry = await stopTimeEntry(entry.id!, notes, customEndTime);
     stoppedEntries.push(stoppedEntry);
   }
 
-  console.log(`[DEBUG] Successfully stopped ${stoppedEntries.length} entries for group ${groupId}`);
   return stoppedEntries;
 };
 

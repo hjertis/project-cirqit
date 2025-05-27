@@ -234,6 +234,15 @@ const TimeEntriesList = ({ orderId, reloadTrigger = 0 }: TimeEntriesListProps) =
                     color={getStatusColor(entry.status)}
                     size="small"
                   />
+                  {entry.groupId && (
+                    <Chip
+                      size="small"
+                      label="Group"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
                 </TableCell>
                 <TableCell sx={{ maxWidth: 200, overflowWrap: "break-word" }}>
                   {entry.notes || "-"}

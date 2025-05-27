@@ -57,6 +57,23 @@ import GroupedTimeEntriesSummary from "../components/time/GroupedTimeEntriesSumm
 import { Timestamp } from "firebase/firestore";
 import OrderTimeLookup from "../components/time/OrderTimeLookup";
 
+const getGroupDisplayInfo = (groupId: string) => {
+  // Extract timestamp from group ID for a shorter display
+  const parts = groupId.split("_");
+  const shortId = parts[1]?.substring(0, 6) || groupId.substring(0, 6);
+
+  // Generate consistent color based on group ID
+  const hash = groupId.split("").reduce((a, b) => a + b.charCodeAt(0), 0);
+  const hue = hash % 360;
+
+  return {
+    shortId,
+    backgroundColor: `hsl(${hue}, 65%, 85%)`,
+    borderColor: `hsl(${hue}, 65%, 60%)`,
+    textColor: `hsl(${hue}, 65%, 30%)`,
+  };
+};
+
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -496,6 +513,55 @@ const TimeDashboardPage = () => {
                             }
                             size="small"
                           />
+                          {entry.groupId &&
+                            (() => {
+                              const groupInfo = getGroupDisplayInfo(entry.groupId);
+                              const groupEntries = userTimeEntries.filter(
+                                e => e.groupId === entry.groupId
+                              );
+                              const groupOrders = [
+                                ...new Set(groupEntries.map(e => e.orderNumber)),
+                              ];
+
+                              return (
+                                <Tooltip
+                                  title={
+                                    <Box>
+                                      <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                                        Group: G-{groupInfo.shortId}
+                                      </Typography>
+                                      <br />
+                                      <Typography variant="caption">
+                                        Orders: {groupOrders.join(", ")}
+                                      </Typography>
+                                      <br />
+                                      <Typography variant="caption">
+                                        {groupEntries.length} entries in this group
+                                      </Typography>
+                                    </Box>
+                                  }
+                                  arrow
+                                >
+                                  <Chip
+                                    size="small"
+                                    label={`G-${groupInfo.shortId}`}
+                                    variant="outlined"
+                                    sx={{
+                                      ml: 1,
+                                      backgroundColor: groupInfo.backgroundColor,
+                                      borderColor: groupInfo.borderColor,
+                                      color: groupInfo.textColor,
+                                      fontWeight: "bold",
+                                      cursor: "help",
+                                      "&:hover": {
+                                        backgroundColor: groupInfo.borderColor,
+                                        color: "white",
+                                      },
+                                    }}
+                                  />
+                                </Tooltip>
+                              );
+                            })()}
                         </TableCell>
                         <TableCell sx={{ maxWidth: 200, overflowWrap: "break-word" }}>
                           {entry.notes || "-"}

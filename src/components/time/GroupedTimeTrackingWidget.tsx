@@ -35,6 +35,7 @@ import {
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../config/firebase";
 import { formatDuration } from "../../utils/helpers";
+import dayjs from "dayjs";
 
 interface OrderOption {
   id: string;
@@ -66,6 +67,12 @@ const GroupedTimeTrackingWidget = ({ onTimeEntryUpdated }: GroupedTimeTrackingWi
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [groupToStop, setGroupToStop] = useState<string | null>(null);
   const [stopNotes, setStopNotes] = useState("");
+
+  // Unclosed groups dialog
+  const [showUnclosedGroupDialog, setShowUnclosedGroupDialog] = useState(false);
+  const [unclosedGroups, setUnclosedGroups] = useState<ActiveGroup[]>([]);
+  const [unclosedEndTime, setUnclosedEndTime] = useState("17:00"); // Default end time
+  const [unclosedNotes, setUnclosedNotes] = useState("");
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -295,6 +302,77 @@ const GroupedTimeTrackingWidget = ({ onTimeEntryUpdated }: GroupedTimeTrackingWi
     setSuccess(null);
   };
 
+  // Check for unclosed groups
+  useEffect(() => {
+    const checkUnclosedGroups = async () => {
+      if (!currentUser) return;
+
+      try {
+        // Get all active groups for the user
+        const groups = await getActiveGroupedTimeEntries(currentUser.uid);
+
+        // Check if any group has entries from a previous day
+        const unclosedGroups = groups.filter(group => {
+          return group.entries.some(entry =>
+            dayjs(entry.startTime.toDate()).isBefore(dayjs(), "day")
+          );
+        });
+
+        if (unclosedGroups.length > 0) {
+          // Handle unclosed groups - could show a dialog similar to individual entries
+          setUnclosedGroups(unclosedGroups);
+          setShowUnclosedGroupDialog(true);
+        }
+      } catch (err) {
+        console.error("Error checking unclosed groups:", err);
+      }
+    };
+
+    checkUnclosedGroups();
+  }, [currentUser]);
+
+  const handleConfirmUnclosedGroups = async () => {
+    if (unclosedGroups.length === 0) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Process each unclosed group
+      for (const group of unclosedGroups) {
+        // Find the earliest start time in the group to determine the day
+        const earliestStartTime = Math.min(
+          ...group.entries.map(entry => entry.startTime.toDate().getTime())
+        );
+        const startDay = dayjs(earliestStartTime);
+
+        // Set end time to the chosen time on the start day
+        const [h, m] = unclosedEndTime.split(":").map(Number);
+        const endTime = startDay.hour(h).minute(m).second(0).toDate();
+
+        // Stop the entire group with the custom end time
+        await stopGroupedTimeEntries(group.groupId, unclosedNotes, endTime);
+      }
+
+      setUnclosedGroups([]);
+      setShowUnclosedGroupDialog(false);
+      setSuccess("Unclosed group sessions have been closed.");
+
+      // Refresh active groups
+      const groups = await getActiveGroupedTimeEntries(currentUser!.uid);
+      setActiveGroups(groups);
+
+      // Notify parent component
+      if (onTimeEntryUpdated) {
+        onTimeEntryUpdated();
+      }
+    } catch (err) {
+      setError("Failed to close unclosed group sessions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardContent>
@@ -472,6 +550,87 @@ const GroupedTimeTrackingWidget = ({ onTimeEntryUpdated }: GroupedTimeTrackingWi
             <Button onClick={() => setShowStopDialog(false)}>Cancel</Button>
             <Button onClick={confirmStopGroup} variant="contained" color="error">
               Stop Group
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Enhanced Unclosed Groups Dialog */}
+        <Dialog
+          open={showUnclosedGroupDialog}
+          onClose={() => setShowUnclosedGroupDialog(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Unclosed Group Sessions Found</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              You have {unclosedGroups.length} unclosed group session
+              {unclosedGroups.length > 1 ? "s" : ""}
+              with entries from previous days. Please set an end time to close them.
+            </Typography>
+
+            {/* Show unclosed groups */}
+            <Box sx={{ mb: 3 }}>
+              {unclosedGroups.map(group => {
+                const earliestStart = Math.min(
+                  ...group.entries.map(entry => entry.startTime.toDate().getTime())
+                );
+                const startDate = dayjs(earliestStart).format("MMM DD, YYYY");
+
+                return (
+                  <Card key={group.groupId} variant="outlined" sx={{ mb: 2 }}>
+                    <CardContent>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Group started on {startDate}
+                      </Typography>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                        {group.entries.map(entry => (
+                          <Chip
+                            key={entry.id}
+                            label={`${entry.orderNumber} (${dayjs(entry.startTime.toDate()).format("HH:mm")})`}
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                          />
+                        ))}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+
+            {/* End time picker */}
+            <TextField
+              fullWidth
+              label="End Time"
+              type="time"
+              value={unclosedEndTime}
+              onChange={e => setUnclosedEndTime(e.target.value)}
+              sx={{ mb: 2 }}
+              helperText="This end time will be applied to all unclosed groups"
+            />
+
+            {/* Notes for closing */}
+            <TextField
+              fullWidth
+              label="Closing Notes"
+              value={unclosedNotes}
+              onChange={e => setUnclosedNotes(e.target.value)}
+              multiline
+              rows={2}
+              placeholder="Optional notes for closing these sessions..."
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowUnclosedGroupDialog(false)}>Cancel</Button>
+            <Button
+              onClick={handleConfirmUnclosedGroups}
+              variant="contained"
+              color="primary"
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={20} /> : "Close All Groups"}
             </Button>
           </DialogActions>
         </Dialog>
